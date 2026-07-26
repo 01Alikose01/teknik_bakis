@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
 import '../widgets/stock_chart.dart';
 import '../widgets/indicator_chip.dart';
+import '../widgets/stock_quote_panel.dart';
 import '../services/portfolio_service.dart';
 import '../models/portfolio_model.dart';
 
@@ -188,6 +189,12 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
               ),
             ),
 
+            if (a != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: StockQuotePanel(asset: a, showDivider: false),
+              ),
+
             const SizedBox(height: 10),
 
             // ── Üst Arama Kutusu ──
@@ -296,7 +303,7 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                       const SizedBox(height: 16),
                       const Text('Göstergeler', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
                       const SizedBox(height: 8),
-                      Wrap(spacing: 8, runSpacing: 8, children: _indicators.map((ind) {
+                      Wrap(spacing: 8, runSpacing: 8, children: _indicators.map<Widget>((ind) {
                         final active = _activeIndicators.contains(ind['label']);
                         return IndicatorChip(
                           label: ind['label']!, iconType: ind['icon']!, isActive: active,
@@ -466,3 +473,4 @@ class _CatBtn extends StatelessWidget {
     );
   }
 }
+

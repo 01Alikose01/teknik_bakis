@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../models/asset_model.dart';
 import '../models/portfolio_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart'; // kBistStocks de buradan export ediliyor
 import '../services/notification_service.dart';
+import '../widgets/stock_quote_panel.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -13,16 +15,7 @@ class WatchlistScreen extends StatefulWidget {
 
 class _WatchlistScreenState extends State<WatchlistScreen> {
   List<WatchlistItem> _items = [];
-  // ignore: prefer_final_fields
-  Map<String, double> _currentPrices = {};
-  // ignore: prefer_final_fields
-  Map<String, double> _changePercents = {};
-  // ignore: prefer_final_fields
-  Map<String, double> _openPrices = {};
-  // ignore: prefer_final_fields
-  Map<String, double> _highPrices = {};
-  // ignore: prefer_final_fields
-  Map<String, double> _lowPrices = {};
+  Map<String, AssetModel> _assets = {};
   bool _loading = false;
 
   @override
@@ -43,13 +36,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       if (asset != null) {
         _checkAlert(item, asset.price);
         if (mounted) {
-          setState(() {
-            _currentPrices[item.symbol] = asset.price;
-            _changePercents[item.symbol] = asset.changePercent;
-            _openPrices[item.symbol] = asset.open;
-            _highPrices[item.symbol] = asset.high;
-            _lowPrices[item.symbol] = asset.low;
-          });
+          setState(() => _assets[item.symbol] = asset);
         }
       }
     }
@@ -93,7 +80,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     );
     // true = fiyat üstüne geçince (Satış Alarmı), false = altına düşünce (Alış Alarmı)
     bool above = item.alertAbove;
-    final currentPrice = _currentPrices[item.symbol] ?? 0.0;
+    final currentPrice = _assets[item.symbol]?.price ?? 0.0;
 
     showDialog(
       context: context,
@@ -452,9 +439,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                       itemCount: _items.length,
                       itemBuilder: (_, i) {
                         final item = _items[i];
-                        final current = _currentPrices[item.symbol];
-                        final change = _changePercents[item.symbol] ?? 0;
-                        final isPos = change >= 0;
+                        final asset = _assets[item.symbol];
 
                         return Dismissible(
                           key: Key(item.symbol),
@@ -538,43 +523,16 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        if (current == null && _loading)
+                                        if (asset == null && _loading)
                                           const SizedBox(
                                             width: 16, height: 16,
                                             child: CircularProgressIndicator(
                                                 strokeWidth: 2,
                                                 color: Color(0xFF34C759)),
                                           )
-                                        else if (current != null) ...[
-                                          Text(
-                                            '${current.toStringAsFixed(2)} ₺',
-                                            style: TextStyle(
-                                              color: isPos
-                                                  ? const Color(0xFF34C759)
-                                                  : const Color(0xFFFF3B30),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: isPos
-                                                  ? const Color(0xFF34C759)
-                                                  : const Color(0xFFFF3B30),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              '${isPos ? '+' : ''}${change.toStringAsFixed(2)}%',
-                                              style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ] else
+                                        else if (asset != null)
+                                          StockPriceHeader(asset: asset)
+                                        else
                                           const Text('—',
                                               style: TextStyle(color: Colors.grey)),
                                         const SizedBox(height: 6),
@@ -596,43 +554,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                 ),
 
                                 // ── Alt satır: Açılış / Yüksek / Düşük / Anlık ──
-                                if (current != null) ...[
+                                if (asset != null) ...[
                                   const SizedBox(height: 12),
-                                  const Divider(height: 1, color: Color(0xFFF2F2F7)),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      _PriceLabel(
-                                        label: 'Açılış',
-                                        value: (_openPrices[item.symbol] ?? 0.0) > 0.0
-                                            ? _openPrices[item.symbol]!.toStringAsFixed(2)
-                                            : current.toStringAsFixed(2),
-                                        color: Colors.black54,
-                                      ),
-                                      _PriceLabel(
-                                        label: 'Yüksek',
-                                        value: (_highPrices[item.symbol] ?? 0.0) > 0.0
-                                            ? _highPrices[item.symbol]!.toStringAsFixed(2)
-                                            : '—',
-                                        color: const Color(0xFF34C759),
-                                      ),
-                                      _PriceLabel(
-                                        label: 'Düşük',
-                                        value: (_lowPrices[item.symbol] ?? 0.0) > 0.0
-                                            ? _lowPrices[item.symbol]!.toStringAsFixed(2)
-                                            : '—',
-                                        color: const Color(0xFFFF3B30),
-                                      ),
-                                      _PriceLabel(
-                                        label: 'Anlık',
-                                        value: current.toStringAsFixed(2),
-                                        color: isPos
-                                            ? const Color(0xFF34C759)
-                                            : const Color(0xFFFF3B30),
-                                        isBold: true,
-                                      ),
-                                    ],
-                                  ),
+                                  StockQuotePanel(asset: asset),
                                 ],
                               ],
                             ),
@@ -672,8 +596,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
   Map<String, String>? _selected;
 
   // Seçilen hissenin fiyat bilgisi
-  double? _price;
-  double? _changePercent;
+  AssetModel? _previewAsset;
   bool _loadingPrice = false;
 
   @override
@@ -688,8 +611,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
       setState(() {
         _filtered = [];
         _selected = null;
-        _price = null;
-        _changePercent = null;
+        _previewAsset = null;
       });
       return;
     }
@@ -720,8 +642,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
       setState(() {
         _filtered = results;
         _selected = exact.first;
-        _price = null;
-        _changePercent = null;
+        _previewAsset = null;
       });
       _fetchPrice(q);
     } else {
@@ -729,8 +650,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
         _filtered = results;
         if (exact.isEmpty) {
           _selected = null;
-          _price = null;
-          _changePercent = null;
+          _previewAsset = null;
         }
       });
     }
@@ -742,8 +662,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
       _selected = stock;
       _ctrl.text = sym;
       _filtered = [];
-      _price = null;
-      _changePercent = null;
+      _previewAsset = null;
     });
     _fetchPrice(sym);
   }
@@ -755,24 +674,13 @@ class _AddStockDialogState extends State<_AddStockDialog> {
     if (!mounted) return;
     setState(() {
       _loadingPrice = false;
-      if (asset != null) {
-        _price = asset.price;
-        _changePercent = asset.changePercent;
-      } else {
-        _price = null;
-        _changePercent = null;
-      }
+      _previewAsset = asset;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isPos = (_changePercent ?? 0) >= 0;
-    final priceColor = _price == null
-        ? Colors.grey
-        : isPos
-            ? const Color(0xFF34C759)
-            : const Color(0xFFFF3B30);
+    final preview = _previewAsset;
 
     return AlertDialog(
       backgroundColor: Colors.white,
@@ -861,28 +769,8 @@ class _AddStockDialogState extends State<_AddStockDialog> {
                           color: Color(0xFF34C759),
                         ),
                       )
-                    else if (_price != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${_price!.toStringAsFixed(2)} ₺',
-                            style: TextStyle(
-                              color: priceColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${isPos ? '+' : ''}${_changePercent!.toStringAsFixed(2)}%',
-                            style: TextStyle(
-                              color: priceColor,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      )
+                    else if (preview != null)
+                      StockPriceHeader(asset: preview)
                     else
                       const Text('—',
                           style:
@@ -890,6 +778,10 @@ class _AddStockDialogState extends State<_AddStockDialog> {
                   ],
                 ),
               ),
+              if (preview != null) ...[
+                const SizedBox(height: 8),
+                StockQuotePanel(asset: preview, showDivider: false),
+              ],
             ],
 
             // ── Sonuç listesi ──
@@ -1012,52 +904,6 @@ class _AddStockDialogState extends State<_AddStockDialog> {
               style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// Fiyat etiket widget'ı (Açılış / Yüksek / Düşük / Anlık)
-// ─────────────────────────────────────────────
-
-class _PriceLabel extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final bool isBold;
-
-  const _PriceLabel({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.isBold = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

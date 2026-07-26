@@ -1,0 +1,31 @@
+name: Update IPO Feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  update-ipo-feed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate IPO feed
+        run: node tools/update_ipo_feed.mjs
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: update ipo feed'
+          file_pattern: data/ipo_feed.json

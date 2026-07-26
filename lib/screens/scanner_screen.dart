@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
+import '../widgets/stock_quote_panel.dart';
 import 'buy_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -20,9 +21,19 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   int _total = 0;
   String? _errorMsg;
   String _activePeriod = 'G';
+  _ScanScope _lastScanScope = _ScanScope.bist500;
 
-  static final List<String> _scanSymbols =
+  static final List<String> _bist500Symbols =
+      kBistStocks.map((e) => e['symbol']!).toList();
+
+  static final List<String> _bist100Symbols =
       kBistStocks.take(100).map((e) => e['symbol']!).toList();
+
+  static List<String> _symbolsForScope(_ScanScope scope) =>
+      scope == _ScanScope.bist100 ? _bist100Symbols : _bist500Symbols;
+
+  static String _scopeLabel(_ScanScope scope) =>
+      scope == _ScanScope.bist100 ? 'BIST 100' : 'BIST 500';
 
   static const List<_FilterDef> _trendFilters = [
     _FilterDef(
@@ -157,20 +168,101 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     });
   }
 
-  Future<void> _startScan(List<String> filterIds) async {
+  Future<void> _onFilterCardTap(_FilterDef def, bool isAiTab) async {
+    if (_scanning) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Tarama devam ediyor, lütfen bitmesini bekleyin.'),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (isAiTab) {
+      setState(() {
+        if (_selectedAiFilters.contains(def.id)) {
+          _selectedAiFilters.remove(def.id);
+        } else {
+          _selectedAiFilters.add(def.id);
+        }
+      });
+      return;
+    }
+
+    final result = await _showScanConfirmDialog(filters: [def]);
+    if (result != null && mounted) {
+      _startScan([def.id], scope: result.scope);
+    }
+  }
+
+  Future<void> _onMultiScanTap() async {
+    if (_scanning) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Tarama devam ediyor, lütfen bitmesini bekleyin.'),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final defs = _momentumFilters
+        .where((f) => _selectedAiFilters.contains(f.id))
+        .toList();
+    final result = await _showScanConfirmDialog(filters: defs);
+    if (result != null && mounted) {
+      _startScan(_selectedAiFilters.toList(), scope: result.scope);
+    }
+  }
+
+  Future<_ScanConfirmResult?> _showScanConfirmDialog(
+      {required List<_FilterDef> filters}) async {
+    if (filters.isEmpty) return null;
+
+    return showDialog<_ScanConfirmResult>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _ScanConfirmDialog(
+        filters: filters,
+        periodLabel: _periodLabel(_activePeriod),
+        bist500Count: _bist500Symbols.length,
+        bist100Count: _bist100Symbols.length,
+      ),
+    );
+  }
+
+  Future<void> _startScan(List<String> filterIds,
+      {required _ScanScope scope}) async {
     if (filterIds.isEmpty) return;
+    final symbols = _symbolsForScope(scope);
     setState(() {
       _activeFilters = filterIds;
+      _lastScanScope = scope;
       _scanning = true;
       _results = [];
       _progress = 0;
-      _total = _scanSymbols.length;
+      _total = symbols.length;
       _errorMsg = null;
     });
     try {
       final hasMa200 = filterIds.contains('MA50 = MA200');
       final assets = await StockService.fetchMultiple(
-        _scanSymbols, period: hasMa200 ? '1y' : '6mo',
+        symbols, period: hasMa200 ? '1y' : '6mo',
         onProgress: (done, total) {
           if (mounted) setState(() => _progress = done);
         },
@@ -435,25 +527,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           ),
           elevation: 0,
         ),
-        onPressed: () {
-          if (_scanning) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text('Tarama devam ediyor, lütfen bitmesini bekleyin.'),
-                  ],
-                ),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 2),
-              ),
-            );
-            return;
-          }
-          _startScan(_selectedAiFilters.toList());
-        },
+        onPressed: _onMultiScanTap,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -496,35 +570,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
         return _FilterCard(
           def: def,
           isSelected: isSelected,
-          onTap: () {
-            if (_scanning) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Tarama devam ediyor, lütfen bitmesini bekleyin.'),
-                    ],
-                  ),
-                  backgroundColor: Colors.orange,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              return;
-            }
-            if (isAiTab) {
-              setState(() {
-                if (_selectedAiFilters.contains(def.id)) {
-                  _selectedAiFilters.remove(def.id);
-                } else {
-                  _selectedAiFilters.add(def.id);
-                }
-              });
-            } else {
-              _startScan([def.id]);
-            }
-          },
+          onTap: () => _onFilterCardTap(def, isAiTab),
         );
       },
     );
@@ -538,7 +584,8 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
-              Text('${_results.length} hisse bulundu',
+              Text(
+                  '${_results.length} hisse bulundu · ${_scopeLabel(_lastScanScope)}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12)),
               const Spacer(),
               GestureDetector(
@@ -602,12 +649,386 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 }
 
+enum _ScanScope { bist500, bist100 }
+
+class _ScanConfirmResult {
+  final _ScanScope scope;
+  const _ScanConfirmResult({required this.scope});
+}
+
 class _FilterDef {
   final String id, label, subtitle;
   final Color color;
   final IconData icon;
   const _FilterDef({required this.id, required this.label, required this.subtitle,
       required this.color, required this.icon});
+
+  String get cleanLabel =>
+      label.replaceAll(RegExp(r'[🔨➕🌟🐂🐻]\s*'), '').trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tarama Onay Diyaloğu
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ScanConfirmDialog extends StatefulWidget {
+  final List<_FilterDef> filters;
+  final String periodLabel;
+  final int bist500Count;
+  final int bist100Count;
+
+  const _ScanConfirmDialog({
+    required this.filters,
+    required this.periodLabel,
+    required this.bist500Count,
+    required this.bist100Count,
+  });
+
+  @override
+  State<_ScanConfirmDialog> createState() => _ScanConfirmDialogState();
+}
+
+class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
+  _ScanScope _scope = _ScanScope.bist500;
+
+  @override
+  Widget build(BuildContext context) {
+    final filters = widget.filters;
+    final primary = filters.first;
+    final isMulti = filters.length > 1;
+    final accent = isMulti ? const Color(0xFF34C759) : primary.color;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Üst renk şeridi
+            Container(
+              height: 5,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20)),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Column(
+                children: [
+                  // İkon — kartla aynı stil
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      isMulti ? Icons.bolt : primary.icon,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Başlık
+                  Text(
+                    isMulti
+                        ? '${filters.length} Algoritma Seçildi'
+                        : '${primary.cleanLabel} Algoritmasını\nSeçtiniz',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Açıklama
+                  Text(
+                    isMulti
+                        ? 'Seçili algoritmalar birlikte uygulanarak tarama yapılacak.'
+                        : primary.subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black54,
+                      height: 1.5,
+                    ),
+                    maxLines: isMulti ? 2 : 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  if (isMulti) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: filters
+                          .map((f) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: f.color.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: f.color.withValues(alpha: 0.35)),
+                                ),
+                                child: Text(
+                                  f.cleanLabel,
+                                  style: TextStyle(
+                                    color: f.color,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // Tarama kapsamı seçimi
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Tarama Kapsamı',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ScopeOption(
+                          title: 'BIST 500 Standart Tarama',
+                          selected: _scope == _ScanScope.bist500,
+                          accent: accent,
+                          onTap: () =>
+                              setState(() => _scope = _ScanScope.bist500),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ScopeOption(
+                          title: 'BIST 100 Hızlı Tarama',
+                          selected: _scope == _ScanScope.bist100,
+                          accent: accent,
+                          onTap: () =>
+                              setState(() => _scope = _ScanScope.bist100),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Bilgi satırları
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F2F7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _ConfirmInfoRow(
+                          icon: Icons.access_time,
+                          iconColor: const Color(0xFF34C759),
+                          label: 'Periyot',
+                          value: widget.periodLabel,
+                        ),
+                      ],
+                    ),
+                  ),
+
+
+                  const SizedBox(height: 18),
+
+                  // Soru
+                  Text(
+                    'Taramayı başlatmak ister misiniz?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Butonlar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.grey[700],
+                        side: BorderSide(color: Colors.grey[300]!),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Hayır',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(
+                        context,
+                        _ScanConfirmResult(scope: _scope),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Evet, Başlat',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScopeOption extends StatelessWidget {
+  final String title;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _ScopeOption({
+    required this.title,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? accent.withValues(alpha: 0.10)
+              : const Color(0xFFF2F2F7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? accent : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: selected ? accent : Colors.black87,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(height: 4),
+              Icon(Icons.check_circle, size: 14, color: accent),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfirmInfoRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  const _ConfirmInfoRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        const Spacer(),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
 }
 
 class _FilterCard extends StatelessWidget {
@@ -766,11 +1187,7 @@ class _ResultCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: Text(asset.symbol,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.black87))),
-              Text('${asset.price.toStringAsFixed(2)} ₺',
-                  style: TextStyle(
-                    color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30),
-                    fontWeight: FontWeight.bold, fontSize: 16,
-                  )),
+              StockPriceHeader(asset: asset),
             ],
           ),
           if (asset.name != asset.symbol)
@@ -779,6 +1196,8 @@ class _ResultCard extends StatelessWidget {
               child: Text(asset.name, style: const TextStyle(color: Colors.grey, fontSize: 11),
                   overflow: TextOverflow.ellipsis),
             ),
+          const SizedBox(height: 10),
+          StockQuotePanel(asset: asset),
           const SizedBox(height: 10),
           const Divider(height: 1),
           const SizedBox(height: 10),
@@ -838,17 +1257,6 @@ class _ResultCard extends StatelessWidget {
               ],
             ),
           ],
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('${isPos ? '+' : ''}${asset.changePercent.toStringAsFixed(2)}%',
-                  style: TextStyle(
-                    color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30),
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                  )),
-            ),
-          ),
         ],
       ),
     ),  // GestureDetector kapanışı

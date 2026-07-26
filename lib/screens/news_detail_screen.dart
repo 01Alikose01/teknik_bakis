@@ -134,7 +134,7 @@ class _KapDetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = KapAiService();
     final rawText = '$title\n$summary';
-    final analysis = service.analyze(rawText);
+    final analysis = service.analyze(rawText, symbol: source);
     final effect = analysis.effect;
     final effectColor = effect == KapEffect.positive
         ? const Color(0xFF34C759)

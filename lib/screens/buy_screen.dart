@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../models/portfolio_model.dart';
+import '../widgets/stock_quote_panel.dart';
 import '../services/portfolio_service.dart';
 
 class BuyScreen extends StatefulWidget {
@@ -147,6 +148,7 @@ class _BuyScreenState extends State<BuyScreen> {
                           valueColor: Colors.black87),
                     ],
                   ),
+                  StockQuotePanel(asset: asset, showDivider: true),
                 ],
               ),
             ),
@@ -322,3 +324,4 @@ class _FieldLabel extends StatelessWidget {
     return Text(text, style: const TextStyle(color: Colors.grey, fontSize: 13));
   }
 }
+

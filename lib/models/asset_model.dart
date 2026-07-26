@@ -3,6 +3,7 @@ class AssetModel {
   final String name;
   double price;
   double changePercent;
+  double previousClose;
   double open;
   double high;
   double low;
@@ -17,6 +18,7 @@ class AssetModel {
     required this.name,
     this.price = 0,
     this.changePercent = 0,
+    this.previousClose = 0,
     this.open = 0,
     this.high = 0,
     this.low = 0,

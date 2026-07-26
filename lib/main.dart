@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/analiz_screen.dart';
 import 'screens/news_screen.dart';
+import 'screens/ipo_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/portfolio_service.dart';
@@ -46,7 +47,9 @@ class TeknikBakisApp extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
         ),
       ),
-      home: SplashScreen(nextScreen: MainNavigation(key: MainNavigation.navKey)),
+      home: SplashScreen(
+        nextScreen: MainNavigation(key: MainNavigation.navKey),
+      ),
     );
   }
 }
@@ -71,7 +74,7 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => MainNavigationState();
 }
 
-  /// Public state — GlobalKey kullanımı için public olmalı
+/// Public state — GlobalKey kullanımı için public olmalı
 class MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   String _analizSymbol = 'THYAO';
@@ -100,6 +103,7 @@ class MainNavigationState extends State<MainNavigation> {
             initialName: _analizName,
           ),
           const NewsScreen(),
+          const IpoScreen(),
           const SettingsScreen(),
         ],
       ),
@@ -112,16 +116,17 @@ class MainNavigationState extends State<MainNavigation> {
         type: BottomNavigationBarType.fixed,
         showSelectedLabels: true,
         showUnselectedLabels: true,
-        selectedLabelStyle:
-            const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        selectedLabelStyle: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         elevation: 8,
         items: [
           BottomNavigationBarItem(
             icon: const Icon(Icons.home_outlined),
             activeIcon: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF34C759).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -133,8 +138,7 @@ class MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.search_outlined),
             activeIcon: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF34C759).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
@@ -152,6 +156,11 @@ class MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.article_outlined),
             activeIcon: Icon(Icons.article, color: Color(0xFF34C759)),
             label: 'Haberler',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.rocket_launch_outlined),
+            activeIcon: Icon(Icons.rocket_launch, color: Color(0xFF34C759)),
+            label: 'Halka Arz',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),

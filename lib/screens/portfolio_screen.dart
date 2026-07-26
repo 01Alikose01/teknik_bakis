@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/asset_model.dart';
+import '../widgets/stock_quote_panel.dart';
 import '../models/portfolio_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
@@ -47,7 +49,7 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   List<_StockGroup> _groups = [];
-  Map<String, double> _currentPrices = {};
+  Map<String, AssetModel> _assets = {};
   bool _loading = false;
 
   @override
@@ -72,11 +74,11 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     )).toList();
 
     // Fiyatları çek
-    final prices = <String, double>{};
+    final assets = <String, AssetModel>{};
     for (final g in groups) {
       final asset = await StockService.fetchStock(g.symbol, period: '5d');
-      if (asset != null) prices[g.symbol] = asset.price;
-      if (mounted) setState(() => _currentPrices = Map.from(prices));
+      if (asset != null) assets[g.symbol] = asset;
+      if (mounted) setState(() => _assets = Map.from(assets));
     }
 
     if (mounted) setState(() { _groups = groups; _loading = false; });
@@ -87,7 +89,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       _groups.fold(0.0, (s, g) => s + g.totalCost);
   double get _totalValue =>
       _groups.fold(0.0, (s, g) =>
-          s + g.totalValue(_currentPrices[g.symbol] ?? g.avgPrice));
+          s + g.totalValue(_assets[g.symbol]?.price ?? g.avgPrice));
   double get _totalProfit => _totalValue - _totalCost;
   double get _totalProfitPct =>
       _totalCost > 0 ? (_totalProfit / _totalCost) * 100 : 0;
@@ -220,7 +222,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               sliver: SliverList(delegate: SliverChildBuilderDelegate(
                 (_, i) {
                   final g = _groups[i];
-                  final current = _currentPrices[g.symbol] ?? g.avgPrice;
+                  final asset = _assets[g.symbol];
+                  final current = asset?.price ?? g.avgPrice;
                   final profit = g.profit(current);
                   final profitPct = g.profitPercent(current);
                   final isPos = profit >= 0;
@@ -270,24 +273,35 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                           )),
                           Column(crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                            Text('${current.toStringAsFixed(2)} ₺',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16, color: Colors.black87)),
+                            if (asset != null)
+                              StockPriceHeader(asset: asset)
+                            else
+                              Text('${current.toStringAsFixed(2)} ₺',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.black87)),
+                            const SizedBox(height: 4),
                             Container(
-                              margin: const EdgeInsets.only(top: 2),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                  color: chgColor,
-                                  borderRadius: BorderRadius.circular(5)),
+                                  color: chgColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                      color: chgColor.withValues(alpha: 0.35))),
                               child: Text(
-                                '${isPos ? '+' : ''}${profitPct.toStringAsFixed(2)}%',
-                                style: const TextStyle(color: Colors.white,
-                                    fontSize: 11, fontWeight: FontWeight.bold)),
+                                'Portföy ${isPos ? '+' : ''}${profitPct.toStringAsFixed(2)}%',
+                                style: TextStyle(
+                                    color: chgColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ]),
                         ]),
+
+                        if (asset != null) StockQuotePanel(asset: asset),
 
                         const SizedBox(height: 12),
                         const Divider(height: 1),
@@ -726,8 +740,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
 
   List<Map<String, String>> _filtered = [];
   Map<String, String>? _selected;
-  double? _currentPrice;
-  double? _currentChange;
+  AssetModel? _previewAsset;
   bool _loadingPrice = false;
   DateTime _selectedDate = DateTime.now();
 
@@ -774,7 +787,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
       _selected = stock;
       _searchCtrl.text = stock['symbol']!;
       _filtered = [];
-      _currentPrice = null;
+      _previewAsset = null;
     });
     _fetchPrice(stock['symbol']!);
   }
@@ -785,12 +798,9 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
     if (!mounted) return;
     setState(() {
       _loadingPrice = false;
-      if (asset != null) {
-        _currentPrice  = asset.price;
-        _currentChange = asset.changePercent;
-        if (_priceCtrl.text.isEmpty) {
-          _priceCtrl.text = asset.price.toStringAsFixed(2);
-        }
+      _previewAsset = asset;
+      if (asset != null && _priceCtrl.text.isEmpty) {
+        _priceCtrl.text = asset.price.toStringAsFixed(2);
       }
     });
   }
@@ -820,7 +830,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
   double get _buyPrice  => double.tryParse(_priceCtrl.text.replaceAll(',', '.')) ?? 0;
   double get _qty       => double.tryParse(_qtyCtrl.text.replaceAll(',', '.')) ?? 0;
   double get _totalCost => _buyPrice * _qty;
-  double get _totalValue => (_currentPrice ?? _buyPrice) * _qty;
+  double get _totalValue => (_previewAsset?.price ?? _buyPrice) * _qty;
   double get _profit    => _totalValue - _totalCost;
   double get _profitPct => _totalCost > 0 ? (_profit / _totalCost) * 100 : 0;
   bool get _canAdd => _selected != null && _buyPrice > 0 && _qty > 0;
@@ -829,8 +839,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
   Widget build(BuildContext context) {
     final isPos = _profit >= 0;
     final profitColor = isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
-    final cpColor = (_currentChange ?? 0) >= 0
-        ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
+    final preview = _previewAsset;
 
     return Dialog(
       backgroundColor: Colors.white,
@@ -941,16 +950,11 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                   const SizedBox(width: 16, height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2,
                           color: Color(0xFF34C759)))
-                else if (_currentPrice != null)
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text('${_currentPrice!.toStringAsFixed(2)} ₺',
-                        style: TextStyle(color: cpColor,
-                            fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('${(_currentChange ?? 0) >= 0 ? '+' : ''}${(_currentChange ?? 0).toStringAsFixed(2)}%',
-                        style: TextStyle(color: cpColor, fontSize: 11)),
-                  ]),
+                else if (preview != null)
+                  StockPriceHeader(asset: preview),
               ]),
             ),
+            if (preview != null) StockQuotePanel(asset: preview),
           ],
 
           const SizedBox(height: 14),
@@ -1009,10 +1013,10 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                     '${_totalCost.toStringAsFixed(2)} ₺', Colors.black87),
                 const SizedBox(height: 6),
                 _CalcRow('Anlık Değer',
-                    _currentPrice != null
+                    _previewAsset?.price != null
                         ? '${_totalValue.toStringAsFixed(2)} ₺' : '—',
                     Colors.black87),
-                if (_currentPrice != null) ...[
+                if (_previewAsset?.price != null) ...[
                   const Divider(height: 14),
                   _CalcRow('Kar / Zarar (₺)',
                       '${isPos ? '+' : ''}${_profit.toStringAsFixed(2)} ₺',

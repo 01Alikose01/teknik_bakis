@@ -113,27 +113,195 @@ class KapAiDetailScreen extends StatelessWidget {
                     height: 1.5)),
           ),
 
+          // ── AI Güveni ──
+          _SectionCard(
+            emoji: '🎯',
+            title: 'AI Güveni',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '%${analysis.confidence}',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: analysis.confidence >= 80
+                            ? const Color(0xFF34C759)
+                            : analysis.confidence >= 50
+                                ? const Color(0xFFFF9500)
+                                : const Color(0xFFFF3B30),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (analysis.confidence >= 80
+                                ? const Color(0xFF34C759)
+                                : analysis.confidence >= 50
+                                    ? const Color(0xFFFF9500)
+                                    : const Color(0xFFFF3B30))
+                            .withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(analysis.confidenceLabel,
+                          style: TextStyle(
+                              color: analysis.confidence >= 80
+                                  ? const Color(0xFF34C759)
+                                  : analysis.confidence >= 50
+                                      ? const Color(0xFFFF9500)
+                                      : const Color(0xFFFF3B30),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: analysis.confidence / 100,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation(
+                      analysis.confidence >= 80
+                          ? const Color(0xFF34C759)
+                          : analysis.confidence >= 50
+                              ? const Color(0xFFFF9500)
+                              : const Color(0xFFFF3B30),
+                    ),
+                    minHeight: 6,
+                  ),
+                ),
+                if (analysis.confidence < 50) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sınıflandırma belirsiz — orijinal KAP metnini kontrol edin.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Çelişki Uyarısı ──
+          if (analysis.hasContradiction)
+            _SectionCard(
+              emoji: '⚡',
+              title: 'Çelişki Tespiti',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9500).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: const Color(0xFFFF9500).withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  analysis.contradiction.message ?? 'Metin içinde çelişkili sinyaller var.',
+                  style: const TextStyle(
+                      fontSize: 13, color: Colors.black87, height: 1.4),
+                ),
+              ),
+            ),
+
+          // ── Çıkarılan Veriler ──
+          if (analysis.entities.hasAny)
+            _SectionCard(
+              emoji: '🔍',
+              title: 'Çıkarılan Veriler',
+              child: Column(
+                children: [
+                  if (analysis.entities.amount != null)
+                    _InfoRow(
+                      label: 'Tutar',
+                      value: analysis.entities.amount!,
+                    ),
+                  if (analysis.entities.dates.isNotEmpty) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Tarih',
+                      value: analysis.entities.dates.join(', '),
+                    ),
+                  ],
+                  if (analysis.entities.percentages.isNotEmpty) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Oran',
+                      value: analysis.entities.percentages.join(', '),
+                    ),
+                  ],
+                  if (analysis.entities.symbols.isNotEmpty) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Hisse',
+                      value: analysis.entities.symbols.join(', '),
+                    ),
+                  ],
+                  if (analysis.entities.institution != null) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Kurum',
+                      value: analysis.entities.institution!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
           // ── Haber Türü ──
           _SectionCard(
             emoji: '🏷',
             title: 'Haber Türü',
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: effectColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: effectColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(analysis.categoryName,
-                      style: TextStyle(
-                          color: effectColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: effectColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: effectColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(analysis.categoryName,
+                          style: TextStyle(
+                              color: effectColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                    ),
+                  ],
                 ),
+                if (analysis.secondaryCategories.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text('Ek kategoriler',
+                      style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: analysis.secondaryCategories
+                        .map((c) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Text(c.categoryName,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.black54)),
+                            ))
+                        .toList(),
+                  ),
+                ],
               ],
             ),
           ),

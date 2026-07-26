@@ -3,6 +3,7 @@ import '../models/asset_model.dart';
 import '../services/stock_service.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
+import '../widgets/stock_quote_panel.dart';
 import '../main.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,9 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<String> _selectedItems = ['bist100', 'bist30', 'goldgram', 'THYAO', 'GARAN'];
 
-  // Tüm BIST hisselerini çekmek yerine ilk 100'ü kullan (performans)
+  // Anasayfa piyasa listesinde tüm hisseleri baz al
   static final List<String> _topSymbols =
-      kBistStocks.take(100).map((e) => e['symbol']!).toList();
+      kBistStocks.map((e) => e['symbol']!).toList();
 
   // Yüklenen tüm piyasa verisi (filtreleme için saklanır)
   List<AssetModel> _allMarketAssets = [];
@@ -177,41 +178,92 @@ class _HomeScreenState extends State<HomeScreen> {
     final cards = <Widget>[];
     bool first = true;
     void add(Widget w) {
-      if (!first) cards.add(const SizedBox(width: 10));
+      if (!first) cards.add(const SizedBox(width: 8));
       cards.add(w); first = false;
     }
-    String chg(AssetModel a) =>
-        '${a.changePercent >= 0 ? '+' : ''}${a.changePercent.toStringAsFixed(2)}%';
 
     for (final id in _selectedItems) {
       switch (id) {
         case 'bist100':
-          if (_bist100 != null) { add(_IndexCard(symbol: 'BIST 100',
-              value: _bist100!.price.toStringAsFixed(2), change: chg(_bist100!),
-              isPos: _bist100!.changePercent >= 0, badge: 'B100', badgeColor: const Color(0xFF0066CC))); }
+          if (_bist100 != null) {
+            add(_QuoteQuickCard(
+              asset: _bist100!,
+              title: 'BIST 100',
+              priceText: _bist100!.price.toStringAsFixed(2),
+              digits: 2,
+              badge: 'B100',
+              badgeColor: const Color(0xFF0066CC),
+            ));
+          }
         case 'bist30':
-          if (_bist30 != null) { add(_IndexCard(symbol: 'BIST 30',
-              value: _bist30!.price.toStringAsFixed(2), change: chg(_bist30!),
-              isPos: _bist30!.changePercent >= 0, badge: 'B30', badgeColor: const Color(0xFF0066CC))); }
+          if (_bist30 != null) {
+            add(_QuoteQuickCard(
+              asset: _bist30!,
+              title: 'BIST 30',
+              priceText: _bist30!.price.toStringAsFixed(2),
+              digits: 2,
+              badge: 'B30',
+              badgeColor: const Color(0xFF0066CC),
+            ));
+          }
         case 'goldgram':
-          if (_goldGram != null) { add(_IndexCard(symbol: 'Gram Altın',
-              value: '${_goldGram!.price.toStringAsFixed(2)} ₺', change: chg(_goldGram!),
-              isPos: _goldGram!.changePercent >= 0, badge: 'AU', badgeColor: const Color(0xFFD4AF37))); }
+          if (_goldGram != null) {
+            add(_QuoteQuickCard(
+              asset: _goldGram!,
+              title: 'Gram Altın',
+              priceText: '${_goldGram!.price.toStringAsFixed(2)} ₺',
+              digits: 2,
+              badge: 'AU',
+              badgeColor: const Color(0xFFD4AF37),
+            ));
+          }
         case 'silvergram':
-          if (_silverGram != null) { add(_IndexCard(symbol: 'Gram Gümüş',
-              value: '${_silverGram!.price.toStringAsFixed(2)} ₺', change: chg(_silverGram!),
-              isPos: _silverGram!.changePercent >= 0, badge: 'AG', badgeColor: const Color(0xFF9E9E9E))); }
+          if (_silverGram != null) {
+            add(_QuoteQuickCard(
+              asset: _silverGram!,
+              title: 'Gram Gümüş',
+              priceText: '${_silverGram!.price.toStringAsFixed(2)} ₺',
+              digits: 2,
+              badge: 'AG',
+              badgeColor: const Color(0xFF9E9E9E),
+            ));
+          }
         case 'dollar':
-          if (_dollar != null) { add(_IndexCard(symbol: 'Dolar/TL',
-              value: _dollar!.price.toStringAsFixed(4), change: chg(_dollar!),
-              isPos: _dollar!.changePercent >= 0, badge: r'$', badgeColor: const Color(0xFF2E7D32))); }
+          if (_dollar != null) {
+            add(_QuoteQuickCard(
+              asset: _dollar!,
+              title: 'Dolar/TL',
+              priceText: _dollar!.price.toStringAsFixed(4),
+              digits: 4,
+              badge: r'$',
+              badgeColor: const Color(0xFF2E7D32),
+            ));
+          }
         case 'euro':
-          if (_euro != null) { add(_IndexCard(symbol: 'Euro/TL',
-              value: _euro!.price.toStringAsFixed(4), change: chg(_euro!),
-              isPos: _euro!.changePercent >= 0, badge: '€', badgeColor: const Color(0xFF1565C0))); }
+          if (_euro != null) {
+            add(_QuoteQuickCard(
+              asset: _euro!,
+              title: 'Euro/TL',
+              priceText: _euro!.price.toStringAsFixed(4),
+              digits: 4,
+              badge: '€',
+              badgeColor: const Color(0xFF1565C0),
+            ));
+          }
         default:
           final a = _quickPrices.where((x) => x.symbol == id).firstOrNull;
-          if (a != null) { add(_StockQuickCard(asset: a)); }
+          if (a != null) {
+            add(_QuoteQuickCard(
+              asset: a,
+              title: a.symbol,
+              priceText: '${a.price.toStringAsFixed(2)} ₺',
+              digits: 2,
+              badge: a.symbol.length > 4 ? a.symbol.substring(0, 4) : a.symbol,
+              badgeColor: a.changePercent >= 0
+                  ? const Color(0xFF34C759)
+                  : const Color(0xFFFF3B30),
+            ));
+          }
       }
     }
     return cards;
@@ -226,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
       {'id': 'dollar',     'label': 'Dolar/TL',  'icon': r'$'},
       {'id': 'euro',       'label': 'Euro/TL',   'icon': '€'},
     ];
-    final bistOptions = kBistStocks.take(30).toList();
+    String query = '';
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
@@ -234,11 +286,28 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => DraggableScrollableSheet(
-          expand: false, initialChildSize: 0.65, maxChildSize: 0.9,
-          builder: (_, ctrl) => Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        builder: (ctx, setSheet) {
+          List<Map<String, String>> filteredStocks() {
+            if (query.trim().isEmpty) return kBistStocks;
+            final q = query.trim().toUpperCase();
+            final bySymbol = kBistStocks
+                .where((s) => s['symbol']!.startsWith(q))
+                .toList();
+            final byName = kBistStocks
+                .where((s) =>
+                    !s['symbol']!.startsWith(q) &&
+                    s['name']!.toUpperCase().contains(q))
+                .toList();
+            return [...bySymbol, ...byName];
+          }
+
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.65,
+            maxChildSize: 0.9,
+            builder: (_, ctrl) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Anlık Fiyatları Düzenle',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
@@ -286,12 +355,28 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text('BIST Hisseleri',
                   style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
+              TextField(
+                onChanged: (value) => setSheet(() => query = value),
+                decoration: InputDecoration(
+                  hintText: 'Hisse ara...',
+                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 18),
+                  filled: true,
+                  fillColor: const Color(0xFFF2F2F7),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: ListView.builder(
                   controller: ctrl,
-                  itemCount: bistOptions.length,
+                  itemCount: filteredStocks().length,
                   itemBuilder: (_, i) {
-                    final s = bistOptions[i];
+                    final s = filteredStocks()[i];
                     final sel = _selectedItems.contains(s['symbol']);
                     return ListTile(
                       dense: true, contentPadding: EdgeInsets.zero,
@@ -341,9 +426,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-            ]),
-          ),
-        ),
+              ]),
+            ),
+          );
+        },
       ),
     );
   }
@@ -482,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Fiyat kartları
             SliverToBoxAdapter(child: SizedBox(
-              height: 120,
+              height: 132,
               child: _loadingQuick
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFF34C759)))
                   : ListView(
@@ -499,10 +585,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(children: [
                 _TabChip(label: 'En Çok Artan', isActive: _marketTab == 0,
                     onTap: () { setState(() => _marketTab = 0); _applyMarketFilter(); }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _TabChip(label: 'En Çok Azalan', isActive: _marketTab == 1,
                     onTap: () { setState(() => _marketTab = 1); _applyMarketFilter(); }),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _TabChip(label: 'Hacim Liderleri', isActive: _marketTab == 2,
                     onTap: () { setState(() => _marketTab = 2); _applyMarketFilter(); }),
               ]),
@@ -525,63 +611,63 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => MainNavigation.goToAnaliz(a.symbol, a.name),
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [BoxShadow(
                           color: Colors.black.withValues(alpha: 0.04), blurRadius: 5)],
                     ),
-                    child: Row(children: [
-                      // Sıra numarası
-                      Container(
-                        width: 28, height: 28,
-                        decoration: BoxDecoration(
-                          color: chgColor.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text('${i + 1}',
-                              style: TextStyle(color: chgColor,
-                                  fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Sembol + isim
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(a.symbol, style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                          Text(a.name, style: const TextStyle(color: Colors.grey, fontSize: 11),
-                              overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          Text('Hacim: ${_fmtVol(a.avgVolume)}',
-                              style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                        ],
-                      )),
-                      // Fiyat + değişim rozeti
-                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                        Text('${a.price.toStringAsFixed(2)} ₺',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                        const SizedBox(height: 4),
+                    child: Row(
+                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          width: 26,
+                          height: 26,
                           decoration: BoxDecoration(
-                            color: chgColor,
-                            borderRadius: BorderRadius.circular(6),
+                            color: chgColor.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            '${isPos ? '+' : ''}${a.changePercent.toStringAsFixed(2)}%',
-                            style: const TextStyle(color: Colors.white,
-                                fontWeight: FontWeight.bold, fontSize: 12),
+                          child: Center(
+                            child: Text('${i + 1}',
+                                style: TextStyle(
+                                  color: chgColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                )),
                           ),
                         ),
-                      ]),
-                      const SizedBox(width: 6),
-                      Icon(Icons.chevron_right, color: Colors.grey[300], size: 18),
-                    ]),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(a.symbol, style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87)),
+                              Text(a.name, style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                  overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${a.price.toStringAsFixed(2)} ₺',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                )),
+                            const SizedBox(height: 4),
+                            StockPriceChangeBadge(asset: a, fontSize: 10),
+                          ],
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(Icons.chevron_right, color: Colors.grey[300], size: 16),
+                      ],
+                    ),
                   ),
                 );
               }, childCount: _marketList.length)),
@@ -593,12 +679,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _fmtVol(double v) {
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(1)}B';
-    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)}M';
-    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
-  }
 }
 
 class _QuickCard extends StatelessWidget {
@@ -644,65 +724,60 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-class _IndexCard extends StatelessWidget {
-  final String symbol, value, change, badge;
-  final bool isPos;
-  final Color badgeColor;
-  const _IndexCard({required this.symbol, required this.value, required this.change,
-      required this.isPos, required this.badge, required this.badgeColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 120, padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
-          child: Center(child: Text(badge, style: const TextStyle(
-              color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
-        ),
-        const SizedBox(height: 6),
-        Text(symbol, style: const TextStyle(color: Colors.grey, fontSize: 11), overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(
-            color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30),
-            fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
-        Text(change, style: TextStyle(
-            color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30), fontSize: 11)),
-      ]),
-    );
-  }
-}
-
-class _StockQuickCard extends StatelessWidget {
+class _QuoteQuickCard extends StatelessWidget {
   final AssetModel asset;
-  const _StockQuickCard({required this.asset});
+  final String title;
+  final String priceText;
+  final int digits;
+  final String badge;
+  final Color badgeColor;
+  const _QuoteQuickCard({
+    required this.asset,
+    required this.title,
+    required this.priceText,
+    required this.digits,
+    required this.badge,
+    required this.badgeColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isPos = asset.changePercent >= 0;
-    final shortSym = asset.symbol.length > 4 ? asset.symbol.substring(0, 4) : asset.symbol;
+    final chgColor =
+        isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
     return Container(
-      width: 120, padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      width: 104,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(
-              color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30), shape: BoxShape.circle),
-          child: Center(child: Text(shortSym, style: const TextStyle(
-              color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold))),
+        Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+              child: Center(child: Text(badge, style: const TextStyle(
+                  color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold))),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(title,
+                  style: const TextStyle(color: Colors.grey, fontSize: 9),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        Text(asset.symbol, style: const TextStyle(color: Colors.grey, fontSize: 11), overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 2),
-        Text(asset.price.toStringAsFixed(2), style: TextStyle(
-            color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30),
-            fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
-        Text('${isPos ? '+' : ''}${asset.changePercent.toStringAsFixed(2)}%', style: TextStyle(
-            color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30), fontSize: 11)),
+        const SizedBox(height: 8),
+        Text(priceText, style: TextStyle(
+            color: chgColor, fontWeight: FontWeight.bold, fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 4),
+        StockPriceChangeBadge(asset: asset, fontSize: 9),
+
       ]),
     );
   }
@@ -732,3 +807,8 @@ class _TabChip extends StatelessWidget {
     );
   }
 }
+
+
+
+
+

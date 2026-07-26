@@ -26,5 +26,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/data/ipo_seed.json
     - assets/teknik.jpg
     - assets/tek.png

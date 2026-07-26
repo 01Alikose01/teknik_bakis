@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/asset_model.dart';
 import 'bist_stocks.dart';
@@ -8,264 +8,227 @@ class StockService {
   static const String _baseUrl =
       'https://query1.finance.yahoo.com/v8/finance/chart';
 
-  // Tek hisse güncel fiyat + tarihsel veri
-  static Future<AssetModel?> fetchStock(String symbol,
-      {String period = '3mo'}) async {
+  /// Günlük kotasyon: fiyat, OHLC ve değişim % tek kaynaktan.
+  static _DailyQuote _extractDailyQuote(
+    Map<String, dynamic> meta,
+    List<double> closes,
+    List<double> opens,
+    List<double> highs,
+    List<double> lows,
+  ) {
+    final price =
+        (meta['regularMarketPrice'] as num?)?.toDouble() ??
+            (closes.isNotEmpty ? closes.last : 0.0);
+
+    final previousClose = _resolvePreviousClose(meta, closes, price);
+
+    final open = _todayOpen(meta, opens);
+    final high = _todayHigh(meta, highs, price);
+    final low = _todayLow(meta, lows, price);
+
+    final changePercent =
+        (meta['regularMarketChangePercent'] as num?)?.toDouble() ??
+        (previousClose != 0 ? ((price - previousClose) / previousClose) * 100 : 0.0);
+
+    return _DailyQuote(
+      price: price,
+      open: open,
+      high: high,
+      low: low,
+      previousClose: previousClose,
+      changePercent: changePercent,
+    );
+  }
+
+  static double _resolvePreviousClose(
+      Map<String, dynamic> meta, List<double> closes, double price) {
+    final fromMeta = (meta['previousClose'] as num?)?.toDouble();
+    if (fromMeta != null && fromMeta > 0) return fromMeta;
+    if (closes.isEmpty) return price;
+
+    final lastClose = closes.last;
+    final priceIncluded = (lastClose - price).abs() < 0.0001;
+    if (priceIncluded && closes.length >= 2) {
+      return closes[closes.length - 2];
+    }
+    return lastClose;
+  }
+
+  static double _todayOpen(Map<String, dynamic> meta, List<double> opens) {
+    if (opens.isNotEmpty && opens.last > 0) return opens.last;
+    return (meta['regularMarketOpen'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  static double _todayHigh(
+      Map<String, dynamic> meta, List<double> highs, double price) {
+    final fromMeta = (meta['regularMarketDayHigh'] as num?)?.toDouble();
+    if (fromMeta != null && fromMeta > 0) return fromMeta;
+    if (highs.isNotEmpty && highs.last > 0) return highs.last;
+    return price;
+  }
+
+  static double _todayLow(
+      Map<String, dynamic> meta, List<double> lows, double price) {
+    final fromMeta = (meta['regularMarketDayLow'] as num?)?.toDouble();
+    if (fromMeta != null && fromMeta > 0) return fromMeta;
+    if (lows.isNotEmpty && lows.last > 0) return lows.last;
+    return price;
+  }
+
+  static List<double> _toDoubleList(List? raw, {bool dropNulls = false}) {
+    if (raw == null) return [];
+    if (dropNulls) {
+      return raw
+          .where((e) => e != null)
+          .map<double>((e) => (e as num).toDouble())
+          .toList();
+    }
+    return raw
+        .map<double>((e) => e != null ? (e as num).toDouble() : 0.0)
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>?> _fetchChartJson(
+      String yahooSymbol, String range) async {
     try {
-      final yahooSymbol = '$symbol.IS';
-      final url = Uri.parse('$_baseUrl/$yahooSymbol?interval=1d&range=$period');
+      final url = Uri.parse(
+          '$_baseUrl/$yahooSymbol?interval=1d&range=$range');
       final response = await http
           .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return null;
-
       final data = jsonDecode(response.body);
       final result = data['chart']?['result'];
       if (result == null || result.isEmpty) return null;
+      return result[0] as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
 
-      final meta = result[0]['meta'];
-      final closePrices =
-          result[0]['indicators']?['quote']?[0]?['close'] as List?;
-      final openPrices =
-          result[0]['indicators']?['quote']?[0]?['open'] as List?;
-      final highPrices =
-          result[0]['indicators']?['quote']?[0]?['high'] as List?;
-      final lowPrices =
-          result[0]['indicators']?['quote']?[0]?['low'] as List?;
-      final volumeData =
-          result[0]['indicators']?['quote']?[0]?['volume'] as List?;
-      if (closePrices == null || closePrices.isEmpty) return null;
+  static AssetModel? _assetFromChart(
+    Map<String, dynamic> chartResult, {
+    required String symbol,
+    required String name,
+  }) {
+    final meta = chartResult['meta'] as Map<String, dynamic>;
+    final quote = chartResult['indicators']?['quote']?[0];
+    if (quote == null) return null;
 
-      final prices = closePrices
-          .where((e) => e != null)
-          .map<double>((e) => (e as num).toDouble())
-          .toList();
+    final closes = _toDoubleList(quote['close'] as List?, dropNulls: true);
+    if (closes.isEmpty) return null;
 
-      final opens = openPrices != null
-          ? openPrices.map<double>((e) => e != null ? (e as num).toDouble() : 0.0).toList()
-          : <double>[];
-      final highs = highPrices != null
-          ? highPrices.map<double>((e) => e != null ? (e as num).toDouble() : 0.0).toList()
-          : <double>[];
-      final lows = lowPrices != null
-          ? lowPrices.map<double>((e) => e != null ? (e as num).toDouble() : 0.0).toList()
-          : <double>[];
+    final opens = _toDoubleList(quote['open'] as List?);
+    final highs = _toDoubleList(quote['high'] as List?);
+    final lows = _toDoubleList(quote['low'] as List?);
+    final volumes = _toDoubleList(quote['volume'] as List?, dropNulls: true);
 
-      final volumes = volumeData != null
-          ? volumeData
-              .where((e) => e != null)
-              .map<double>((e) => (e as num).toDouble())
-              .toList()
-          : List<double>.filled(prices.length, 0);
+    final q = _extractDailyQuote(meta, closes, opens, highs, lows);
 
-      final currentPrice =
-          (meta['regularMarketPrice'] as num?)?.toDouble() ?? prices.last;
+    final allPrices = [...closes];
+    if (allPrices.last != q.price) allPrices.add(q.price);
 
-      // Bir önceki günün kapanış fiyatı — değişim hesabı için kullanılır
-      final prevClose =
-          (meta['previousClose'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble();
+    return AssetModel(
+      symbol: symbol,
+      name: name,
+      price: q.price,
+      changePercent: q.changePercent,
+      previousClose: q.previousClose,
+      open: q.open,
+      high: q.high,
+      low: q.low,
+      prices: allPrices,
+      opens: opens,
+      highs: highs,
+      lows: lows,
+      volumes: volumes.isNotEmpty
+          ? volumes
+          : List<double>.filled(allPrices.length, 0),
+    );
+  }
 
-      // Yahoo'nun anlık günlük değişim yüzdesi (önceki kapanışa göre)
-      final directChangePct =
-          (meta['regularMarketChangePercent'] as num?)?.toDouble();
-
-      // Fallback hesaplama — prevClose kullan, o da yoksa prices listesinden al
-      double changePercent;
-      if (directChangePct != null) {
-        changePercent = directChangePct;
-      } else {
-        final effectivePrev = prevClose ??
-            (prices.length >= 2 ? prices[prices.length - 2] : null);
-        changePercent = (effectivePrev != null && effectivePrev != 0)
-            ? ((currentPrice - effectivePrev) / effectivePrev) * 100
-            : 0.0;
-      }
-
-      // Günlük açılış fiyatı — prevClose ile AYNI DEĞİL
-      final openPrice =
-          (meta['regularMarketOpen'] as num?)?.toDouble() ?? 0.0;
-      final highPrice =
-          (meta['regularMarketDayHigh'] as num?)?.toDouble() ?? currentPrice;
-      final lowPrice =
-          (meta['regularMarketDayLow'] as num?)?.toDouble() ?? currentPrice;
-
-      final allPrices = [...prices];
-      if (allPrices.isNotEmpty && allPrices.last != currentPrice) {
-        allPrices.add(currentPrice);
-      }
+  static Future<AssetModel?> fetchStock(String symbol,
+      {String period = '3mo'}) async {
+    try {
+      final chart = await _fetchChartJson('$symbol.IS', period);
+      if (chart == null) return null;
 
       final stock = kBistStocks.firstWhere(
         (s) => s['symbol'] == symbol,
         orElse: () => {'symbol': symbol, 'name': symbol},
       );
 
-      return AssetModel(
+      return _assetFromChart(
+        chart,
         symbol: symbol,
         name: stock['name'] ?? symbol,
-        price: currentPrice,
-        changePercent: changePercent,
-        open: openPrice,
-        high: highPrice,
-        low: lowPrice,
-        prices: allPrices,
-        opens: opens,
-        highs: highs,
-        lows: lows,
-        volumes: volumes,
       );
     } catch (_) {
       return null;
     }
   }
 
-  // Çoklu hisse toplu çekme (tarama için)
   static Future<List<AssetModel>> fetchMultiple(
     List<String> symbols, {
     String period = '3mo',
     void Function(int done, int total)? onProgress,
   }) async {
     final results = <AssetModel>[];
-    for (int i = 0; i < symbols.length; i++) {
-      final asset = await fetchStock(symbols[i], period: period);
-      if (asset != null) results.add(asset);
-      onProgress?.call(i + 1, symbols.length);
-      await Future.delayed(const Duration(milliseconds: 100));
+    const batchSize = 12;
+    int done = 0;
+
+    for (int i = 0; i < symbols.length; i += batchSize) {
+      final batch = symbols.skip(i).take(batchSize).toList();
+      final batchResults = await Future.wait(
+        batch.map((symbol) => fetchStock(symbol, period: period)),
+      );
+
+      for (final asset in batchResults) {
+        if (asset != null) results.add(asset);
+        done++;
+        onProgress?.call(done, symbols.length);
+      }
+
+      if (i + batchSize < symbols.length) {
+        await Future.delayed(const Duration(milliseconds: 120));
+      }
     }
     return results;
   }
 
-  // Altın (ONS/USD)
   static Future<AssetModel?> fetchGold() async {
     try {
-      final url = Uri.parse('$_baseUrl/GC%3DF?interval=1d&range=3mo');
-      final response = await http
-          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body);
-      final result = data['chart']?['result'];
-      if (result == null || result.isEmpty) return null;
-      final meta = result[0]['meta'];
-      final closePrices =
-          result[0]['indicators']?['quote']?[0]?['close'] as List?;
-      if (closePrices == null || closePrices.isEmpty) return null;
-      final prices = closePrices
-          .where((e) => e != null)
-          .map<double>((e) => (e as num).toDouble())
-          .toList();
-      final currentPrice =
-          (meta['regularMarketPrice'] as num?)?.toDouble() ?? prices.last;
-      final prevClose =
-          (meta['previousClose'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble();
-      final directChg = (meta['regularMarketChangePercent'] as num?)?.toDouble();
-      final prevFromList = prices.length >= 2 ? prices[prices.length - 2] : null;
-      final effectivePrev = prevClose ?? prevFromList ?? prices.last;
-      final changePercent = directChg ??
-          (effectivePrev != 0
-              ? ((currentPrice - effectivePrev) / effectivePrev) * 100
-              : 0.0);
-      return AssetModel(
-          symbol: 'ALTIN',
-          name: 'Altın (USD/oz)',
-          price: currentPrice,
-          changePercent: changePercent,
-          prices: prices,
-          volumes: []);
+      final chart = await _fetchChartJson('GC%3DF', '3mo');
+      if (chart == null) return null;
+      return _assetFromChart(chart,
+          symbol: 'ALTIN', name: 'Altın (USD/oz)');
     } catch (_) {
       return null;
     }
   }
 
-  // Dolar/TL
   static Future<AssetModel?> fetchDollar() async {
     try {
-      final url = Uri.parse('$_baseUrl/USDTRY%3DX?interval=1d&range=3mo');
-      final response = await http
-          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body);
-      final result = data['chart']?['result'];
-      if (result == null || result.isEmpty) return null;
-      final meta = result[0]['meta'];
-      final closePrices =
-          result[0]['indicators']?['quote']?[0]?['close'] as List?;
-      if (closePrices == null || closePrices.isEmpty) return null;
-      final prices = closePrices
-          .where((e) => e != null)
-          .map<double>((e) => (e as num).toDouble())
-          .toList();
-      final currentPrice =
-          (meta['regularMarketPrice'] as num?)?.toDouble() ?? prices.last;
-      final prevClose =
-          (meta['previousClose'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble();
-      final directChgD = (meta['regularMarketChangePercent'] as num?)?.toDouble();
-      final prevFromListD = prices.length >= 2 ? prices[prices.length - 2] : null;
-      final effectivePrevD = prevClose ?? prevFromListD ?? prices.last;
-      final changePercent = directChgD ??
-          (effectivePrevD != 0
-              ? ((currentPrice - effectivePrevD) / effectivePrevD) * 100
-              : 0.0);
-      return AssetModel(
-          symbol: 'DOLAR',
-          name: 'Dolar/TL',
-          price: currentPrice,
-          changePercent: changePercent,
-          prices: prices,
-          volumes: []);
+      final chart = await _fetchChartJson('USDTRY%3DX', '3mo');
+      if (chart == null) return null;
+      return _assetFromChart(chart,
+          symbol: 'DOLAR', name: 'Dolar/TL');
     } catch (_) {
       return null;
     }
   }
 
-  // BIST endeks verisi
   static Future<AssetModel?> fetchIndex(
       String yahooSymbol, String displaySymbol, String name) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$yahooSymbol?interval=1d&range=5d');
-      final response = await http
-          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body);
-      final result = data['chart']?['result'];
-      if (result == null || result.isEmpty) return null;
-      final meta = result[0]['meta'];
-      final closePrices =
-          result[0]['indicators']?['quote']?[0]?['close'] as List?;
-      if (closePrices == null || closePrices.isEmpty) return null;
-      final prices = closePrices
-          .where((e) => e != null)
-          .map<double>((e) => (e as num).toDouble())
-          .toList();
-      final currentPrice =
-          (meta['regularMarketPrice'] as num?)?.toDouble() ?? prices.last;
-      final prevClose = (meta['previousClose'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble();
-      final directChgI = (meta['regularMarketChangePercent'] as num?)?.toDouble();
-      final prevFromListI = prices.length >= 2 ? prices[prices.length - 2] : null;
-      final effectivePrevI = prevClose ?? prevFromListI ?? prices.last;
-      final changePercent = directChgI ??
-          (effectivePrevI != 0
-              ? ((currentPrice - effectivePrevI) / effectivePrevI) * 100
-              : 0.0);
-      return AssetModel(
-          symbol: displaySymbol,
-          name: name,
-          price: currentPrice,
-          changePercent: changePercent,
-          prices: prices,
-          volumes: []);
+      final chart = await _fetchChartJson(yahooSymbol, '5d');
+      if (chart == null) return null;
+      return _assetFromChart(chart, symbol: displaySymbol, name: name);
     } catch (_) {
       return null;
     }
   }
 
-  // Gram Altın TL
   static Future<AssetModel?> fetchGoldGram() async {
     try {
       final results = await Future.wait([
@@ -277,26 +240,29 @@ class StockService {
       if (goldUsd == null || usdTry == null) return null;
       final gramPrice = (goldUsd['price']! / 31.1035) * usdTry['price']!;
       final prevGram = (goldUsd['prev']! / 31.1035) * usdTry['prev']!;
-      // Doğrudan Yahoo'dan gelen changePercent daha güvenilir
-      final goldChange = goldUsd['changePercent'] ?? 0.0;
-      final usdChange  = usdTry['changePercent'] ?? 0.0;
-      // Gram altın değişimi ≈ ONS değişimi + USD/TRY değişimi (yaklaşık)
       final change = prevGram != 0
           ? ((gramPrice - prevGram) / prevGram) * 100
-          : (goldChange + usdChange);
+          : (goldUsd['changePercent']! + usdTry['changePercent']!);
       return AssetModel(
-          symbol: 'ALTIN/GR',
-          name: 'Gram Altın (₺)',
-          price: gramPrice,
-          changePercent: change,
-          prices: [],
-          volumes: []);
+        symbol: 'ALTIN/GR',
+        name: 'Gram Altın (₺)',
+        price: gramPrice,
+        changePercent: change,
+        previousClose: prevGram,
+        open: ((goldUsd['open'] ?? goldUsd['price'])! / 31.1035) *
+            (usdTry['open'] ?? usdTry['price'])!,
+        high: ((goldUsd['high'] ?? goldUsd['price'])! / 31.1035) *
+            (usdTry['high'] ?? usdTry['price'])!,
+        low: ((goldUsd['low'] ?? goldUsd['price'])! / 31.1035) *
+            (usdTry['low'] ?? usdTry['price'])!,
+        prices: [],
+        volumes: [],
+      );
     } catch (_) {
       return null;
     }
   }
 
-  // Gram Gümüş TL
   static Future<AssetModel?> fetchSilverGram() async {
     try {
       final results = await Future.wait([
@@ -308,39 +274,45 @@ class StockService {
       if (silverUsd == null || usdTry == null) return null;
       final gramPrice = (silverUsd['price']! / 31.1035) * usdTry['price']!;
       final prevGram = (silverUsd['prev']! / 31.1035) * usdTry['prev']!;
-      final silverChange = silverUsd['changePercent'] ?? 0.0;
-      final usdChange2   = usdTry['changePercent'] ?? 0.0;
       final change = prevGram != 0
           ? ((gramPrice - prevGram) / prevGram) * 100
-          : (silverChange + usdChange2);
+          : (silverUsd['changePercent']! + usdTry['changePercent']!);
       return AssetModel(
-          symbol: 'GUMUS/GR',
-          name: 'Gram Gümüş (₺)',
-          price: gramPrice,
-          changePercent: change,
-          prices: [],
-          volumes: []);
+        symbol: 'GUMUS/GR',
+        name: 'Gram Gümüş (₺)',
+        price: gramPrice,
+        changePercent: change,
+        previousClose: prevGram,
+        open: ((silverUsd['open'] ?? silverUsd['price'])! / 31.1035) *
+            (usdTry['open'] ?? usdTry['price'])!,
+        high: ((silverUsd['high'] ?? silverUsd['price'])! / 31.1035) *
+            (usdTry['high'] ?? usdTry['price'])!,
+        low: ((silverUsd['low'] ?? silverUsd['price'])! / 31.1035) *
+            (usdTry['low'] ?? usdTry['price'])!,
+        prices: [],
+        volumes: [],
+      );
     } catch (_) {
       return null;
     }
   }
 
-  // Euro/TL
   static Future<AssetModel?> fetchEuro() async {
     try {
       final spot = await _fetchSpot('EURTRY%3DX');
       if (spot == null) return null;
-      final change = spot['changePercent'] ??
-          (spot['prev']! != 0
-              ? ((spot['price']! - spot['prev']!) / spot['prev']!) * 100
-              : 0.0);
       return AssetModel(
-          symbol: 'EURO',
-          name: 'Euro/TL',
-          price: spot['price']!,
-          changePercent: change,
-          prices: [],
-          volumes: []);
+        symbol: 'EURO',
+        name: 'Euro/TL',
+        price: spot['price']!,
+        changePercent: spot['changePercent']!,
+        previousClose: spot['prev']!,
+        open: spot['open'] ?? spot['price']!,
+        high: spot['high'] ?? spot['price']!,
+        low: spot['low'] ?? spot['price']!,
+        prices: [],
+        volumes: [],
+      );
     } catch (_) {
       return null;
     }
@@ -348,46 +320,50 @@ class StockService {
 
   static Future<Map<String, double>?> _fetchSpot(String yahooSymbol) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$yahooSymbol?interval=1d&range=5d');
-      final resp = await http
-          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
-          .timeout(const Duration(seconds: 10));
-      if (resp.statusCode != 200) return null;
-      final data = jsonDecode(resp.body);
-      final result = data['chart']?['result'];
-      if (result == null || result.isEmpty) return null;
-      final meta = result[0]['meta'];
-      final current = (meta['regularMarketPrice'] as num?)?.toDouble();
-      if (current == null) return null;
-      // Yahoo doğrudan changePercent veriyor — en güvenilir kaynak
-      final directChange =
-          (meta['regularMarketChangePercent'] as num?)?.toDouble();
-      final prev = (meta['previousClose'] as num?)?.toDouble() ??
-          (meta['chartPreviousClose'] as num?)?.toDouble();
-      // Kapanış listesinden de prev hesapla (fallback)
-      double? prevFromList;
-      final closes =
-          result[0]['indicators']?['quote']?[0]?['close'] as List?;
-      if (closes != null && closes.length >= 2) {
-        final filtered = closes.where((e) => e != null).toList();
-        if (filtered.length >= 2) {
-          prevFromList =
-              (filtered[filtered.length - 2] as num).toDouble();
-        }
-      }
-      final effectivePrev =
-          prev ?? prevFromList ?? current;
+      final chart = await _fetchChartJson(yahooSymbol, '5d');
+      if (chart == null) return null;
+
+      final meta = chart['meta'] as Map<String, dynamic>;
+      final quote = chart['indicators']?['quote']?[0];
+      final closes = _toDoubleList(quote?['close'] as List?, dropNulls: true);
+      final opens = _toDoubleList(quote?['open'] as List?);
+      final highs = _toDoubleList(quote?['high'] as List?);
+      final lows = _toDoubleList(quote?['low'] as List?);
+
+      if (closes.isEmpty) return null;
+
+      final q = _extractDailyQuote(meta, closes, opens, highs, lows);
+
       return {
-        'price': current,
-        'prev': effectivePrev,
-        'changePercent': directChange ??
-            (effectivePrev != 0
-                ? ((current - effectivePrev) / effectivePrev) * 100
-                : 0.0),
+        'price': q.price,
+        'prev': q.previousClose,
+        'changePercent': q.changePercent,
+        'open': q.open,
+        'high': q.high,
+        'low': q.low,
       };
     } catch (_) {
       return null;
     }
   }
 }
+
+class _DailyQuote {
+  final double price;
+  final double open;
+  final double high;
+  final double low;
+  final double previousClose;
+  final double changePercent;
+
+  const _DailyQuote({
+    required this.price,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.previousClose,
+    required this.changePercent,
+  });
+}
+
+
