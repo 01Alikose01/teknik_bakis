@@ -23,7 +23,7 @@ Uygulamadaki `Halka Arzlar` ekrani uzaktaki bir JSON feed'i okur.
 Varsayilan feed yolu:
 
 ```text
-https://raw.githubusercontent.com/Alikose010/teknik_bakis/main/data/ipo_feed.json
+https://raw.githubusercontent.com/01Alikose01/teknik_bakis/main/data/ipo_feed.json
 ```
 
 Bu adres uygulamanin icine gomuludur. Magazadan yuklenen surumde son kullanicinin GitHub hesabi eklemesi, `dart-define` vermesi veya ekstra ayar yapmasi gerekmez.

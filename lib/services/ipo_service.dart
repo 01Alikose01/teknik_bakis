@@ -26,9 +26,9 @@ class IpoService {
   static const String _cacheLastSyncedAtKey = 'last_synced_at';
   static const String _cacheSourceKey = 'source';
   static const String _defaultFeedUrl =
-      'https://raw.githubusercontent.com/Alikose010/teknik_bakis/main/data/ipo_feed.json';
+      'https://raw.githubusercontent.com/01Alikose01/teknik_bakis/main/data/ipo_feed.json';
   static const String _defaultFeedCdnUrl =
-      'https://cdn.jsdelivr.net/gh/Alikose010/teknik_bakis@main/data/ipo_feed.json';
+      'https://cdn.jsdelivr.net/gh/01Alikose01/teknik_bakis@main/data/ipo_feed.json';
 
   static const String _configuredFeedUrl = String.fromEnvironment(
     'IPO_FEED_URL',
