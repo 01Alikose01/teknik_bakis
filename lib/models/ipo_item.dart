@@ -7,7 +7,7 @@ class IpoItem {
   final String lot;
   final String distributionType;
   final String symbol;
-  final IpoStatus status;
+  final IpoStatus _status;
   final DateTime? requestStart;
   final DateTime? requestEnd;
   final DateTime? listingDate;
@@ -22,14 +22,14 @@ class IpoItem {
     required this.lot,
     required this.distributionType,
     required this.symbol,
-    required this.status,
+    required IpoStatus status,
     this.requestStart,
     this.requestEnd,
     this.listingDate,
     this.kapUrl = '',
     this.source = 'KAP',
     this.publishedAt,
-  });
+  }) : _status = status;
 
   factory IpoItem.fromJson(Map<String, dynamic> json) {
     final requestStart = _parseFlexibleDate(json['requestStart']);
@@ -117,6 +117,22 @@ class IpoItem {
     return listingDate ?? requestEnd ?? requestStart ?? publishedAt;
   }
 
+  IpoStatus get status {
+    if (_hasTimelineData) {
+      return _deriveStatus(
+        requestStart: requestStart,
+        requestEnd: requestEnd,
+        listingDate: listingDate,
+        fallbackStatus: _status,
+      );
+    }
+    return _status;
+  }
+
+  bool get _hasTimelineData {
+    return requestStart != null || requestEnd != null || listingDate != null;
+  }
+
   String get statusLabel {
     switch (status) {
       case IpoStatus.upcoming:
@@ -135,6 +151,24 @@ class IpoItem {
     required DateTime? listingDate,
   }) {
     final value = raw?.trim().toLowerCase() ?? '';
+    final explicit = _parseRawStatus(value);
+    if (explicit != null) {
+      return explicit;
+    }
+
+    if (requestStart != null || requestEnd != null || listingDate != null) {
+      return _deriveStatus(
+        requestStart: requestStart,
+        requestEnd: requestEnd,
+        listingDate: listingDate,
+        fallbackStatus: IpoStatus.upcoming,
+      );
+    }
+
+    return IpoStatus.upcoming;
+  }
+
+  static IpoStatus? _parseRawStatus(String value) {
     switch (value) {
       case 'yaklasan':
       case 'yaklaşan':
@@ -151,11 +185,7 @@ class IpoItem {
       case 'completed':
         return IpoStatus.trading;
       default:
-        return _deriveStatus(
-          requestStart: requestStart,
-          requestEnd: requestEnd,
-          listingDate: listingDate,
-        );
+        return null;
     }
   }
 
@@ -163,24 +193,32 @@ class IpoItem {
     required DateTime? requestStart,
     required DateTime? requestEnd,
     required DateTime? listingDate,
+    required IpoStatus fallbackStatus,
   }) {
     final now = DateTime.now();
     if (listingDate != null && !listingDate.isAfter(now)) {
       return IpoStatus.trading;
     }
-    if (requestStart != null && requestEnd != null) {
-      final start = _startOfDay(requestStart);
-      final end = _endOfDay(requestEnd);
-      if (now.isBefore(start)) return IpoStatus.upcoming;
-      if (!now.isAfter(end)) return IpoStatus.collecting;
-      return IpoStatus.trading;
+
+    if (requestEnd != null && now.isAfter(_endOfDay(requestEnd))) {
+      if (listingDate == null || !listingDate.isAfter(now)) {
+        return IpoStatus.trading;
+      }
+      return IpoStatus.collecting;
     }
+
     if (requestStart != null) {
-      return now.isBefore(_startOfDay(requestStart))
-          ? IpoStatus.upcoming
-          : IpoStatus.collecting;
+      final start = _startOfDay(requestStart);
+      return now.isBefore(start) ? IpoStatus.upcoming : IpoStatus.collecting;
     }
-    return IpoStatus.upcoming;
+
+    if (listingDate != null) {
+      return now.isBefore(_startOfDay(listingDate))
+          ? IpoStatus.upcoming
+          : IpoStatus.trading;
+    }
+
+    return fallbackStatus;
   }
 
   static String _resolveRequestDatesLabel({
