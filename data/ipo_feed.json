@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-08-07T13:48:28.483Z",
+  "lastUpdated": "2026-08-07T14:08:33.003Z",
   "source": "HalkArz Scraper",
   "items": [
     {
@@ -15,7 +15,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fd9277b3110bc",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:18.637Z"
+      "publishedAt": "2026-08-07T14:08:23.028Z"
     },
     {
       "companyName": "Kapeks Kimya Sanayi A.Ş.",
@@ -30,7 +30,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc3f019fdb5a6a12166b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:19.164Z"
+      "publishedAt": "2026-08-07T14:08:23.551Z"
     },
     {
       "companyName": "Çitlekçi Mağazacılık Gıda A.Ş.",
@@ -45,7 +45,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc40019fd7eb4af2321e",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:19.680Z"
+      "publishedAt": "2026-08-07T14:08:24.075Z"
     },
     {
       "companyName": "Teknika Plast Teknik Kalıp Plastik San. ve Tic. A.Ş.",
@@ -60,7 +60,7 @@
       "listingDate": "",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:20.197Z"
+      "publishedAt": "2026-08-07T14:08:24.593Z"
     },
     {
       "companyName": "Quick Sigorta A.S.",
@@ -72,25 +72,10 @@
       "distributionType": "Esit Dagitim",
       "symbol": "QUICK",
       "status": "upcoming",
-      "listingDate": "",
-      "kapUrl": "",
+      "listingDate": "2026-08-06T09:00:00.000Z",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc40019f94ccb8a06e0c",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
-    },
-    {
-      "companyName": "Bewen Enerji A.S.",
-      "requestDates": "29.07.2026 - 31.07.2026",
-      "requestStart": "2026-07-29T00:00:00.000Z",
-      "requestEnd": "2026-07-31T00:00:00.000Z",
-      "price": "48,10 TL",
-      "lot": "96.000.000 lot",
-      "distributionType": "Esit Dagitim",
-      "symbol": "BEWEN",
-      "status": "upcoming",
-      "listingDate": "",
-      "kapUrl": "",
-      "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:25.663Z"
     },
     {
       "companyName": "Kardemir Celik Sanayi A.S.",
@@ -103,9 +88,9 @@
       "symbol": "KARCL",
       "status": "trading",
       "listingDate": "2026-07-29T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc3f019f709e5827107e",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:26.180Z"
     },
     {
       "companyName": "Masfen Enerji A.S.",
@@ -118,9 +103,9 @@
       "symbol": "MASFN",
       "status": "trading",
       "listingDate": "2026-07-29T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddc019f70f1fdb33a64",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:26.704Z"
     },
     {
       "companyName": "Albayrak Hazir Beton San. ve Tic. A.S.",
@@ -133,9 +118,9 @@
       "symbol": "ALBTN",
       "status": "trading",
       "listingDate": "2026-07-29T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddc019f71eb1d434267",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:27.238Z"
     },
     {
       "companyName": "Metgun Enerji Yatirimlari A.S.",
@@ -148,9 +133,9 @@
       "symbol": "METEN",
       "status": "trading",
       "listingDate": "2026-07-28T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019f70f991ec2e65",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:27.766Z"
     },
     {
       "companyName": "Sa-Ra Enerji Insaat Tic. ve San. A.S.",
@@ -163,9 +148,9 @@
       "symbol": "SARAE",
       "status": "trading",
       "listingDate": "2026-07-17T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f0a085a019f28f201327586",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:28.309Z"
     },
     {
       "companyName": "Saat ve Saat San. ve Tic. A.S.",
@@ -178,9 +163,9 @@
       "symbol": "SSAAT",
       "status": "trading",
       "listingDate": "2026-07-15T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f0a085b019f2484de57414e",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:28.829Z"
     },
     {
       "companyName": "Ekim Turizm Tic. ve San. A.S.",
@@ -193,24 +178,9 @@
       "symbol": "EKIM",
       "status": "trading",
       "listingDate": "2026-07-10T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019f051c0e427376",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
-    },
-    {
-      "companyName": "Golda Gida San. ve Tic. A.S.",
-      "requestDates": "01.07.2026 - 02.07.2026",
-      "requestStart": "2026-07-01T00:00:00.000Z",
-      "requestEnd": "2026-07-02T00:00:00.000Z",
-      "price": "9,20 TL",
-      "lot": "87.500.000 lot",
-      "distributionType": "Oransal Dagitim",
-      "symbol": "GOLDA",
-      "status": "trading",
-      "listingDate": "2026-07-09T00:00:00.000Z",
-      "kapUrl": "",
-      "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:29.874Z"
     },
     {
       "companyName": "Isvea Seramik ve Banyo Urunleri Sanayi A.S.",
@@ -223,9 +193,24 @@
       "symbol": "ISVEA",
       "status": "trading",
       "listingDate": "2026-07-09T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019efff937cb5030",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:29.359Z"
+    },
+    {
+      "companyName": "Golda Gida San. ve Tic. A.S.",
+      "requestDates": "01.07.2026 - 02.07.2026",
+      "requestStart": "2026-07-01T00:00:00.000Z",
+      "requestEnd": "2026-07-02T00:00:00.000Z",
+      "price": "9,20 TL",
+      "lot": "87.500.000 lot",
+      "distributionType": "Oransal Dagitim",
+      "symbol": "GOLDA",
+      "status": "trading",
+      "listingDate": "2026-07-09T00:00:00.000Z",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9ec11d42019f02e9e4f7602e",
+      "source": "Manual Override",
+      "publishedAt": "2026-08-07T14:08:30.392Z"
     },
     {
       "companyName": "Soho Giyim ve Enerji A.S.",
@@ -240,7 +225,7 @@
       "listingDate": "2026-07-08T00:00:00.000Z",
       "kapUrl": "",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:30.922Z"
     },
     {
       "companyName": "Orzaks Ilac ve Kimya Sanayi Tic. A.S.",
@@ -253,9 +238,9 @@
       "symbol": "ORZAX",
       "status": "trading",
       "listingDate": "2026-07-07T00:00:00.000Z",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9ec11d43019f000c0774485b",
       "source": "Manual Override",
-      "publishedAt": "2026-08-07T13:04:46.925Z"
+      "publishedAt": "2026-08-07T14:08:31.441Z"
     },
     {
       "companyName": "Beta Enerji ve Teknoloji A.Ş.",
@@ -270,7 +255,7 @@
       "listingDate": "2026-07-01T09:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019ed910f3ea7a2d",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:27.450Z"
+      "publishedAt": "2026-08-07T14:08:31.957Z"
     },
     {
       "companyName": "Ekinciler Demir ve Çelik Sanayi A.Ş.",
@@ -285,7 +270,7 @@
       "listingDate": "2026-05-22T09:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9d7b22d3019e1d5491210e0b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:27.965Z"
+      "publishedAt": "2026-08-07T14:08:32.485Z"
     },
     {
       "companyName": "Enpara Bank A.Ş.",
@@ -300,7 +285,7 @@
       "listingDate": "2026-04-07T09:00:00.000Z",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:48:28.482Z"
+      "publishedAt": "2026-08-07T14:08:33.000Z"
     }
   ]
 }

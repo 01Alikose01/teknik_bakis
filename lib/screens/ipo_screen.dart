@@ -539,10 +539,22 @@ class _IpoScreenState extends State<IpoScreen>
 
     final upcoming = all
         .where((item) => item.status == IpoStatus.upcoming)
-        .toList();
+        .toList()
+      ..sort((a, b) {
+        final aDate = a.requestStart ?? a.sortDate ?? DateTime(2099);
+        final bDate = b.requestStart ?? b.sortDate ?? DateTime(2099);
+        return aDate.compareTo(bDate);
+      });
+      
     final collecting = all
         .where((item) => item.status == IpoStatus.collecting)
-        .toList();
+        .toList()
+      ..sort((a, b) {
+        final aDate = a.requestStart ?? a.sortDate ?? DateTime(2099);
+        final bDate = b.requestStart ?? b.sortDate ?? DateTime(2099);
+        return aDate.compareTo(bDate);
+      });
+      
     final trading = all
         .where((item) => item.status == IpoStatus.trading)
         .toList();
