@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../models/ipo_item.dart';
 import '../services/ipo_service.dart';
+import '../services/subscription_service.dart';
+import '../services/app_navigation.dart';
+import 'premium_gate_screen.dart';
 
 class IpoScreen extends StatefulWidget {
   const IpoScreen({super.key});
@@ -96,6 +99,17 @@ class _IpoScreenState extends State<IpoScreen>
     final theme = Theme.of(context);
     final grouped = _groupedItems();
 
+    // Halka Arz: 10 gün ücretsiz deneme sonrası yalnızca premium erişim.
+    if (!SubscriptionService.canAccess('ipo')) {
+      return PremiumGateScreen(
+        embedded: true,
+        nextScreen: const IpoScreen(),
+        showGuestOption: !SubscriptionService.hasUsedTrialBefore,
+        onBack: () => AppNavigation.goToHome(),
+        onGuestContinue: () => AppNavigation.goToHome(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Halka Arzlar'),
@@ -146,13 +160,13 @@ class _IpoScreenState extends State<IpoScreen>
                         emptyText:
                             'Borsada işlem görmeye başlayan halka arz bulunmuyor.',
                         infoText:
-                            'Bu bölüm sadece en yeni 10 halka arz kaydını gösterir.',
+                            'Bu bölümde yalnızca en güncel 10 halka arz yer alır; yeni kayıtlar geldikçe en eski olanlar otomatik olarak listeden çıkar.',
                       ),
                       _buildList(
-                        grouped.all,
+                        grouped.latestAll,
                         emptyText: 'Genel halka arz listesi boş.',
                         infoText:
-                            'Bu liste geçmiş kayıtları silmez; yeni halka arzlar geldikçe büyür.',
+                            'Tümü sekmesinde en güncel 10 halka arzı toplu olarak görürsünüz; yeni kayıtlar eklendikçe liste kendini otomatik yeniler.',
                       ),
                     ],
                   ),
@@ -166,7 +180,7 @@ class _IpoScreenState extends State<IpoScreen>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -203,12 +217,16 @@ class _IpoScreenState extends State<IpoScreen>
           const SizedBox(height: 10),
           Text(
             'Son senkron: ${_formatDateTime(_lastSyncedAt)}',
-            style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             'Kaynak: $_source',
-            style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -255,19 +273,23 @@ class _IpoScreenState extends State<IpoScreen>
                     child: _infoCard(infoText),
                   );
                 }
-                final item = items[infoText == null ? index : index - 1];
-                return _buildIpoCard(item);
+                final itemIndex = infoText == null ? index : index - 1;
+                final item = items[itemIndex];
+                return _buildIpoCard(item, itemIndex);
               },
             ),
     );
   }
 
-  Widget _buildIpoCard(IpoItem item) {
+  Widget _buildIpoCard(IpoItem item, int index) {
+    final theme = Theme.of(context);
     final statusColor = _statusColor(item.status);
+    final palette = _cardPalette(theme, index);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
+      color: palette.backgroundColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -285,7 +307,7 @@ class _IpoScreenState extends State<IpoScreen>
                         item.companyName.isEmpty
                             ? item.symbol
                             : item.companyName,
-                        style: const TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
@@ -293,9 +315,11 @@ class _IpoScreenState extends State<IpoScreen>
                       const SizedBox(height: 4),
                       Text(
                         item.symbol.isEmpty ? 'Kod bekleniyor' : item.symbol,
-                        style: const TextStyle(
+                        style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 13,
-                          color: Colors.black54,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.65,
+                          ),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -327,15 +351,42 @@ class _IpoScreenState extends State<IpoScreen>
               spacing: 10,
               runSpacing: 10,
               children: [
-                _detailTile('Talep Tarihleri', item.requestDates),
-                _detailTile('Fiyat', item.price),
-                _detailTile('Lot', item.lot),
-                _detailTile('Dagitim Tipi', item.distributionType),
-                _detailTile('Borsa Kodu', item.symbol),
+                _detailTile(
+                  'Talep Tarihleri',
+                  item.requestDates,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
+                ),
+                _detailTile(
+                  'Fiyat',
+                  item.price,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
+                ),
+                _detailTile(
+                  'Lot',
+                  item.lot,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
+                ),
+                _detailTile(
+                  'Dagitim Tipi',
+                  item.distributionType,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
+                ),
+                _detailTile(
+                  'Borsa Kodu',
+                  item.symbol,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
+                ),
                 _detailTile(
                   'Durum',
                   item.statusLabel,
                   accentColor: statusColor,
+                  backgroundColor: palette.tileColor,
+                  borderColor: palette.borderColor,
                 ),
               ],
             ),
@@ -343,9 +394,9 @@ class _IpoScreenState extends State<IpoScreen>
               const SizedBox(height: 12),
               Text(
                 'Islem tarihi: ${_formatDate(item.listingDate!)}',
-                style: const TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: 12,
-                  color: Colors.black54,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -356,23 +407,30 @@ class _IpoScreenState extends State<IpoScreen>
     );
   }
 
-  Widget _detailTile(String label, String value, {Color? accentColor}) {
+  Widget _detailTile(
+    String label,
+    String value, {
+    Color? accentColor,
+    Color? backgroundColor,
+    Color? borderColor,
+  }) {
+    final theme = Theme.of(context);
     return Container(
       constraints: const BoxConstraints(minWidth: 140, maxWidth: 280),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE6E8EC)),
+        border: Border.all(color: borderColor ?? theme.colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 11,
-              color: Colors.black54,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -382,7 +440,7 @@ class _IpoScreenState extends State<IpoScreen>
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: accentColor ?? Colors.black87,
+              color: accentColor ?? theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -421,18 +479,19 @@ class _IpoScreenState extends State<IpoScreen>
   }
 
   Widget _infoCard(String text) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF2FF),
+        color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: theme.textTheme.bodyMedium?.copyWith(
           fontSize: 13,
-          color: Color(0xFF1D4ED8),
+          color: theme.colorScheme.onPrimaryContainer,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -440,23 +499,28 @@ class _IpoScreenState extends State<IpoScreen>
   }
 
   Widget _emptyCard(String text) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
-          const Icon(Icons.inbox_outlined, size: 38, color: Colors.black38),
+          Icon(
+            Icons.inbox_outlined,
+            size: 38,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
           const SizedBox(height: 10),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: 14,
-              color: Colors.black54,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -485,11 +549,33 @@ class _IpoScreenState extends State<IpoScreen>
 
     return _IpoGroups(
       all: all,
+      latestAll: all.take(10).toList(),
       upcoming: upcoming,
       collecting: collecting,
       trading: trading,
       latestTrading: trading.take(10).toList(),
     );
+  }
+
+  _IpoCardPalette _cardPalette(ThemeData theme, int index) {
+    final baseBackground = theme.colorScheme.surface;
+    final altBackground = theme.colorScheme.surfaceContainerHighest;
+    final tileColor = theme.colorScheme.surfaceContainerHighest;
+    final borderColor = theme.brightness == Brightness.light
+        ? theme.colorScheme.outline
+        : theme.colorScheme.onSurface.withValues(alpha: 0.12);
+
+    return index.isEven
+        ? _IpoCardPalette(
+            backgroundColor: baseBackground,
+            tileColor: tileColor,
+            borderColor: borderColor,
+          )
+        : _IpoCardPalette(
+            backgroundColor: altBackground,
+            tileColor: tileColor,
+            borderColor: borderColor,
+          );
   }
 
   Color _statusColor(IpoStatus status) {
@@ -519,6 +605,7 @@ class _IpoScreenState extends State<IpoScreen>
 
 class _IpoGroups {
   final List<IpoItem> all;
+  final List<IpoItem> latestAll;
   final List<IpoItem> upcoming;
   final List<IpoItem> collecting;
   final List<IpoItem> trading;
@@ -526,9 +613,22 @@ class _IpoGroups {
 
   const _IpoGroups({
     required this.all,
+    required this.latestAll,
     required this.upcoming,
     required this.collecting,
     required this.trading,
     required this.latestTrading,
+  });
+}
+
+class _IpoCardPalette {
+  final Color backgroundColor;
+  final Color tileColor;
+  final Color borderColor;
+
+  const _IpoCardPalette({
+    required this.backgroundColor,
+    required this.tileColor,
+    required this.borderColor,
   });
 }

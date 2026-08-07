@@ -85,6 +85,10 @@ async function main() {
   // Finalize, sort, and output
   const items = [...records.values()]
     .map((item) => finalizeItem(item))
+    .filter((item) => {
+      const combined = `${item.companyName} ${item.requestDates} ${item.status}`.toLowerCase();
+      return !combined.includes('ertelendi');
+    })
     .sort(compareItemsDesc);
 
   const output = {

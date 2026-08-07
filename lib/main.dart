@@ -9,47 +9,97 @@ import 'screens/news_screen.dart';
 import 'screens/ipo_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/premium_gate_screen.dart';
+import 'services/app_navigation.dart';
 import 'services/portfolio_service.dart';
 import 'services/notification_service.dart';
+import 'services/settings_service.dart';
+import 'services/subscription_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   await PortfolioService.init();
+  await SettingsService.init();
+  await SubscriptionService.init();
   await NotificationService.init();
   await NotificationService.requestPermission();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const TeknikBakisApp());
 }
 
-class TeknikBakisApp extends StatelessWidget {
+class TeknikBakisApp extends StatefulWidget {
   const TeknikBakisApp({super.key});
 
   @override
+  State<TeknikBakisApp> createState() => _TeknikBakisAppState();
+}
+
+class _TeknikBakisAppState extends State<TeknikBakisApp> {
+  Widget _getInitialScreen() {
+    // Sadece ücretli aboneler direkt ana uygulamaya girsin. 
+    // Ücretsiz kullanıcılar (deneme sürümündekiler dahil) her açılışta Premium kapısını görsün.
+    if (SubscriptionService.isPaidSubscriber) {
+      return MainNavigation(key: MainNavigation.navKey);
+    }
+    // Ücretli değilse → premium gate
+    return PremiumGateScreen(
+      nextScreen: MainNavigation(key: MainNavigation.navKey),
+      embedded: false,
+      showGuestOption: !SubscriptionService.hasUsedTrialBefore,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Teknik Bakış',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF2F2F7),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF34C759),
-          secondary: Color(0xFF34C759),
-          surface: Colors.white,
-        ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF2F2F7),
-          foregroundColor: Colors.black,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
-      ),
-      home: SplashScreen(
-        nextScreen: MainNavigation(key: MainNavigation.navKey),
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: SettingsService.darkMode,
+      builder: (context, isDarkMode, child) {
+        return MaterialApp(
+          title: 'Teknik Bakış',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: const Color(0xFFF2F2F7),
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF34C759),
+              secondary: Color(0xFF34C759),
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFFF2F2F7),
+              foregroundColor: Colors.black,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+            ),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: Colors.black,
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF34C759),
+              secondary: Color(0xFF34C759),
+              surface: Color(0xFF121212),
+              onSurface: Colors.white,
+            ),
+            textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+            ),
+          ),
+          themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          home: SplashScreen(
+            nextScreen: _getInitialScreen(),
+          ),
+        );
+      },
     );
   }
 }
@@ -70,6 +120,11 @@ class MainNavigation extends StatefulWidget {
     navKey.currentState?.goToAnaliz(symbol, name);
   }
 
+  /// Abonelik durumu değişince tüm sekmeleri yeniden build et
+  static void refreshSubscription() {
+    navKey.currentState?.refreshState();
+  }
+
   @override
   State<MainNavigation> createState() => MainNavigationState();
 }
@@ -88,8 +143,24 @@ class MainNavigationState extends State<MainNavigation> {
     });
   }
 
+  /// Abonelik değişince dışarıdan çağrılır — tüm sekmeleri rebuild et
+  void refreshState() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AppNavigation.registerTabSetter((index) {
+      setState(() {
+        _currentIndex = index;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -110,9 +181,9 @@ class MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF34C759),
-        unselectedItemColor: Colors.grey,
+        backgroundColor: theme.colorScheme.surface,
+        selectedItemColor: theme.colorScheme.primary,
+        unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
         type: BottomNavigationBarType.fixed,
         showSelectedLabels: true,
         showUnselectedLabels: true,

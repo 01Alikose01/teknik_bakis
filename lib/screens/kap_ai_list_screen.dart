@@ -158,12 +158,17 @@ class _KapAiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final effect = item.analysis.effect;
     final effectColor = effect == KapEffect.positive
         ? const Color(0xFF34C759)
         : effect == KapEffect.negative
             ? const Color(0xFFFF3B30)
             : const Color(0xFFFF9500);
+    final cardColor = theme.brightness == Brightness.dark ? Colors.black : Colors.white;
+    final textColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black87;
+    final mutedTextColor = theme.brightness == Brightness.dark ? Colors.white70 : Colors.black54;
+    final subtleBg = theme.brightness == Brightness.dark ? Colors.white10 : Colors.grey[100];
 
     final effectEmoji = effect == KapEffect.positive
         ? '🟢'
@@ -187,7 +192,7 @@ class _KapAiCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -247,14 +252,14 @@ class _KapAiCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: subtleBg,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '%${item.analysis.confidence}',
                       style: TextStyle(
                         color: item.analysis.confidence >= 50
-                            ? Colors.black54
+                            ? mutedTextColor
                             : const Color(0xFFFF3B30),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -270,10 +275,10 @@ class _KapAiCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
-                          color: Colors.black87),
+                          color: textColor),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                   if (item.analysis.hasContradiction) ...[
@@ -298,8 +303,8 @@ class _KapAiCard extends StatelessWidget {
                       const Text('📢 ', style: TextStyle(fontSize: 12)),
                       Expanded(
                         child: Text(item.analysis.summary,
-                            style: const TextStyle(
-                                color: Colors.black54, fontSize: 12),
+                            style: TextStyle(
+                                color: mutedTextColor, fontSize: 12),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis),
                       ),

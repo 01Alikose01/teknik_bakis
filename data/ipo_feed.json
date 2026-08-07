@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-08-07T13:04:46.926Z",
+  "lastUpdated": "2026-08-07T13:48:28.483Z",
   "source": "HalkArz Scraper",
   "items": [
     {
@@ -15,7 +15,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fd9277b3110bc",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:36.954Z"
+      "publishedAt": "2026-08-07T13:48:18.637Z"
     },
     {
       "companyName": "Kapeks Kimya Sanayi A.Ş.",
@@ -30,7 +30,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc3f019fdb5a6a12166b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:37.469Z"
+      "publishedAt": "2026-08-07T13:48:19.164Z"
     },
     {
       "companyName": "Çitlekçi Mağazacılık Gıda A.Ş.",
@@ -45,7 +45,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc40019fd7eb4af2321e",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:38.024Z"
+      "publishedAt": "2026-08-07T13:48:19.680Z"
     },
     {
       "companyName": "Teknika Plast Teknik Kalıp Plastik San. ve Tic. A.Ş.",
@@ -60,7 +60,7 @@
       "listingDate": "",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:38.551Z"
+      "publishedAt": "2026-08-07T13:48:20.197Z"
     },
     {
       "companyName": "Quick Sigorta A.S.",
@@ -270,7 +270,7 @@
       "listingDate": "2026-07-01T09:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019ed910f3ea7a2d",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:45.892Z"
+      "publishedAt": "2026-08-07T13:48:27.450Z"
     },
     {
       "companyName": "Ekinciler Demir ve Çelik Sanayi A.Ş.",
@@ -285,7 +285,7 @@
       "listingDate": "2026-05-22T09:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9d7b22d3019e1d5491210e0b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:46.408Z"
+      "publishedAt": "2026-08-07T13:48:27.965Z"
     },
     {
       "companyName": "Enpara Bank A.Ş.",
@@ -300,7 +300,7 @@
       "listingDate": "2026-04-07T09:00:00.000Z",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T13:04:46.924Z"
+      "publishedAt": "2026-08-07T13:48:28.482Z"
     }
   ]
 }

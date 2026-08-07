@@ -1,8 +1,25 @@
+import 'dart:io';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+
+  static List<AndroidNotificationChannel> get androidChannels => const [
+        AndroidNotificationChannel(
+          'price_alerts',
+          'Fiyat Alarmları',
+          description: 'Hisse fiyat alarm bildirimleri',
+          importance: Importance.high,
+        ),
+        AndroidNotificationChannel(
+          'signals',
+          'Teknik Sinyaller',
+          description: 'Hisse teknik analiz sinyal bildirimleri',
+          importance: Importance.high,
+        ),
+      ];
 
   static Future<void> init() async {
     const androidSettings =
@@ -16,10 +33,24 @@ class NotificationService {
       android: androidSettings,
       iOS: iosSettings,
     );
+
     await _plugin.initialize(settings);
+
+    if (Platform.isAndroid) {
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+      for (final channel in androidChannels) {
+        await androidPlugin?.createNotificationChannel(channel);
+      }
+    }
   }
 
   static Future<void> requestPermission() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()

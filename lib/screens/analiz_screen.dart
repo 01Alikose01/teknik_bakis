@@ -5,7 +5,9 @@ import '../widgets/stock_chart.dart';
 import '../widgets/indicator_chip.dart';
 import '../widgets/stock_quote_panel.dart';
 import '../services/portfolio_service.dart';
+import '../services/kap_news_service.dart';
 import '../models/portfolio_model.dart';
+import '../models/kap_news_item.dart';
 
 class AnalizScreen extends StatefulWidget {
   final String? initialSymbol;
@@ -21,16 +23,21 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
   late String _selectedSymbol;
   String _assetCategory = 'bist';
   int _selectedPeriod = 1;
+  int _selectedChartStyle = 0; // 0 = Çizgi, 1 = Mum
   AssetModel? _asset;
   bool _loading = false;
+  bool _newsLoading = false;
+  int _selectedInfoTab = 0;
   final Set<String> _activeIndicators = {'RSI 30'};
+  List<KapNewsItem> _symbolNews = [];
 
   // Üst arama
   final TextEditingController _searchCtrl = TextEditingController();
   List<Map<String, String>> _searchResults = [];
 
-  final List<String> _periods = ['1A', '3A', '1Y'];
-  final List<String> _ranges  = ['1mo', '3mo', '1y'];
+  final List<String> _periods = ['4S', 'G', 'H', '1A', '3A', '1Y'];
+  final List<String> _ranges = ['1d', '5d', '1mo', '1mo', '3mo', '1y'];
+  final List<String> _intervals = ['5m', '1h', '1d', '1d', '1d', '1wk'];
 
   final List<Map<String, String>> _indicators = [
     {'label': 'RSI 30', 'icon': 'rsi'},
@@ -96,16 +103,51 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
     } else if (_assetCategory == 'dollar') {
       a = await StockService.fetchDollar();
     } else {
-      a = await StockService.fetchStock(_selectedSymbol, period: _ranges[_selectedPeriod]);
+      a = await StockService.fetchStock(
+        _selectedSymbol,
+        period: _ranges[_selectedPeriod],
+        interval: _intervals[_selectedPeriod],
+      );
     }
-    if (mounted) setState(() { _asset = a; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _asset = a;
+        _loading = false;
+      });
+    }
+    await _loadSymbolNews();
+  }
+
+  Future<void> _loadSymbolNews() async {
+    if (_assetCategory != 'bist') {
+      if (mounted) setState(() => _symbolNews = []);
+      return;
+    }
+
+    if (mounted) setState(() => _newsLoading = true);
+    try {
+      final investingNews = await KapNewsService.fetchInvestingNews(_selectedSymbol);
+      if (investingNews.isNotEmpty) {
+        if (mounted) setState(() => _symbolNews = investingNews);
+        return;
+      }
+
+      final allNews = await KapNewsService.fetch();
+      final filtered = KapNewsService.filterBySymbol(allNews, _selectedSymbol);
+      if (mounted) setState(() => _symbolNews = filtered.take(6).toList());
+    } catch (_) {
+      if (mounted) setState(() => _symbolNews = []);
+    } finally {
+      if (mounted) setState(() => _newsLoading = false);
+    }
   }
 
   void _showPicker() {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _PickerSheet(
         selectedCategory: _assetCategory,
@@ -118,13 +160,78 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
     );
   }
 
+  Future<void> _addToFavoriteList(String symbol, String name, String listKey) async {
+    final listA = PortfolioService.getFavoriteList('listA');
+    final listB = PortfolioService.getFavoriteList('listB');
+
+    if (listKey == 'listA' && listA.contains(symbol) || listKey == 'listB' && listB.contains(symbol)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$name zaten ${listKey == 'listA' ? 'Takip 1' : 'Takip 2'} listesinde.')),
+        );
+      }
+      return;
+    }
+
+    if (listKey == 'listA') {
+      await PortfolioService.saveFavoriteLists([...listA, symbol], listB);
+    } else {
+      await PortfolioService.saveFavoriteLists(listA, [...listB, symbol]);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$name ${listKey == 'listA' ? 'Takip 1' : 'Takip 2'} listesine eklendi.')),
+      );
+      setState(() {});
+    }
+  }
+
+  void _showFavoriteChoiceDialog(String symbol, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Favori Listesine Ekle'),
+        content: const Text('Hisseyi hangi listeye eklemek istersiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _addToFavoriteList(symbol, name, 'listA');
+            },
+            child: const Text('Takip 1'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _addToFavoriteList(symbol, name, 'listB');
+            },
+            child: const Text('Takip 2'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final surfaceVariant = theme.colorScheme.surfaceVariant;
+    final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceSecondary = onSurface.withOpacity(0.72);
+    final borderColor = theme.dividerColor;
+    final shadowColor = theme.brightness == Brightness.light
+        ? Colors.black.withOpacity(0.08)
+        : Colors.white.withOpacity(0.08);
     final a = _asset;
     final isPos = (a?.changePercent ?? 0) >= 0;
+    final isInFavorites = PortfolioService.getFavoriteList('listA').contains(_selectedSymbol) ||
+        PortfolioService.getFavoriteList('listB').contains(_selectedSymbol);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -141,12 +248,12 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                         children: [
                           Row(children: [
                             Text(a?.symbol ?? _selectedSymbol,
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: onSurface)),
                             const SizedBox(width: 4),
-                            const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 18),
+                            Icon(Icons.keyboard_arrow_down, color: onSurfaceSecondary, size: 18),
                           ]),
                           if (a != null)
-                            Text(a.name, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text(a.name, style: TextStyle(fontSize: 12, color: onSurfaceSecondary)),
                         ],
                       ),
                     ),
@@ -158,28 +265,19 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                     Row(children: [
                       if (_assetCategory == 'bist')
                         GestureDetector(
-                          onTap: () async {
-                            if (PortfolioService.isInWatchlist(_selectedSymbol)) {
-                              await PortfolioService.removeFromWatchlist(_selectedSymbol);
-                            } else {
-                              await PortfolioService.addToWatchlist(
-                                  WatchlistItem(symbol: _selectedSymbol, name: a?.name ?? _selectedSymbol));
-                            }
-                            setState(() {});
-                          },
+                          onTap: () => _showFavoriteChoiceDialog(_selectedSymbol, a?.name ?? _selectedSymbol),
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: Icon(
-                              PortfolioService.isInWatchlist(_selectedSymbol) ? Icons.star : Icons.star_border,
-                              color: PortfolioService.isInWatchlist(_selectedSymbol)
-                                  ? const Color(0xFFFFB300) : Colors.grey,
+                              isInFavorites ? Icons.star : Icons.star_border,
+                              color: isInFavorites ? const Color(0xFFFFB300) : onSurfaceSecondary,
                               size: 22,
                             ),
                           ),
                         ),
                       Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                         Text(a?.price.toStringAsFixed(2) ?? '-',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: onSurface)),
                         Text('${isPos ? '+' : ''}${a?.changePercent.toStringAsFixed(2) ?? '0.00'}%',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                                 color: isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30))),
@@ -206,14 +304,14 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                   TextField(
                     controller: _searchCtrl,
                     onChanged: _onSearch,
-                    style: const TextStyle(color: Colors.black87),
+                    style: TextStyle(color: onSurface),
                     decoration: InputDecoration(
                       hintText: 'Hisse ara... (örn: THY, Akbank)',
-                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
+                      hintStyle: TextStyle(color: onSurfaceSecondary, fontSize: 13),
+                      prefixIcon: Icon(Icons.search, color: onSurfaceSecondary, size: 20),
                       suffixIcon: _searchCtrl.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
+                              icon: Icon(Icons.clear, color: onSurfaceSecondary, size: 18),
                               onPressed: () {
                                 _searchCtrl.clear();
                                 setState(() => _searchResults = []);
@@ -221,7 +319,7 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -233,10 +331,10 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: surface,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08), blurRadius: 8)],
+                            color: shadowColor, blurRadius: 8)],
                       ),
                       child: Column(
                         children: _searchResults.map((s) => ListTile(
@@ -278,16 +376,53 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                             margin: EdgeInsets.only(right: i < _periods.length - 1 ? 8 : 0),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: sel ? const Color(0xFF34C759) : Colors.white,
+                              color: sel ? const Color(0xFF34C759) : surface,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Center(child: Text(_periods[i], style: TextStyle(
-                              color: sel ? Colors.white : Colors.grey,
+                              color: sel ? Colors.white : onSurfaceSecondary,
                               fontWeight: sel ? FontWeight.bold : FontWeight.normal, fontSize: 13,
                             ))),
                           ),
                         ));
                       })),
+
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(child: GestureDetector(
+                          onTap: () => setState(() { _selectedChartStyle = 0; }),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _selectedChartStyle == 0 ? const Color(0xFF34C759) : surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _selectedChartStyle == 0 ? Colors.transparent : borderColor),
+                            ),
+                            child: Center(child: Text('Çizgi', style: TextStyle(
+                              color: _selectedChartStyle == 0 ? Colors.white : onSurfaceSecondary,
+                              fontWeight: _selectedChartStyle == 0 ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 13,
+                            ))),
+                          ),
+                        )),
+                        Expanded(child: GestureDetector(
+                          onTap: () => setState(() { _selectedChartStyle = 1; }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _selectedChartStyle == 1 ? const Color(0xFF34C759) : surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _selectedChartStyle == 1 ? Colors.transparent : borderColor),
+                            ),
+                            child: Center(child: Text('Mum', style: TextStyle(
+                              color: _selectedChartStyle == 1 ? Colors.white : onSurfaceSecondary,
+                              fontWeight: _selectedChartStyle == 1 ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 13,
+                            ))),
+                          ),
+                        )),
+                      ]),
 
                       const SizedBox(height: 14),
 
@@ -295,40 +430,157 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                         const SizedBox(height: 200,
                             child: Center(child: CircularProgressIndicator(color: Color(0xFF34C759))))
                       else if (a != null)
-                        StockChart(asset: a, activeIndicators: _activeIndicators)
+                        StockChart(
+                          asset: a,
+                          activeIndicators: _activeIndicators,
+                          showCandles: _selectedChartStyle == 1,
+                        )
                       else
-                        const SizedBox(height: 200,
-                            child: Center(child: Text('Veri yüklenemedi', style: TextStyle(color: Colors.grey)))),
+                        SizedBox(height: 200,
+                            child: Center(child: Text('Veri yüklenemedi', style: TextStyle(color: onSurfaceSecondary)))),
+
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Grafik görsel bir referans olarak gösterilmektedir. Karar verme aşamasında ek analiz ve kendi stratejiniz önemlidir.',
+                          style: TextStyle(
+                            color: onSurfaceSecondary,
+                            fontSize: 12,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
 
                       const SizedBox(height: 16),
-                      const Text('Göstergeler', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                      const SizedBox(height: 8),
-                      Wrap(spacing: 8, runSpacing: 8, children: _indicators.map<Widget>((ind) {
-                        final active = _activeIndicators.contains(ind['label']);
-                        return IndicatorChip(
-                          label: ind['label']!, iconType: ind['icon']!, isActive: active,
-                          onTap: () => setState(() {
-                            if (active) { _activeIndicators.remove(ind['label']); }
-                            else { _activeIndicators.add(ind['label']!); }
-                          }),
-                        );
-                      }).toList()),
-
-                      const SizedBox(height: 16),
-                      const Text('Algoritmalar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                      const SizedBox(height: 8),
-                      if (a != null) ...[
-                        _AlgoCard(label: 'Trend Takip (EMA Cross)',
-                            signal: a.isGoldenCross ? 'Al Sinyali' : a.isDeathCross ? 'Sat Sinyali' : 'Nötr',
-                            isPositive: a.isGoldenCross ? true : a.isDeathCross ? false : null),
-                        const SizedBox(height: 8),
-                        _AlgoCard(label: 'Supertrend',
-                            signal: a.isSupertrendBuy ? 'Al Sinyali' : a.isSupertrendSell ? 'Sat Sinyali' : 'Nötr',
-                            isPositive: a.isSupertrendBuy ? true : a.isSupertrendSell ? false : null),
-                        const SizedBox(height: 8),
-                        _AlgoCard(label: 'RSI Tarayıcısı',
-                            signal: a.isRsiBelow40 ? 'Aşırı Satım' : 'Normal',
-                            isPositive: a.isRsiBelow40 ? true : null),
+                      Row(
+                        children: [
+                          _InfoTabButton(
+                            label: 'Özet',
+                            selected: _selectedInfoTab == 0,
+                            onTap: () => setState(() => _selectedInfoTab = 0),
+                          ),
+                          const SizedBox(width: 8),
+                          _InfoTabButton(
+                            label: 'Haberler',
+                            selected: _selectedInfoTab == 1,
+                            onTap: () => setState(() => _selectedInfoTab = 1),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (_selectedInfoTab == 0) ...[
+                        if (a != null) ...[
+                          _SummaryCard(items: [
+                            _SummaryItem(label: 'Son Fiyat', value: '${a.price.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Alış Fiyatı', value: '${a.open.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Satış Fiyatı', value: '${a.price.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Önceki Kapanış', value: '${a.previousClose.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Açılış Fiyatı', value: '${a.open.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Ağırlıklı Ortalama', value: '${a.vwap.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'En Yüksek', value: '${a.high.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'En Düşük', value: '${a.low.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'PD/DD', value: a.pdDd > 0 ? a.pdDd.toStringAsFixed(2) : '-'),
+                            _SummaryItem(label: 'F/K', value: a.fk > 0 ? a.fk.toStringAsFixed(2) : '-'),
+                            _SummaryItem(label: 'Tavan', value: '${a.ceiling.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Taban', value: '${a.floor.toStringAsFixed(2)} ₺'),
+                            _SummaryItem(label: 'Günlük İşlem Adedi', value: a.latestVolume.toStringAsFixed(0)),
+                            _SummaryItem(label: 'Günlük İşlem Hacmi', value: '${a.dailyTurnover.toStringAsFixed(2)} ₺'),
+                          ]),
+                        ],
+                      ] else ...[
+                        if (_assetCategory == 'bist') ...[
+                          if (_newsLoading)
+                            const SizedBox(
+                              height: 80,
+                              child: Center(child: CircularProgressIndicator(color: Color(0xFF34C759))),
+                            )
+                          else if (_symbolNews.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: surface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$_selectedSymbol için henüz haber bulunamadı.',
+                                style: TextStyle(color: onSurfaceSecondary, fontSize: 13),
+                              ),
+                            )
+                          else
+                            ..._symbolNews.map((item) => Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: surface,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: borderColor.withOpacity(0.4)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              item.cleanTitle.isNotEmpty ? item.cleanTitle : item.title,
+                                              style: TextStyle(
+                                                color: onSurface,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF34C759).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              item.source,
+                                              style: const TextStyle(
+                                                color: Color(0xFF34C759),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (item.summary.isNotEmpty)
+                                        Text(
+                                          item.summary,
+                                          style: TextStyle(color: onSurfaceSecondary, fontSize: 12, height: 1.4),
+                                        ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        item.time,
+                                        style: TextStyle(color: onSurfaceSecondary.withOpacity(0.8), fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                        ] else
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Haberler bölümü yalnızca BIST hisseleri için kullanılabilir.',
+                              style: TextStyle(color: onSurfaceSecondary, fontSize: 13),
+                            ),
+                          ),
                       ],
                       const SizedBox(height: 24),
                     ]),
@@ -341,21 +593,120 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
   }
 }
 
+class _InfoTabButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _InfoTabButton({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final color = selected ? const Color(0xFF34C759) : onSurface.withOpacity(0.72);
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF34C759).withOpacity(0.12) : surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: selected ? const Color(0xFF34C759) : theme.dividerColor),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final List<_SummaryItem> items;
+  const _SummaryCard({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final shadowColor = theme.brightness == Brightness.light
+        ? Colors.black.withOpacity(0.05)
+        : Colors.white.withOpacity(0.05);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: shadowColor, blurRadius: 10)],
+      ),
+      child: Column(
+        children: items.map((item) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _SummaryTile(item: item),
+        )).toList(),
+      ),
+    );
+  }
+}
+
+class _SummaryItem {
+  final String label;
+  final String value;
+  const _SummaryItem({required this.label, required this.value});
+}
+
+class _SummaryTile extends StatelessWidget {
+  final _SummaryItem item;
+  const _SummaryTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceSecondary = onSurface.withOpacity(0.72);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(item.label, style: TextStyle(color: onSurfaceSecondary, fontSize: 13)),
+        Text(item.value, style: TextStyle(color: onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+}
+
 class _AlgoCard extends StatelessWidget {
   final String label, signal; final bool? isPositive;
   const _AlgoCard({required this.label, required this.signal, required this.isPositive});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceSecondary = onSurface.withOpacity(0.72);
     final color = isPositive == true ? const Color(0xFF34C759)
         : isPositive == false ? const Color(0xFFFF3B30) : Colors.grey;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12)),
       child: Row(children: [
-        const Icon(Icons.settings_input_component, color: Colors.grey, size: 18),
+        Icon(Icons.settings_input_component, color: onSurfaceSecondary, size: 18),
         const SizedBox(width: 10),
-        Expanded(child: Text(label, style: const TextStyle(color: Colors.black87, fontSize: 14))),
+        Expanded(child: Text(label, style: TextStyle(color: onSurface, fontSize: 14))),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
@@ -419,9 +770,12 @@ class _PickerSheetState extends State<_PickerSheet> {
           const SizedBox(height: 10),
           if (_cat == 'bist')
             TextField(
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: InputDecoration(
-                hintText: 'Hisse ara...', prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                filled: true, fillColor: const Color(0xFFF2F2F7),
+                hintText: 'Hisse ara...',
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                filled: true, fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
               onChanged: (v) => setState(() => _q = v),
@@ -458,17 +812,18 @@ class _CatBtn extends StatelessWidget {
   const _CatBtn({required this.label, required this.value, required this.cur, required this.onTap});
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final sel = value == cur;
     return GestureDetector(
       onTap: () => onTap(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: sel ? const Color(0xFF34C759) : const Color(0xFFF2F2F7),
+          color: sel ? const Color(0xFF34C759) : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(label, style: TextStyle(
-            color: sel ? Colors.white : Colors.black54, fontWeight: FontWeight.bold, fontSize: 13)),
+            color: sel ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.65), fontWeight: FontWeight.bold, fontSize: 13)),
       ),
     );
   }

@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/asset_model.dart';
 import 'bist_stocks.dart';
@@ -18,7 +18,7 @@ class StockService {
   ) {
     final price =
         (meta['regularMarketPrice'] as num?)?.toDouble() ??
-            (closes.isNotEmpty ? closes.last : 0.0);
+        (closes.isNotEmpty ? closes.last : 0.0);
 
     final previousClose = _resolvePreviousClose(meta, closes, price);
 
@@ -26,9 +26,12 @@ class StockService {
     final high = _todayHigh(meta, highs, price);
     final low = _todayLow(meta, lows, price);
 
-    final changePercent =
-        (meta['regularMarketChangePercent'] as num?)?.toDouble() ??
-        (previousClose != 0 ? ((price - previousClose) / previousClose) * 100 : 0.0);
+    final rawChangePercent = (meta['regularMarketChangePercent'] as num?)
+        ?.toDouble();
+    final fallbackChangePercent = previousClose != 0
+        ? ((price - previousClose) / previousClose) * 100
+        : 0.0;
+    final changePercent = rawChangePercent ?? fallbackChangePercent;
 
     return _DailyQuote(
       price: price,
@@ -41,7 +44,10 @@ class StockService {
   }
 
   static double _resolvePreviousClose(
-      Map<String, dynamic> meta, List<double> closes, double price) {
+    Map<String, dynamic> meta,
+    List<double> closes,
+    double price,
+  ) {
     final fromMeta = (meta['previousClose'] as num?)?.toDouble();
     if (fromMeta != null && fromMeta > 0) return fromMeta;
     if (closes.isEmpty) return price;
@@ -60,7 +66,10 @@ class StockService {
   }
 
   static double _todayHigh(
-      Map<String, dynamic> meta, List<double> highs, double price) {
+    Map<String, dynamic> meta,
+    List<double> highs,
+    double price,
+  ) {
     final fromMeta = (meta['regularMarketDayHigh'] as num?)?.toDouble();
     if (fromMeta != null && fromMeta > 0) return fromMeta;
     if (highs.isNotEmpty && highs.last > 0) return highs.last;
@@ -68,7 +77,10 @@ class StockService {
   }
 
   static double _todayLow(
-      Map<String, dynamic> meta, List<double> lows, double price) {
+    Map<String, dynamic> meta,
+    List<double> lows,
+    double price,
+  ) {
     final fromMeta = (meta['regularMarketDayLow'] as num?)?.toDouble();
     if (fromMeta != null && fromMeta > 0) return fromMeta;
     if (lows.isNotEmpty && lows.last > 0) return lows.last;
@@ -89,10 +101,14 @@ class StockService {
   }
 
   static Future<Map<String, dynamic>?> _fetchChartJson(
-      String yahooSymbol, String range) async {
+    String yahooSymbol,
+    String range, {
+    String interval = '1d',
+  }) async {
     try {
       final url = Uri.parse(
-          '$_baseUrl/$yahooSymbol?interval=1d&range=$range');
+        '$_baseUrl/$yahooSymbol?interval=$interval&range=$range',
+      );
       final response = await http
           .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
           .timeout(const Duration(seconds: 10));
@@ -106,10 +122,69 @@ class StockService {
     }
   }
 
+  static Future<Map<String, dynamic>?> _fetchQuoteSummaryJson(
+    String yahooSymbol, {
+    String modules = 'financialData,defaultKeyStatistics',
+  }) async {
+    try {
+      final url = Uri.parse(
+        'https://query1.finance.yahoo.com/v10/finance/quoteSummary/$yahooSymbol?modules=$modules',
+      );
+      final response = await http
+          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static double _parseYahooRawValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    if (value is Map<String, dynamic>) {
+      final raw = value['raw'];
+      if (raw is num) return raw.toDouble();
+    }
+    return 0;
+  }
+
+  static Map<String, double> _extractFundamentals(
+    Map<String, dynamic>? summaryJson,
+  ) {
+    if (summaryJson == null) return {'pdDd': 0, 'fk': 0};
+    final result = (summaryJson['quoteSummary']?['result'] as List?)?.first;
+    if (result == null) return {'pdDd': 0, 'fk': 0};
+
+    final financialData = result['financialData'] as Map<String, dynamic>?;
+    final defaultKeyStats =
+        result['defaultKeyStatistics'] as Map<String, dynamic>?;
+
+    final pdDd = _parseYahooRawValue(
+      financialData?['priceToBook'] ?? defaultKeyStats?['priceToBook'],
+    );
+    final trailingPe = _parseYahooRawValue(
+      financialData?['trailingPE'] ?? defaultKeyStats?['trailingPE'],
+    );
+    final forwardPe = _parseYahooRawValue(
+      financialData?['forwardPE'] ?? defaultKeyStats?['forwardPE'],
+    );
+    final fk = trailingPe > 0
+        ? trailingPe
+        : forwardPe > 0
+        ? forwardPe
+        : 0.0;
+
+    return {'pdDd': pdDd, 'fk': fk};
+  }
+
   static AssetModel? _assetFromChart(
     Map<String, dynamic> chartResult, {
     required String symbol,
     required String name,
+    double pdDd = 0,
+    double fk = 0,
   }) {
     final meta = chartResult['meta'] as Map<String, dynamic>;
     final quote = chartResult['indicators']?['quote']?[0];
@@ -147,12 +222,25 @@ class StockService {
     );
   }
 
-  static Future<AssetModel?> fetchStock(String symbol,
-      {String period = '3mo'}) async {
+  static Future<AssetModel?> fetchStock(
+    String symbol, {
+    String period = '3mo',
+    String interval = '1d',
+  }) async {
     try {
-      final chart = await _fetchChartJson('$symbol.IS', period);
+      final chartFuture = _fetchChartJson(
+        '$symbol.IS',
+        period,
+        interval: interval,
+      );
+      final summaryFuture = _fetchQuoteSummaryJson('$symbol.IS');
+      final results = await Future.wait([chartFuture, summaryFuture]);
+
+      final chart = results[0];
+      final quoteSummary = results[1];
       if (chart == null) return null;
 
+      final fundamentals = _extractFundamentals(quoteSummary);
       final stock = kBistStocks.firstWhere(
         (s) => s['symbol'] == symbol,
         orElse: () => {'symbol': symbol, 'name': symbol},
@@ -162,6 +250,8 @@ class StockService {
         chart,
         symbol: symbol,
         name: stock['name'] ?? symbol,
+        pdDd: fundamentals['pdDd'] ?? 0,
+        fk: fundamentals['fk'] ?? 0,
       );
     } catch (_) {
       return null;
@@ -171,6 +261,7 @@ class StockService {
   static Future<List<AssetModel>> fetchMultiple(
     List<String> symbols, {
     String period = '3mo',
+    String interval = '1d',
     void Function(int done, int total)? onProgress,
   }) async {
     final results = <AssetModel>[];
@@ -180,7 +271,9 @@ class StockService {
     for (int i = 0; i < symbols.length; i += batchSize) {
       final batch = symbols.skip(i).take(batchSize).toList();
       final batchResults = await Future.wait(
-        batch.map((symbol) => fetchStock(symbol, period: period)),
+        batch.map(
+          (symbol) => fetchStock(symbol, period: period, interval: interval),
+        ),
       );
 
       for (final asset in batchResults) {
@@ -200,8 +293,7 @@ class StockService {
     try {
       final chart = await _fetchChartJson('GC%3DF', '3mo');
       if (chart == null) return null;
-      return _assetFromChart(chart,
-          symbol: 'ALTIN', name: 'Altın (USD/oz)');
+      return _assetFromChart(chart, symbol: 'ALTIN', name: 'Altın (USD/oz)');
     } catch (_) {
       return null;
     }
@@ -211,15 +303,17 @@ class StockService {
     try {
       final chart = await _fetchChartJson('USDTRY%3DX', '3mo');
       if (chart == null) return null;
-      return _assetFromChart(chart,
-          symbol: 'DOLAR', name: 'Dolar/TL');
+      return _assetFromChart(chart, symbol: 'DOLAR', name: 'Dolar/TL');
     } catch (_) {
       return null;
     }
   }
 
   static Future<AssetModel?> fetchIndex(
-      String yahooSymbol, String displaySymbol, String name) async {
+    String yahooSymbol,
+    String displaySymbol,
+    String name,
+  ) async {
     try {
       final chart = await _fetchChartJson(yahooSymbol, '5d');
       if (chart == null) return null;
@@ -249,11 +343,14 @@ class StockService {
         price: gramPrice,
         changePercent: change,
         previousClose: prevGram,
-        open: ((goldUsd['open'] ?? goldUsd['price'])! / 31.1035) *
+        open:
+            ((goldUsd['open'] ?? goldUsd['price'])! / 31.1035) *
             (usdTry['open'] ?? usdTry['price'])!,
-        high: ((goldUsd['high'] ?? goldUsd['price'])! / 31.1035) *
+        high:
+            ((goldUsd['high'] ?? goldUsd['price'])! / 31.1035) *
             (usdTry['high'] ?? usdTry['price'])!,
-        low: ((goldUsd['low'] ?? goldUsd['price'])! / 31.1035) *
+        low:
+            ((goldUsd['low'] ?? goldUsd['price'])! / 31.1035) *
             (usdTry['low'] ?? usdTry['price'])!,
         prices: [],
         volumes: [],
@@ -283,11 +380,14 @@ class StockService {
         price: gramPrice,
         changePercent: change,
         previousClose: prevGram,
-        open: ((silverUsd['open'] ?? silverUsd['price'])! / 31.1035) *
+        open:
+            ((silverUsd['open'] ?? silverUsd['price'])! / 31.1035) *
             (usdTry['open'] ?? usdTry['price'])!,
-        high: ((silverUsd['high'] ?? silverUsd['price'])! / 31.1035) *
+        high:
+            ((silverUsd['high'] ?? silverUsd['price'])! / 31.1035) *
             (usdTry['high'] ?? usdTry['price'])!,
-        low: ((silverUsd['low'] ?? silverUsd['price'])! / 31.1035) *
+        low:
+            ((silverUsd['low'] ?? silverUsd['price'])! / 31.1035) *
             (usdTry['low'] ?? usdTry['price'])!,
         prices: [],
         volumes: [],
@@ -296,6 +396,67 @@ class StockService {
       return null;
     }
   }
+
+  static Future<AssetModel?> _fetchMetalTl({
+    required String yahooSymbol,
+    required String symbol,
+    required String name,
+  }) async {
+    try {
+      final results = await Future.wait([
+        _fetchSpot(yahooSymbol),
+        _fetchSpot('USDTRY%3DX'),
+      ]);
+      final metalUsd = results[0];
+      final usdTry = results[1];
+      if (metalUsd == null || usdTry == null) return null;
+
+      final gramPrice = (metalUsd['price']! / 31.1035) * usdTry['price']!;
+      final prevGram = (metalUsd['prev']! / 31.1035) * usdTry['prev']!;
+      final change = prevGram != 0
+          ? ((gramPrice - prevGram) / prevGram) * 100
+          : (metalUsd['changePercent']! + usdTry['changePercent']!);
+
+      return AssetModel(
+        symbol: symbol,
+        name: name,
+        price: gramPrice,
+        changePercent: change,
+        previousClose: prevGram,
+        open:
+            ((metalUsd['open'] ?? metalUsd['price'])! / 31.1035) *
+            (usdTry['open'] ?? usdTry['price'])!,
+        high:
+            ((metalUsd['high'] ?? metalUsd['price'])! / 31.1035) *
+            (usdTry['high'] ?? usdTry['price'])!,
+        low:
+            ((metalUsd['low'] ?? metalUsd['price'])! / 31.1035) *
+            (usdTry['low'] ?? usdTry['price'])!,
+        prices: [],
+        volumes: [],
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<AssetModel?> fetchSilverTl() => _fetchMetalTl(
+    yahooSymbol: 'SI%3DF',
+    symbol: 'GUMUS/TL',
+    name: 'Gümüş/TL',
+  );
+
+  static Future<AssetModel?> fetchPalladiumTl() => _fetchMetalTl(
+    yahooSymbol: 'PA%3DF',
+    symbol: 'PALADYUM/TL',
+    name: 'Paladyum/TL',
+  );
+
+  static Future<AssetModel?> fetchPlatinumTl() => _fetchMetalTl(
+    yahooSymbol: 'PL%3DF',
+    symbol: 'PLATIN/TL',
+    name: 'Platin/TL',
+  );
 
   static Future<AssetModel?> fetchEuro() async {
     try {
@@ -365,5 +526,3 @@ class _DailyQuote {
     required this.changePercent,
   });
 }
-
-

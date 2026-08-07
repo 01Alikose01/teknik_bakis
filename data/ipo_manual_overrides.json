@@ -12,18 +12,6 @@
     "source": "Manual Override"
   },
   {
-    "companyName": "Bewen Enerji A.S.",
-    "requestDates": "29.07.2026 - 31.07.2026",
-    "requestStart": "2026-07-29",
-    "requestEnd": "2026-07-31",
-    "price": "48,10 TL",
-    "lot": "96.000.000 lot",
-    "distributionType": "Esit Dagitim",
-    "symbol": "BEWEN",
-    "status": "upcoming",
-    "source": "Manual Override"
-  },
-  {
     "companyName": "Kardemir Celik Sanayi A.S.",
     "requestDates": "22.07.2026 - 24.07.2026",
     "requestStart": "2026-07-22",

@@ -5,11 +5,13 @@ import '../models/asset_model.dart';
 class StockChart extends StatelessWidget {
   final AssetModel asset;
   final Set<String> activeIndicators;
+  final bool showCandles;
 
   const StockChart({
     super.key,
     required this.asset,
     required this.activeIndicators,
+    this.showCandles = false,
   });
 
   @override
@@ -131,48 +133,50 @@ class StockChart extends StatelessWidget {
       children: [
         SizedBox(
           height: 200,
-          child: LineChart(
-            LineChartData(
-              minY: minPrice,
-              maxY: maxPrice,
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: (maxPrice - minPrice) / 4,
-                getDrawingHorizontalLine: (_) =>
-                    const FlLine(color: Colors.white10, strokeWidth: 1),
-              ),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                show: true,
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 52,
-                    getTitlesWidget: (value, meta) => Text(
-                      value.toStringAsFixed(1),
-                      style: const TextStyle(color: Colors.grey, fontSize: 9),
+          child: showCandles
+              ? _CandleChart(asset: asset)
+              : LineChart(
+                  LineChartData(
+                    minY: minPrice,
+                    maxY: maxPrice,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: (maxPrice - minPrice) / 4,
+                      getDrawingHorizontalLine: (_) =>
+                          const FlLine(color: Colors.white10, strokeWidth: 1),
                     ),
+                    borderData: FlBorderData(show: false),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 52,
+                          getTitlesWidget: (value, meta) => Text(
+                            value.toStringAsFixed(1),
+                            style: const TextStyle(color: Colors.grey, fontSize: 9),
+                          ),
+                        ),
+                      ),
+                    ),
+                    lineTouchData: LineTouchData(
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipColor: (_) => const Color(0xFF333355),
+                      ),
+                    ),
+                    lineBarsData: lineBars,
                   ),
                 ),
-              ),
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor: (_) => const Color(0xFF333355),
-                ),
-              ),
-              lineBarsData: lineBars,
-            ),
-          ),
         ),
         if (asset.volumes.isNotEmpty) ...[
           const SizedBox(height: 4),
           _VolumeChart(volumes: asset.volumes),
         ],
-        if (legendItems.length > 1) ...[
+        if (!showCandles && legendItems.length > 1) ...[
           const SizedBox(height: 6),
           Wrap(spacing: 12, runSpacing: 4, children: legendItems),
         ],
@@ -189,6 +193,118 @@ class StockChart extends StatelessWidget {
           _MacdChart(macdData: macdData),
         ],
       ],
+    );
+  }
+}
+
+class _CandleChart extends StatelessWidget {
+  final AssetModel asset;
+  const _CandleChart({required this.asset});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = [
+      asset.prices.length,
+      asset.opens.length,
+      asset.highs.length,
+      asset.lows.length,
+    ].reduce((a, b) => a < b ? a : b);
+
+    if (count <= 0) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: Text('Mum verisi yok', style: TextStyle(color: Colors.grey))),
+      );
+    }
+
+    final highs = asset.highs.take(count).toList();
+    final lows = asset.lows.take(count).toList();
+    final opens = asset.opens.take(count).toList();
+    final closes = asset.prices.take(count).toList();
+
+    final minY = lows.reduce((a, b) => a < b ? a : b) * 0.995;
+    final maxY = highs.reduce((a, b) => a > b ? a : b) * 1.005;
+    final range = maxY - minY;
+
+    final barGroups = List.generate(count, (i) {
+      final open = opens[i];
+      final close = closes[i];
+      final high = highs[i];
+      final low = lows[i];
+      final isUp = close >= open;
+      final bodyTop = isUp ? close : open;
+      final bodyBottom = isUp ? open : close;
+
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            fromY: low,
+            toY: high,
+            color: isUp ? const Color(0xFF00C853) : const Color(0xFFE53935),
+            width: 1.2,
+            borderRadius: BorderRadius.zero,
+          ),
+          BarChartRodData(
+            fromY: bodyBottom,
+            toY: bodyTop,
+            color: isUp ? const Color(0xFF00C853) : const Color(0xFFE53935),
+            width: 8,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ],
+      );
+    });
+
+    return SizedBox(
+      height: 200,
+      child: BarChart(
+        BarChartData(
+          minY: minY == maxY ? minY - 1 : minY,
+          maxY: maxY == minY ? maxY + 1 : maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: range == 0 ? 1 : range / 4,
+            getDrawingHorizontalLine: (_) => const FlLine(color: Colors.white10, strokeWidth: 1),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            show: true,
+            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 52,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toStringAsFixed(1),
+                  style: const TextStyle(color: Colors.grey, fontSize: 9),
+                ),
+              ),
+            ),
+          ),
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => const Color(0xFF333355),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final idx = group.x.toInt();
+                final open = opens[idx];
+                final high = highs[idx];
+                final low = lows[idx];
+                final close = closes[idx];
+                return BarTooltipItem(
+                  'O: ${open.toStringAsFixed(2)}\nH: ${high.toStringAsFixed(2)}\nL: ${low.toStringAsFixed(2)}\nC: ${close.toStringAsFixed(2)}',
+                  const TextStyle(color: Colors.white, fontSize: 11),
+                );
+              },
+            ),
+          ),
+          barGroups: barGroups,
+        ),
+      ),
     );
   }
 }

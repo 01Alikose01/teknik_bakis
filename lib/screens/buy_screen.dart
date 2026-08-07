@@ -64,20 +64,22 @@ class _BuyScreenState extends State<BuyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final asset = widget.asset;
     final isPos = asset.changePercent >= 0;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 18),
+          icon: Icon(Icons.arrow_back_ios, color: theme.colorScheme.onSurface, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(asset.symbol,
-            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -89,9 +91,9 @@ class _BuyScreenState extends State<BuyScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+                boxShadow: [BoxShadow(color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.05), blurRadius: 8)],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,10 +120,10 @@ class _BuyScreenState extends State<BuyScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(asset.symbol,
-                                style: const TextStyle(fontWeight: FontWeight.bold,
-                                    fontSize: 18, color: Colors.black87)),
+                                style: TextStyle(fontWeight: FontWeight.bold,
+                                    fontSize: 18, color: theme.colorScheme.onSurface)),
                             Text(asset.name,
-                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
                                 overflow: TextOverflow.ellipsis),
                           ],
                         ),
@@ -159,15 +161,15 @@ class _BuyScreenState extends State<BuyScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+                boxShadow: [BoxShadow(color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.05), blurRadius: 8)],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Alım Emri',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                  Text('Alım Emri',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 16),
 
                   // Fiyat (salt okunur, anlık)
@@ -176,16 +178,16 @@ class _BuyScreenState extends State<BuyScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F7),
+                      color: theme.colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
                         Text(asset.price.toStringAsFixed(2),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                                color: Colors.black87)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface)),
                         const Spacer(),
-                        const Text('₺', style: TextStyle(color: Colors.grey)),
+                        Text('₺', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7))),
                       ],
                     ),
                   ),
@@ -203,10 +205,10 @@ class _BuyScreenState extends State<BuyScreen> {
                         child: Container(
                           width: 44, height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF2F2F7),
+                            color: theme.colorScheme.surfaceVariant,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.remove, color: Colors.black54),
+                          child: Icon(Icons.remove, color: theme.colorScheme.onSurface.withOpacity(0.7)),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -218,7 +220,7 @@ class _BuyScreenState extends State<BuyScreen> {
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: const Color(0xFFF2F2F7),
+                            fillColor: theme.colorScheme.surfaceVariant,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide: BorderSide.none,
@@ -252,11 +254,11 @@ class _BuyScreenState extends State<BuyScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Toplam Tutar',
-                          style: TextStyle(color: Colors.grey, fontSize: 14)),
+                      Text('Toplam Tutar',
+                          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 14)),
                       Text('${_total.toStringAsFixed(2)} ₺',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87)),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 18, color: theme.colorScheme.onSurface)),
                     ],
                   ),
                 ],
@@ -272,7 +274,7 @@ class _BuyScreenState extends State<BuyScreen> {
                 onPressed: _saved ? null : _buy,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF34C759),
-                  foregroundColor: Colors.white,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
@@ -283,10 +285,10 @@ class _BuyScreenState extends State<BuyScreen> {
             ),
 
             const SizedBox(height: 8),
-            const Center(
+            Center(
               child: Text(
                 'Bu işlem yatırım tavsiyesi niteliği taşımaz.',
-                style: TextStyle(color: Colors.grey, fontSize: 11),
+                style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 11),
               ),
             ),
             const SizedBox(height: 24),

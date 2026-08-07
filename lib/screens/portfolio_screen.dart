@@ -108,9 +108,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isProfit = _totalProfit >= 0;
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final secondary = onSurface.withValues(alpha: 0.72);
+    final cardColor = theme.colorScheme.surfaceContainerHighest;
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: surface,
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,
         backgroundColor: const Color(0xFF34C759),
@@ -133,24 +138,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     child: Container(
                       margin: const EdgeInsets.only(right: 10),
                       padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(color: Colors.white,
+                      decoration: BoxDecoration(color: cardColor,
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
+                              color: theme.colorScheme.shadow.withValues(alpha: 0.08),
                               blurRadius: 4)]),
-                      child: const Icon(Icons.arrow_back_ios,
-                          size: 16, color: Colors.black87),
+                      child: Icon(Icons.arrow_back_ios,
+                          size: 16, color: onSurface),
                     ),
                   ),
-                const Text('Portföy', style: TextStyle(fontSize: 22,
-                    fontWeight: FontWeight.bold, color: Colors.black87)),
+                Text('Portföy', style: TextStyle(fontSize: 22,
+                    fontWeight: FontWeight.bold, color: onSurface)),
                 const Spacer(),
                 if (_loading)
                   const SizedBox(width: 18, height: 18,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Color(0xFF34C759))),
                 IconButton(onPressed: _loadPortfolio,
-                    icon: const Icon(Icons.refresh, color: Colors.grey, size: 20)),
+                    icon: Icon(Icons.refresh, color: secondary, size: 20)),
               ]),
             )),
 
@@ -195,13 +200,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               SliverFillRemaining(child: Center(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.pie_chart_outline, color: Colors.grey, size: 56),
+                  Icon(Icons.pie_chart_outline, color: secondary, size: 56),
                   const SizedBox(height: 16),
-                  const Text('Portföyünüz boş',
-                      style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  Text('Portföyünüz boş',
+                      style: TextStyle(color: secondary, fontSize: 16)),
                   const SizedBox(height: 6),
-                  const Text('Sağ alttaki + butonuna tıklayarak hisse ekleyin.',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text('Sağ alttaki + butonuna tıklayarak hisse ekleyin.',
+                      style: TextStyle(color: secondary, fontSize: 12)),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     onPressed: _showAddDialog,
@@ -236,10 +241,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardColor,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
+                            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
                             blurRadius: 6)],
                       ),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,14 +266,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                           Expanded(child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(g.name, style: const TextStyle(
-                                  color: Colors.black87, fontSize: 13,
+                              Text(g.name, style: TextStyle(
+                                  color: onSurface, fontSize: 13,
                                   fontWeight: FontWeight.w600),
                                   overflow: TextOverflow.ellipsis),
                               Text('${g.lots.length} alış kaydı  •  '
                                   '${g.totalQty % 1 == 0 ? g.totalQty.toInt() : g.totalQty.toStringAsFixed(2)} lot',
-                                  style: const TextStyle(
-                                      color: Colors.grey, fontSize: 11)),
+                                  style: TextStyle(
+                                      color: secondary, fontSize: 11)),
                             ],
                           )),
                           Column(crossAxisAlignment: CrossAxisAlignment.end,
@@ -277,10 +282,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                               StockPriceHeader(asset: asset)
                             else
                               Text('${current.toStringAsFixed(2)} ₺',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
-                                      color: Colors.black87)),
+                                      color: onSurface)),
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -330,14 +335,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
                         const SizedBox(height: 6),
                         Row(children: [
-                          const Icon(Icons.touch_app_outlined,
-                              size: 12, color: Colors.grey),
+                          Icon(Icons.touch_app_outlined,
+                              size: 12, color: secondary),
                           const SizedBox(width: 4),
-                          const Text('Alış detayları için tıkla',
-                              style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          Text('Alış detayları için tıkla',
+                              style: TextStyle(color: secondary, fontSize: 11)),
                           const Spacer(),
-                          const Icon(Icons.chevron_right,
-                              size: 16, color: Colors.grey),
+                          Icon(Icons.chevron_right,
+                              size: 16, color: secondary),
                         ]),
                       ]),
                     ),
@@ -414,15 +419,19 @@ class _LotDetailScreen extends StatelessWidget {
     final chgColor =
         isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
 
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final secondary = onSurface.withValues(alpha: 0.72);
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F2F7),
+        backgroundColor: surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 18, color: Colors.black87),
+          icon: Icon(Icons.arrow_back_ios_new,
+              size: 18, color: onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(children: [
@@ -437,8 +446,8 @@ class _LotDetailScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(group.name, style: const TextStyle(
-              color: Colors.black87, fontSize: 14,
+          Expanded(child: Text(group.name, style: TextStyle(
+              color: onSurface, fontSize: 14,
               fontWeight: FontWeight.bold),
               overflow: TextOverflow.ellipsis)),
         ]),
@@ -495,8 +504,8 @@ class _LotDetailScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
           Text('Alış Kayıtları (${group.lots.length})',
-              style: const TextStyle(fontWeight: FontWeight.bold,
-                  fontSize: 15, color: Colors.black87)),
+              style: TextStyle(fontWeight: FontWeight.bold,
+                  fontSize: 15, color: onSurface)),
           const SizedBox(height: 8),
 
           // Her alış kaydı
@@ -555,10 +564,10 @@ class _LotDetailScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
+                      color: theme.colorScheme.shadow.withValues(alpha: 0.05),
                       blurRadius: 4)],
                 ),
                 child: Column(
@@ -600,10 +609,10 @@ class _LotDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.access_time, size: 11, color: Colors.grey),
+                      Icon(Icons.access_time, size: 11, color: secondary),
                       const SizedBox(width: 3),
                       Text(_fmtDate(lot.buyDate),
-                          style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                          style: TextStyle(color: secondary, fontSize: 11)),
                     ]),
                     const SizedBox(height: 10),
                     Row(children: [
@@ -643,22 +652,23 @@ class _LotDetailScreen extends StatelessWidget {
             ? lot.quantity.toInt().toString()
             : lot.quantity.toStringAsFixed(2));
 
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('${idx + 1}. Alışı Düzenle',
-            style: const TextStyle(
-                color: Colors.black87, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
             controller: priceCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(color: Colors.black87),
+            style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Alış Fiyatı (₺)',
-              filled: true, fillColor: const Color(0xFFF2F2F7),
+              filled: true, fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none),
@@ -668,10 +678,10 @@ class _LotDetailScreen extends StatelessWidget {
           TextField(
             controller: qtyCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(color: Colors.black87),
+            style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               labelText: 'Adet (lot)',
-              filled: true, fillColor: const Color(0xFFF2F2F7),
+              filled: true, fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none),
@@ -842,7 +852,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
     final preview = _previewAsset;
 
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: SingleChildScrollView(
@@ -853,10 +863,10 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
 
           // Başlık
           Row(children: [
-            const Text('Hisse Ekle', style: TextStyle(fontSize: 18,
-                fontWeight: FontWeight.bold, color: Colors.black87)),
+            Text('Hisse Ekle', style: TextStyle(fontSize: 18,
+                fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
             const Spacer(),
-            IconButton(icon: const Icon(Icons.close, color: Colors.grey),
+            IconButton(icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                 onPressed: () => Navigator.pop(context),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints()),
@@ -869,7 +879,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
               controller: _searchCtrl,
               autofocus: true,
               textCapitalization: TextCapitalization.characters,
-              style: const TextStyle(color: Colors.black87),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: _dec('Hisse ara... (THYAO, Akbank...)'),
               onChanged: _onSearch,
             ),
@@ -890,7 +900,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                         decoration: BoxDecoration(
                           color: chosen
                               ? const Color(0xFF34C759).withValues(alpha: 0.10)
-                              : const Color(0xFFF2F2F7),
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                           border: chosen ? Border.all(
                               color: const Color(0xFF34C759).withValues(alpha: 0.4))
@@ -909,7 +919,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                           const SizedBox(width: 8),
                           Expanded(child: Text(s['name']!,
                               style: TextStyle(color: chosen
-                                  ? const Color(0xFF34C759) : Colors.black87,
+                                  ? const Color(0xFF34C759) : Theme.of(context).colorScheme.onSurface,
                                   fontSize: 12),
                               overflow: TextOverflow.ellipsis)),
                           if (chosen) const Icon(Icons.check_circle,
@@ -944,7 +954,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(child: Text(_selected!['name']!,
-                    style: const TextStyle(color: Colors.black87, fontSize: 12),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
                     overflow: TextOverflow.ellipsis)),
                 if (_loadingPrice)
                   const SizedBox(width: 16, height: 16,
@@ -964,7 +974,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
           const SizedBox(height: 4),
           TextField(controller: _priceCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(color: Colors.black87),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: _dec('Örn: 325.50'),
               onChanged: (_) => setState(() {})),
           const SizedBox(height: 10),
@@ -974,7 +984,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
           const SizedBox(height: 4),
           TextField(controller: _qtyCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(color: Colors.black87),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: _dec('Örn: 100'),
               onChanged: (_) => setState(() {})),
           const SizedBox(height: 10),
@@ -987,12 +997,12 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
             child: AbsorbPointer(
               child: TextField(
                 controller: _dateCtrl,
-                style: const TextStyle(color: Colors.black87),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 decoration: _dec('').copyWith(
                   hintText: 'Boş bırakırsanız şu an kullanılır',
-                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
-                  suffixIcon: const Icon(Icons.calendar_today,
-                      color: Colors.grey, size: 18),
+                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12),
+                  suffixIcon: Icon(Icons.calendar_today,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), size: 18),
                 ),
               ),
             ),
@@ -1004,18 +1014,18 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F8F8),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: Column(children: [
                 _CalcRow('Toplam Maliyet',
-                    '${_totalCost.toStringAsFixed(2)} ₺', Colors.black87),
+                    '${_totalCost.toStringAsFixed(2)} ₺', Theme.of(context).colorScheme.onSurface),
                 const SizedBox(height: 6),
                 _CalcRow('Anlık Değer',
                     _previewAsset?.price != null
                         ? '${_totalValue.toStringAsFixed(2)} ₺' : '—',
-                    Colors.black87),
+                    Theme.of(context).colorScheme.onSurface),
                 if (_previewAsset?.price != null) ...[
                   const Divider(height: 14),
                   _CalcRow('Kar / Zarar (₺)',
@@ -1028,7 +1038,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                   const SizedBox(height: 4),
                   _CalcRow('Ortalama Maliyet',
                       '${_buyPrice.toStringAsFixed(2)} ₺ / lot',
-                      Colors.black54),
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                 ],
               ]),
             ),
@@ -1046,8 +1056,8 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
                     borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('İptal',
-                  style: TextStyle(color: Colors.grey)),
+              child: Text('İptal',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
             )),
             const SizedBox(width: 10),
             Expanded(child: ElevatedButton(
@@ -1081,9 +1091,9 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
 
   InputDecoration _dec(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
         filled: true,
-        fillColor: const Color(0xFFF2F2F7),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none),
@@ -1103,7 +1113,7 @@ class _SummaryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(children: [
-        Text(label, style: TextStyle(color: color.withValues(alpha: 0.75),
+        Text(label, style: TextStyle(color: color.withValues(alpha: 0.8),
             fontSize: 11)),
         const SizedBox(height: 2),
         Text(value, style: TextStyle(color: color,
@@ -1120,10 +1130,10 @@ class _DetailItem extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 10)),
           const SizedBox(height: 2),
           Text(value, style: TextStyle(
-              color: valueColor ?? Colors.black87,
+              color: valueColor ?? Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w600, fontSize: 12)),
         ]);
 }
@@ -1133,7 +1143,7 @@ class _Label extends StatelessWidget {
   const _Label(this.text);
   @override
   Widget build(BuildContext context) => Text(text,
-      style: const TextStyle(color: Colors.black54, fontSize: 12,
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12,
           fontWeight: FontWeight.w600));
 }
 
@@ -1145,7 +1155,7 @@ class _CalcRow extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
           Text(value, style: TextStyle(color: color,
               fontWeight: FontWeight.w600, fontSize: 13)),
         ]);

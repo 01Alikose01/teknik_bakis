@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/ipo_item.dart';
+import 'bist_stocks.dart';
 
 class IpoFeedData {
   final List<IpoItem> items;
@@ -43,6 +44,8 @@ class IpoService {
     if (cachedJson.isNotEmpty) {
       final items = _decodeItems(cachedJson);
       if (items.isNotEmpty) {
+        syncBistStocksWithIpoItems(items);
+
         return IpoFeedData(
           items: items,
           lastSyncedAt: _parseDate(box.get(_cacheLastSyncedAtKey)),
@@ -55,8 +58,11 @@ class IpoService {
     final seedJson = await rootBundle.loadString('assets/data/ipo_seed.json');
     final seedData = jsonDecode(seedJson) as Map<String, dynamic>;
 
+    final items = _mapItems(seedData['items'] as List? ?? []);
+    syncBistStocksWithIpoItems(items);
+
     return IpoFeedData(
-      items: _mapItems(seedData['items'] as List? ?? []),
+      items: items,
       lastSyncedAt: _parseDate(seedData['lastUpdated']),
       source: seedData['source']?.toString() ?? 'Yerel yedek veri',
       isFromCache: false,
@@ -93,6 +99,8 @@ class IpoService {
               .toString(),
         );
         await box.put(_cacheSourceKey, payload['source']?.toString() ?? url);
+
+        syncBistStocksWithIpoItems(items);
 
         return IpoFeedData(
           items: items,

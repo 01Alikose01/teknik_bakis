@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
+import '../services/subscription_service.dart';
 import '../widgets/stock_quote_panel.dart';
 import 'buy_screen.dart';
 
@@ -11,7 +12,8 @@ class ScannerScreen extends StatefulWidget {
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProviderStateMixin {
+class _ScannerScreenState extends State<ScannerScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   List<String> _activeFilters = [];
   final Set<String> _selectedAiFilters = {};
@@ -34,6 +36,11 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
 
   static String _scopeLabel(_ScanScope scope) =>
       scope == _ScanScope.bist100 ? 'BIST 100' : 'BIST 500';
+
+  static String _scopeSubtitle(_ScanScope scope) =>
+      scope == _ScanScope.bist100
+          ? 'BIST 100 içindeki hisseler taranır.'
+          : 'Borsa İstanbul’daki güncel hisse listesi üzerinden $kBistListedCount hisse taranır.';
 
   static const List<_FilterDef> _trendFilters = [
     _FilterDef(
@@ -117,6 +124,34 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       icon: Icons.show_chart,
     ),
     _FilterDef(
+      id: 'KISA VADE TRADE',
+      label: 'KISA VADE TRADE',
+      subtitle: 'Kısa vade AL/SAT sinyali',
+      color: Color(0xFF29B6F6),
+      icon: Icons.flash_on,
+    ),
+    _FilterDef(
+      id: 'HACIMLENEN DİP',
+      label: '🔥 HACİMLENEN DİP',
+      subtitle: 'Koşul: RSI düşük, hacim yükselmiş ve fiyat dip bölgesinde. Premium sinyali.',
+      color: Color(0xFFEF6C00),
+      icon: Icons.local_fire_department,
+    ),
+    _FilterDef(
+      id: 'DEGER_FILTRESI',
+      label: '💎 DEĞER FİLTRESİ',
+      subtitle: 'PD/DD < 1.50 · F/K > 0 · F/K < 15',
+      color: Color(0xFF00BFA5),
+      icon: Icons.diamond,
+    ),
+    _FilterDef(
+      id: 'BB SIKIŞMA',
+      label: 'BB SIKIŞMA',
+      subtitle: 'Bollinger Bandı Squeeze patlama öncesi oluşum.',
+      color: Color(0xFF7C4DFF),
+      icon: Icons.compress,
+    ),
+    _FilterDef(
       id: 'EMA20 > EMA50',
       label: 'EMA20 > EMA50',
       subtitle: 'Koşul: EMA20 çizgisi EMA50 çizgisini yukarı kestikten sonra en az %0.20 üzerine çıkmış olması.',
@@ -136,21 +171,52 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // App foreground'a gelince (ör: ödeme sonrası dönünce) premium durumu güncele
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {}); // hasPremiumAccess'i taze oku
+    }
   }
 
   List<_FilterDef> get _currentFilters =>
       _tabController.index == 0 ? _trendFilters : _momentumFilters;
 
+  bool _isFilterAvailableForFreePlan(String filterId) {
+    // Deneme süresi bittikten sonra ücretsiz kullanımda açık olan filtreler
+    const freeFilters = {
+      'MACD Bullish',  // MACD
+      'Golden Cross',  // EMA Kesişimi
+      'Death Cross',   // Death Cross
+    };
+    return freeFilters.contains(filterId);
+  }
+
+  bool _canUseFilter(String filterId) {
+    // Aktif deneme (10 gün) veya ücretli premium ise tüm filtreler açık
+    if (SubscriptionService.hasPremiumAccess) return true;
+    // Deneme bitmişse sadece ücretsiz filtreler
+    return _isFilterAvailableForFreePlan(filterId);
+  }
+
   bool _matchFilters(AssetModel a, List<String> filterIds) {
     return filterIds.every((filterId) {
       switch (filterId) {
         case 'RSI 40':           return a.isRsiBelow40;
+        case 'HACIMLENEN DİP':   return a.isVolumeDip;
+        case 'DEGER_FILTRESI':   return a.isValueStock;
+        case 'KISA VADE TRADE':  return a.isKisaVadeTrade;
+        case 'BB SIKIŞMA':       return a.isBollingerSqueeze;
         case 'EMA20 > EMA50':    return a.isEma20AboveEma50WithMargin;
         case 'MA50 = MA200':     return a.isPriceAboveMa50AndMa200;
         case 'Golden Cross':     return a.isGoldenCross;
@@ -169,6 +235,26 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   Future<void> _onFilterCardTap(_FilterDef def, bool isAiTab) async {
+    // Ücretsiz planda kısıtlı filtrelere erişim kontrolü
+    if (!_canUseFilter(def.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.lock, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('"${def.label}" premium özellik. Lütfen plan yükseltin.'),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFFF6B6B),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     if (_scanning) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -221,6 +307,32 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       return;
     }
 
+    // Seçili filtreler arasında erişim izni olmayan kontrol
+    final unavailableFilters = _selectedAiFilters
+        .where((filterId) => !_canUseFilter(filterId))
+        .toList();
+
+    if (unavailableFilters.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.lock, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${unavailableFilters.length} filtre premium. Lütfen plan yükseltin.',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFFF6B6B),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final defs = _momentumFilters
         .where((f) => _selectedAiFilters.contains(f.id))
         .toList();
@@ -249,6 +361,32 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   Future<void> _startScan(List<String> filterIds,
       {required _ScanScope scope}) async {
     if (filterIds.isEmpty) return;
+
+    // Erişim kontrolü
+    final unavailableFilters = filterIds.where((filterId) => !_canUseFilter(filterId)).toList();
+    if (unavailableFilters.isNotEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.lock, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${unavailableFilters.length} filtre premium. Lütfen plan yükseltin.',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFFF6B6B),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     final symbols = _symbolsForScope(scope);
     setState(() {
       _activeFilters = filterIds;
@@ -276,8 +414,9 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,14 +426,14 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: Row(
                 children: [
-                  const Icon(Icons.menu, color: Colors.black54, size: 22),
+                  Icon(Icons.menu, color: theme.colorScheme.onSurface.withValues(alpha: 0.7), size: 22),
                   const SizedBox(width: 8),
-                  const Text('Tarama', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  Text('Tarama', style: theme.textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   if (_scanning)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: Text('$_progress/$_total', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      child: Text('$_progress/$_total', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
                     ),
                   if (_scanning)
                     const SizedBox(width: 18, height: 18,
@@ -308,11 +447,11 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time, color: Color(0xFF34C759), size: 14),
+                  Icon(Icons.access_time, color: theme.colorScheme.primary, size: 14),
                   const SizedBox(width: 4),
-                  const Text('Aktif Periyot: ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text('Aktif Periyot: ', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 24)),
                   Text(_periodLabel(_activePeriod),
-                      style: const TextStyle(color: Color(0xFF34C759), fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontSize: 24, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -330,12 +469,12 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.tune, color: Colors.white, size: 16),
+                      Icon(Icons.tune, color: theme.colorScheme.onPrimary, size: 16),
                       const SizedBox(width: 8),
-                      const Text('Periyot Değiştir',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text('Periyot Değiştir',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                       const Spacer(),
-                      const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+                      Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.onPrimary, size: 20),
                     ],
                   ),
                 ),
@@ -360,7 +499,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: LinearProgressIndicator(
                   value: _total > 0 ? _progress / _total : 0,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   color: const Color(0xFF34C759),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -399,6 +538,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   Widget _buildEmptyResult() {
+    final theme = Theme.of(context);
     final filterName = _activeFilters.isNotEmpty
         ? (_currentFilters
             .where((f) => _activeFilters.contains(f.id))
@@ -442,50 +582,45 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
         'Farklı bir formasyon veya periyot deneyebilirsiniz.',
     };
 
-    return Center(
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759).withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.search_off,
-                  color: Color(0xFF34C759), size: 36),
-            ),
-            const SizedBox(height: 16),
+            Icon(Icons.search_off, size: 48, color: theme.colorScheme.primary),
+            const SizedBox(height: 18),
             Text(
               '$periodMsg taramasında sonuç bulunamadı',
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.black87),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 6)],
+            const SizedBox(height: 14),
+            Text(
+              advice,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                height: 1.6,
               ),
-              child: Text(
-                advice,
-                style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 13,
-                    height: 1.6),
-                textAlign: TextAlign.center,
-              ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             OutlinedButton.icon(
               onPressed: () => setState(() {
                 _activeFilters = [];
@@ -494,10 +629,11 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
               icon: const Icon(Icons.arrow_back, size: 16),
               label: const Text('Filtrelere Dön'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF34C759),
-                side: const BorderSide(color: Color(0xFF34C759)),
+                foregroundColor: theme.colorScheme.primary,
+                side: BorderSide(color: theme.colorScheme.primary),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -507,6 +643,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   Widget _buildScanButton() {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
         boxShadow: [
@@ -519,8 +656,8 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _scanning ? Colors.grey : const Color(0xFF34C759),
-          foregroundColor: Colors.white,
+          backgroundColor: _scanning ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF34C759),
+          foregroundColor: theme.colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -532,22 +669,22 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_scanning) ...[
-              const SizedBox(
+              SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Taranıyor...',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ] else ...[
               const Icon(Icons.search, size: 20),
               const SizedBox(width: 8),
               Text(
                 '${_selectedAiFilters.length} Sinyalle Süz (${_selectedAiFilters.length == 1 ? "Hassas" : "Çoklu Doğruluk"})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ],
           ],
@@ -567,9 +704,12 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
         final isSelected = isAiTab
             ? _selectedAiFilters.contains(def.id)
             : _activeFilters.contains(def.id);
+        final isAvailable = _canUseFilter(def.id);
         return _FilterCard(
           def: def,
           isSelected: isSelected,
+          isAvailable: isAvailable,
+          isPremium: !_isFilterAvailableForFreePlan(def.id),
           onTap: () => _onFilterCardTap(def, isAiTab),
         );
       },
@@ -577,6 +717,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   Widget _buildResults() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -584,14 +725,34 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
-              Text(
+              Expanded(
+                child: Text(
                   '${_results.length} hisse bulundu · ${_scopeLabel(_lastScanScope)}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              const Spacer(),
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => setState(() { _activeFilters = []; _results = []; }),
-                child: const Text('← Filtrelere Dön',
-                    style: TextStyle(color: Color(0xFF34C759), fontSize: 12, fontWeight: FontWeight.w600)),
+                onTap: () => setState(() {
+                  _activeFilters = [];
+                  _results = [];
+                }),
+                child: Text(
+                  '← Filtrelere Dön',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -611,20 +772,21 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   void _showPeriodSheet() {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Periyot Seç', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Periyot Seç', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ...['4S', 'G', 'H', 'A'].map((p) => ListTile(
-              title: Text(_periodLabel(p)),
+              title: Text(_periodLabel(p), style: theme.textTheme.bodyMedium),
               trailing: _activePeriod == p
                   ? const Icon(Icons.check, color: Color(0xFF34C759)) : null,
               onTap: () {
@@ -698,12 +860,13 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
     final isMulti = filters.length > 1;
     final accent = isMulti ? const Color(0xFF34C759) : primary.color;
 
+    final theme = Theme.of(context);
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -759,10 +922,10 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
                         ? '${filters.length} Algoritma Seçildi'
                         : '${primary.cleanLabel} Algoritmasını\nSeçtiniz',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: theme.colorScheme.onSurface,
                       height: 1.3,
                     ),
                   ),
@@ -774,9 +937,9 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
                         ? 'Seçili algoritmalar birlikte uygulanarak tarama yapılacak.'
                         : primary.subtitle,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
-                      color: Colors.black54,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                       height: 1.5,
                     ),
                     maxLines: isMulti ? 2 : 4,
@@ -814,6 +977,17 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
 
                   const SizedBox(height: 16),
 
+                  Text(
+                    _ScannerScreenState._scopeSubtitle(_scope),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Tarama kapsamı seçimi
                   Align(
                     alignment: Alignment.centerLeft,
@@ -822,7 +996,7 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -858,7 +1032,7 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F7),
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -880,10 +1054,10 @@ class _ScanConfirmDialogState extends State<_ScanConfirmDialog> {
                   Text(
                     'Taramayı başlatmak ister misiniz?',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey[800],
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -963,6 +1137,7 @@ class _ScopeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -971,10 +1146,10 @@ class _ScopeOption extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? accent.withValues(alpha: 0.10)
-              : const Color(0xFFF2F2F7),
+              : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? accent : Colors.grey.shade300,
+            color: selected ? accent : theme.colorScheme.surfaceContainerHighest,
             width: selected ? 2 : 1,
           ),
         ),
@@ -985,7 +1160,7 @@ class _ScopeOption extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: selected ? accent : Colors.black87,
+                color: selected ? accent : theme.colorScheme.onSurface.withValues(alpha: 0.85),
               ),
             ),
             if (selected) ...[
@@ -1014,17 +1189,18 @@ class _ConfirmInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Icon(icon, size: 16, color: iconColor),
         const SizedBox(width: 8),
         Text(label,
-            style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.72), fontSize: 24)),
         const Spacer(),
         Text(value,
-            style: const TextStyle(
-                color: Colors.black87,
-                fontSize: 12,
+            style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 24,
                 fontWeight: FontWeight.w600)),
       ],
     );
@@ -1034,49 +1210,185 @@ class _ConfirmInfoRow extends StatelessWidget {
 class _FilterCard extends StatelessWidget {
   final _FilterDef def;
   final bool isSelected;
+  final bool isAvailable;  // Ücretsiz planda available olup olmadığını gösterir
+  final bool isPremium;
   final VoidCallback onTap;
-  const _FilterCard({required this.def, required this.isSelected, required this.onTap});
+  const _FilterCard({
+    required this.def,
+    required this.isSelected,
+    required this.isAvailable,
+    required this.isPremium,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: isSelected ? Border.all(color: def.color, width: 2) : null,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48, height: 48,
+      onTap: isAvailable ? onTap : null,
+      child: Stack(
+        children: [
+          Opacity(
+            opacity: isAvailable ? 1.0 : 0.4,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(20),  // 14 → 20 (2x artış)
               decoration: BoxDecoration(
-                color: def.color,
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: isSelected && isAvailable
+                    ? Border.all(color: def.color, width: 2.5)
+                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  )
+                ],
               ),
-              child: Icon(def.icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(def.label, style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                  const SizedBox(height: 3),
-                  Text(def.subtitle, style: const TextStyle(color: Colors.grey, fontSize: 11),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Container(
+                    width: 64,  // 48 → 64
+                    height: 64,  // 48 → 64
+                    decoration: BoxDecoration(
+                      color: isAvailable ? def.color : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(14),  // 12 → 14
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          def.icon,
+                          color: Colors.white,
+                          size: 32,  // 24 → 32
+                        ),
+                        if (!isAvailable)
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.lock,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 18),  // 14 → 18
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          def.label,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                        ),
+                        const SizedBox(height: 5),  // 3 → 5
+                        Text(
+                          def.subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                            fontSize: 13,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (isPremium) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              '👑 Premium',
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurface,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!isAvailable) ...[  // Premium lock göstergesi
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFF6B6B).withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: const Text(
+                              '🔒 Premium Özellik',
+                              style: TextStyle(
+                                color: Color(0xFFFF6B6B),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (isAvailable)
+                    Icon(Icons.chevron_right, color: theme.colorScheme.onSurface.withValues(alpha: 0.65), size: 24)
+                  else
+                    Icon(Icons.lock, color: theme.colorScheme.onSurface.withValues(alpha: 0.65), size: 24),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
-          ],
-        ),
+          ),
+          // Kral Tacı ve Premium etiket (Premium filtreler için)
+          if (isPremium)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    )
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('king.png', width: 18, height: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Premium',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1089,6 +1401,7 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isPos = asset.changePercent >= 0;
     final ema5val   = asset.ema(5);
     final ema20val  = asset.ema(20);
@@ -1101,6 +1414,30 @@ class _ResultCard extends StatelessWidget {
       for (final filterId in activeFilters) {
         if (filterId == 'RSI 40' && asset.isRsiBelow40 && currentRsi != null) {
           badges.add(_Badge(label: 'RSI ${currentRsi.toStringAsFixed(1)}', color: const Color(0xFFAB47BC)));
+        }
+        if (filterId == 'HACIMLENEN DİP' && asset.isVolumeDip) {
+          badges.add(const _Badge(label: '🔥 HACİMLENEN DİP', color: Color(0xFFEF6C00)));
+        }
+        if (filterId == 'DEGER_FILTRESI' && asset.isValueStock) {
+          badges.add(const _Badge(label: '💎 DEĞER FİLTRESİ', color: Color(0xFF00BFA5)));
+        }
+        if (filterId == 'KISA VADE TRADE' && asset.isKisaVadeTrade) {
+          String label;
+          if (asset.isEma8CrossUp) {
+            label = '🟢 EMA8 Yukarı Kesti';
+          } else if (asset.isEma8CrossDown) {
+            label = '🔴 EMA8 Aşağı Kesti';
+          } else if (asset.isPriceAboveEma8) {
+            label = '📈 EMA8 Üzerinde';
+          } else if (asset.isPriceBelowEma8) {
+            label = '📉 EMA8 Altında';
+          } else {
+            label = 'KISA VADE TRADE';
+          }
+          badges.add(_Badge(label: label, color: const Color(0xFF29B6F6)));
+        }
+        if (filterId == 'BB SIKIŞMA' && asset.isBollingerSqueeze) {
+          badges.add(_Badge(label: asset.bollingerSqueezeStatus, color: const Color(0xFF7C4DFF)));
         }
         if (filterId == 'EMA20 > EMA50' && asset.isEma20AboveEma50WithMargin) {
           badges.add(const _Badge(label: 'EMA20 > EMA50', color: Color(0xFF2196F3)));
@@ -1143,6 +1480,9 @@ class _ResultCard extends StatelessWidget {
       if (asset.isRsiBelow40 && currentRsi != null) {
         badges.add(_Badge(label: 'RSI ${currentRsi.toStringAsFixed(1)}', color: const Color(0xFFAB47BC)));
       }
+      if (asset.isBollingerSqueeze) {
+        badges.add(_Badge(label: asset.bollingerSqueezeStatus, color: const Color(0xFF7C4DFF)));
+      }
       if (asset.isEma20AboveEma50WithMargin) {
         badges.add(const _Badge(label: 'EMA20 > EMA50', color: Color(0xFF2196F3)));
       }
@@ -1170,7 +1510,7 @@ class _ResultCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
       ),
@@ -1186,14 +1526,14 @@ class _ResultCard extends StatelessWidget {
                   )),
               const SizedBox(width: 8),
               Expanded(child: Text(asset.symbol,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.black87))),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 20, color: theme.colorScheme.onSurface) ?? const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.white))),
               StockPriceHeader(asset: asset),
             ],
           ),
           if (asset.name != asset.symbol)
             Padding(
               padding: const EdgeInsets.only(left: 16, top: 1),
-              child: Text(asset.name, style: const TextStyle(color: Colors.grey, fontSize: 11),
+              child: Text(asset.name, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis),
             ),
           const SizedBox(height: 10),
@@ -1206,9 +1546,8 @@ class _ResultCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _InfoRow(icon: Icons.bar_chart, iconColor: Colors.grey,
-                      label: 'Hacim', value: _fmtVol(asset.avgVolume)),
-                  const SizedBox(height: 5),
+                  _InfoRow(icon: Icons.bar_chart, iconColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      label: 'Hacim', value: _fmtVol(asset.avgVolume)),                  const SizedBox(height: 5),
                   _InfoRow(icon: Icons.arrow_upward, iconColor: const Color(0xFF34C759),
                       label: '52H Yüksek', value: '${asset.high52w.toStringAsFixed(2)} ₺'),
                   const SizedBox(height: 5),
@@ -1217,7 +1556,7 @@ class _ResultCard extends StatelessWidget {
                 ]),
               ),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                const Text('EMA Durumu', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                Text('EMA Durumu', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65))),
                 const SizedBox(height: 4),
                 if (ema5val.isNotEmpty)   _EmaRow(label: 'EMA5',   emaVal: ema5val.last,   price: asset.price),
                 if (ema20val.isNotEmpty)  _EmaRow(label: 'EMA20',  emaVal: ema20val.last,  price: asset.price),
@@ -1236,7 +1575,7 @@ class _ResultCard extends StatelessWidget {
                   padding: EdgeInsets.only(top: 3),
                   child: Text(
                     'Eşleşen Süzgeçler: ',
-                    style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
                 Expanded(
@@ -1250,7 +1589,7 @@ class _ResultCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(5),
                         border: Border.all(color: b.color.withValues(alpha: 0.4)),
                       ),
-                      child: Text(b.label, style: TextStyle(color: b.color, fontSize: 10, fontWeight: FontWeight.bold)),
+                      child: Text(b.label, style: TextStyle(color: b.color, fontSize: 11, fontWeight: FontWeight.w700)),
                     )).toList(),
                   ),
                 ),
@@ -1275,11 +1614,14 @@ class _InfoRow extends StatelessWidget {
   final IconData icon; final Color iconColor; final String label, value;
   const _InfoRow({required this.icon, required this.iconColor, required this.label, required this.value});
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    Icon(icon, color: iconColor, size: 13), const SizedBox(width: 3),
-    Text('$label  ', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-    Text(value, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w600)),
-  ]);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, color: iconColor, size: 14), const SizedBox(width: 3),
+      Text('$label  ', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12, fontWeight: FontWeight.w600)),
+      Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w700)),
+    ]);
+  }
 }
 
 class _EmaRow extends StatelessWidget {
@@ -1289,14 +1631,14 @@ class _EmaRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final above = price > emaVal;
     return Padding(padding: const EdgeInsets.only(bottom: 3), child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+      Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
       const SizedBox(width: 3),
-      Icon(above ? Icons.arrow_upward : Icons.arrow_downward, size: 11,
+      Icon(above ? Icons.arrow_upward : Icons.arrow_downward, size: 12,
           color: above ? const Color(0xFF34C759) : const Color(0xFFFF3B30)),
       const SizedBox(width: 2),
       Text(emaVal.toStringAsFixed(2), style: TextStyle(
           color: above ? const Color(0xFF34C759) : const Color(0xFFFF3B30),
-          fontSize: 11, fontWeight: FontWeight.w600)),
+          fontSize: 12, fontWeight: FontWeight.w700)),
     ]));
   }
 }
@@ -1326,10 +1668,11 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
   @override
   Widget build(BuildContext context) {
     final idx = widget.controller.index;
+    final theme = Theme.of(context);
     return Container(
       height: 80,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -1371,8 +1714,8 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
                       'RADAR',
                       style: TextStyle(
                         color: idx == 0
-                            ? Colors.black87
-                            : Colors.grey.shade400,
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.55),
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                         letterSpacing: 1.5,
@@ -1388,7 +1731,7 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
           Container(
             width: 1,
             height: 50,
-            color: Colors.grey.shade200,
+            color: theme.colorScheme.outline,
           ),
 
           // AI SİNYAL
@@ -1418,8 +1761,8 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
                       'AI SİNYAL',
                       style: TextStyle(
                         color: idx == 1
-                            ? Colors.black87
-                            : Colors.grey.shade400,
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.55),
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                         letterSpacing: 1.2,
@@ -1470,3 +1813,4 @@ class _RadarPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RadarPainter old) => old.color != color;
 }
+

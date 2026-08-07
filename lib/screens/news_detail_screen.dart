@@ -72,19 +72,20 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 18),
+          icon: Icon(Icons.arrow_back_ios, color: theme.colorScheme.onSurface, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(widget.source,
-            style: const TextStyle(
-                color: Color(0xFF34C759),
+            style: TextStyle(
+                color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 16)),
         centerTitle: true,
@@ -132,6 +133,7 @@ class _KapDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final service = KapAiService();
     final rawText = '$title\n$summary';
     final analysis = service.analyze(rawText, symbol: source);
@@ -160,11 +162,11 @@ class _KapDetailBody extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-                color: const Color(0xFF1C3A5E),
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6)),
             child: Text(source,
-                style: const TextStyle(
-                    color: Colors.white,
+                style: TextStyle(
+                    color: theme.colorScheme.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold)),
           ),
@@ -181,18 +183,17 @@ class _KapDetailBody extends StatelessWidget {
                     fontWeight: FontWeight.w600)),
           ),
           const Spacer(),
-          const Icon(Icons.access_time, size: 12, color: Colors.grey),
+          Icon(Icons.access_time, size: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.65)),
           const SizedBox(width: 3),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(time, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
         ]),
 
         const SizedBox(height: 14),
 
         Text(title,
-            style: const TextStyle(
-                fontSize: 19,
+            style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: theme.colorScheme.onSurface,
                 height: 1.4)),
 
         const SizedBox(height: 16),
@@ -209,37 +210,37 @@ class _KapDetailBody extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                      color: const Color(0xFF1C3A5E).withValues(alpha: 0.08),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(6)),
                   child: Text(source,
-                      style: const TextStyle(
-                          color: Color(0xFF1C3A5E),
+                      style: TextStyle(
+                          color: theme.colorScheme.primary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 8),
                 Text('KAP Özel Bildirim',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                    style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 11)),
               ]),
               const SizedBox(height: 10),
               Text(_buildBildirimContent(title, summary),
-                  style: const TextStyle(
-                      fontSize: 14, color: Colors.black87, height: 1.7)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.7)),
               if (fetchedContent.isNotEmpty &&
                   fetchedContent.length >
                       (summary.isEmpty ? title.length : summary.length) + 50) ...[
                 const SizedBox(height: 10),
                 const Divider(),
                 const SizedBox(height: 6),
-                const Text('Tam Metin:',
+                Text('Tam Metin:',
                     style: TextStyle(
-                        color: Colors.grey,
+                        color: theme.colorScheme.onSurface.withOpacity(0.65),
                         fontSize: 11,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 Text(fetchedContent,
-                    style: const TextStyle(
-                        fontSize: 13, color: Colors.black54, height: 1.6)),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.8), height: 1.6)),
               ],
             ],
           ),
@@ -274,16 +275,16 @@ class _KapDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(analysis.summary,
-                  style: const TextStyle(
-                      fontSize: 14, color: Colors.black87, height: 1.6)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.6)),
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Etki Skoru',
-                            style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        Text('Etki Skoru',
+                            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 11)),
                         const SizedBox(height: 4),
                         Row(children: [
                           Text(analysis.effectScore,
@@ -312,8 +313,8 @@ class _KapDetailBody extends StatelessWidget {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Önem',
-                            style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        Text('Önem',
+                            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 11)),
                         const SizedBox(height: 4),
                         Row(
                           children: List.generate(
@@ -341,8 +342,8 @@ class _KapDetailBody extends StatelessWidget {
           icon: '👤',
           title: 'Yatırımcı Yorumu',
           child: Text(_investorComment(analysis.effect, analysis.categoryName),
-              style: const TextStyle(
-                  fontSize: 14, color: Colors.black87, height: 1.6)),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
         ),
 
         // Riskler
@@ -363,9 +364,8 @@ class _KapDetailBody extends StatelessWidget {
                                       fontSize: 16)),
                               Expanded(
                                   child: Text(r,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.black87,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
                                           height: 1.4))),
                             ]),
                       ))
@@ -378,8 +378,8 @@ class _KapDetailBody extends StatelessWidget {
           icon: '📌',
           title: 'Piyasa Etkisi',
           child: Text(_marketImpact(analysis.effect),
-              style: const TextStyle(
-                  fontSize: 14, color: Colors.black87, height: 1.6)),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
         ),
 
         const SizedBox(height: 24),
@@ -520,6 +520,7 @@ class _BorsaDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -536,18 +537,17 @@ class _BorsaDetailBody extends StatelessWidget {
                     fontWeight: FontWeight.bold)),
           ),
           const Spacer(),
-          const Icon(Icons.access_time, size: 12, color: Colors.grey),
+          Icon(Icons.access_time, size: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.65)),
           const SizedBox(width: 3),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(time, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
         ]),
 
         const SizedBox(height: 14),
 
         Text(title,
-            style: const TextStyle(
-                fontSize: 19,
+            style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: theme.colorScheme.onSurface,
                 height: 1.4)),
 
         const SizedBox(height: 16),
@@ -566,30 +566,30 @@ class _BorsaDetailBody extends StatelessWidget {
               icon: '📰',
               title: 'Haber Özeti',
               child: Text(summary,
-                  style: const TextStyle(
-                      fontSize: 14, color: Colors.black87, height: 1.7)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.7)),
             ),
           if (fetchedContent.isNotEmpty && fetchedContent != summary)
             _InfoCard(
               icon: '📄',
               title: 'Haberin Tamamı',
               child: Text(fetchedContent,
-                  style: const TextStyle(
-                      fontSize: 14, color: Colors.black87, height: 1.7)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.7)),
             ),
           _InfoCard(
             icon: '📊',
             title: 'Piyasa Bağlamı',
             child: Text(_marketContext(title, summary),
-                style: const TextStyle(
-                    fontSize: 14, color: Colors.black87, height: 1.6)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
           ),
           _InfoCard(
             icon: '💡',
             title: 'Yatırımcı Notu',
             child: Text(_investorNote(title, summary),
-                style: const TextStyle(
-                    fontSize: 14, color: Colors.black87, height: 1.6)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
           ),
           _InfoCard(
             icon: '🔍',
@@ -607,9 +607,8 @@ class _BorsaDetailBody extends StatelessWidget {
                                       fontSize: 14)),
                               Expanded(
                                   child: Text(item,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.black87,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
                                           height: 1.4))),
                             ]),
                       ))
@@ -708,11 +707,12 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -726,10 +726,10 @@ class _InfoCard extends StatelessWidget {
             Text(icon, style: const TextStyle(fontSize: 15)),
             const SizedBox(width: 6),
             Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: Colors.black87)),
+                    color: theme.colorScheme.onSurface)),
           ]),
           const SizedBox(height: 10),
           child,

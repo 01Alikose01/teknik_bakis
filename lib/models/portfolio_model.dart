@@ -59,3 +59,33 @@ class WatchlistItem extends HiveObject {
     this.alertType = 'price',
   });
 }
+
+@HiveType(typeId: 2)
+class AlarmItem extends HiveObject {
+  @HiveField(0)
+  String symbol;
+
+  @HiveField(1)
+  String name;
+
+  @HiveField(2)
+  double alertPrice;
+
+  @HiveField(3)
+  bool alertAbove;
+
+  @HiveField(4)
+  String alertType; // 'buy' = Alış Alarmı, 'sell' = Satış Alarmı, 'price' = Fiyat Alarmı
+
+  @HiveField(5)
+  DateTime createdAt;
+
+  AlarmItem({
+    required this.symbol,
+    required this.name,
+    required this.alertPrice,
+    this.alertAbove = true,
+    this.alertType = 'price',
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+}

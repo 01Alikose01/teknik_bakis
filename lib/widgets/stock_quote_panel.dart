@@ -14,6 +14,7 @@ class StockQuotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isPos = asset.changePercent >= 0;
     final priceColor =
         isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
@@ -32,7 +33,7 @@ class StockQuotePanel extends StatelessWidget {
               value: asset.open > 0
                   ? asset.open.toStringAsFixed(2)
                   : asset.price.toStringAsFixed(2),
-              color: Colors.black54,
+              color: theme.colorScheme.onSurface.withOpacity(0.9),
             ),
             _OhlcCell(
               label: 'Yüksek',
@@ -138,13 +139,14 @@ class _OhlcCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Column(
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.grey,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),

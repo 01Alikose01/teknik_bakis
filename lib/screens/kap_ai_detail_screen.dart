@@ -13,6 +13,8 @@ class KapAiDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final analysis = item.analysis;
     final effect = analysis.effect;
 
@@ -35,14 +37,14 @@ class KapAiDetailScreen extends StatelessWidget {
             : 'Nötr';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F2F7),
+        backgroundColor: isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: Colors.black87, size: 18),
+          icon: Icon(Icons.arrow_back_ios_new,
+              color: isDark ? theme.colorScheme.onSurface : Colors.black87, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -55,16 +57,16 @@ class KapAiDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(item.source,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text('KAP AI Analizi',
-                  style: const TextStyle(
-                      color: Colors.black87,
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis),
@@ -81,19 +83,19 @@ class KapAiDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(item.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: Colors.black87)),
+                        color: theme.colorScheme.onSurface)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.access_time,
-                        size: 12, color: Colors.grey),
+                    Icon(Icons.access_time,
+                        size: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.65)),
                     const SizedBox(width: 4),
                     Text(item.time,
-                        style: const TextStyle(
-                            color: Colors.grey, fontSize: 12)),
+                        style: TextStyle(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
                   ],
                 ),
               ],
@@ -107,9 +109,9 @@ class KapAiDetailScreen extends StatelessWidget {
             emoji: '📢',
             title: 'AI Özeti',
             child: Text(analysis.summary,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black87,
+                    color: theme.colorScheme.onSurface,
                     height: 1.5)),
           ),
 
@@ -202,8 +204,8 @@ class KapAiDetailScreen extends StatelessWidget {
                 ),
                 child: Text(
                   analysis.contradiction.message ?? 'Metin içinde çelişkili sinyaller var.',
-                  style: const TextStyle(
-                      fontSize: 13, color: Colors.black87, height: 1.4),
+                  style: TextStyle(
+                      fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4),
                 ),
               ),
             ),
@@ -280,8 +282,10 @@ class KapAiDetailScreen extends StatelessWidget {
                 ),
                 if (analysis.secondaryCategories.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  const Text('Ek kategoriler',
-                      style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  Text('Ek kategoriler',
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.65),
+                          fontSize: 11)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
@@ -291,13 +295,20 @@ class KapAiDetailScreen extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.grey[100],
+                                color: isDark
+                                    ? theme.colorScheme.surfaceContainerHighest
+                                    : Colors.grey[100],
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.grey[300]!),
+                                border: Border.all(
+                                  color: isDark
+                                      ? theme.colorScheme.outlineVariant
+                                      : Colors.grey[300]!,
+                                ),
                               ),
                               child: Text(c.categoryName,
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Colors.black54)),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.onSurface.withOpacity(0.75))),
                             ))
                         .toList(),
                   ),
@@ -323,7 +334,7 @@ class KapAiDetailScreen extends StatelessWidget {
                   value: analysis.matchedKeywords.isEmpty
                       ? 'Tespit edilemedi'
                       : analysis.matchedKeywords.join(', '),
-                  valueColor: Colors.black54,
+                  valueColor: theme.colorScheme.onSurface.withOpacity(0.72),
                 ),
               ],
             ),
@@ -355,15 +366,18 @@ class KapAiDetailScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: analysis.score / 100,
-                              backgroundColor: Colors.grey[200],
+                              backgroundColor: isDark
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : Colors.grey[200],
                               valueColor: AlwaysStoppedAnimation(effectColor),
                               minHeight: 8,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text('${analysis.score} / 100',
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 11)),
+                              style: TextStyle(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.65),
+                                  fontSize: 11)),
                         ],
                       ),
                     ),
@@ -396,8 +410,8 @@ class KapAiDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text('${analysis.stars} / 5',
-                    style: const TextStyle(
-                        color: Colors.grey,
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.65),
                         fontSize: 13,
                         fontWeight: FontWeight.w500)),
               ],
@@ -410,8 +424,10 @@ class KapAiDetailScreen extends StatelessWidget {
             title: 'Küçük Yatırımcı İçin',
             child: Text(
               _retailInvestorNote(analysis),
-              style: const TextStyle(
-                  fontSize: 14, color: Colors.black87, height: 1.5),
+              style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface.withOpacity(0.9),
+                  height: 1.5),
             ),
           ),
 
@@ -420,8 +436,10 @@ class KapAiDetailScreen extends StatelessWidget {
             emoji: '⚠',
             title: 'Riskler',
             child: analysis.risks.isEmpty
-                ? const Text('Risk tespit edilmedi.',
-                    style: TextStyle(color: Colors.grey, fontSize: 13))
+                ? Text('Risk tespit edilmedi.',
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.65),
+                        fontSize: 13))
                 : Column(
                     children: analysis.risks
                         .map((r) => Padding(
@@ -435,9 +453,9 @@ class KapAiDetailScreen extends StatelessWidget {
                                           fontSize: 16)),
                                   Expanded(
                                     child: Text(r,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 13,
-                                            color: Colors.black87,
+                                            color: theme.colorScheme.onSurface.withOpacity(0.9),
                                             height: 1.4)),
                                   ),
                                 ],
@@ -472,8 +490,9 @@ class KapAiDetailScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _effectDescription(effect),
-                    style: const TextStyle(
-                        color: Colors.black54, fontSize: 12),
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.72),
+                        fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -489,15 +508,21 @@ class KapAiDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                color: isDark
+                    ? theme.colorScheme.surfaceContainerHighest
+                    : Colors.grey[50],
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
+                border: Border.all(
+                  color: isDark
+                      ? theme.colorScheme.outlineVariant
+                      : Colors.grey[200]!,
+                ),
               ),
               child: Text(
                 item.rawText.isEmpty ? 'Metin bulunamadı.' : item.rawText,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
-                    color: Colors.black54,
+                    color: theme.colorScheme.onSurface.withOpacity(0.78),
                     height: 1.6,
                     fontFamily: 'monospace'),
               ),
@@ -551,15 +576,18 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)
+              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.04), blurRadius: 6)
         ],
       ),
       child: child,
@@ -580,15 +608,18 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)
+              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.04), blurRadius: 6)
         ],
       ),
       child: Column(
@@ -599,10 +630,10 @@ class _SectionCard extends StatelessWidget {
               Text(emoji, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
               Text(title,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Colors.black87)),
+                      color: theme.colorScheme.onSurface)),
             ],
           ),
           const SizedBox(height: 12),
@@ -632,13 +663,15 @@ class _InfoRow extends StatelessWidget {
         SizedBox(
           width: 130,
           child: Text(label,
-              style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
+                  fontSize: 12)),
         ),
         Expanded(
           child: Text(value,
               style: TextStyle(
                   fontSize: 12,
-                  color: valueColor ?? Colors.black87,
+                  color: valueColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
                   fontWeight: FontWeight.w500)),
         ),
       ],
