@@ -122,16 +122,59 @@ class StockService {
     }
   }
 
+  static String? _yahooCookie;
+  static String? _yahooCrumb;
+  static DateTime? _yahooAuthLastFetch;
+  static bool _yahooAuthFetching = false;
+
+  static Future<void> _ensureYahooAuth() async {
+    if (_yahooCrumb != null &&
+        _yahooAuthLastFetch != null &&
+        DateTime.now().difference(_yahooAuthLastFetch!).inMinutes < 30) {
+      return;
+    }
+    if (_yahooAuthFetching) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+    _yahooAuthFetching = true;
+    try {
+      final res1 = await http.get(Uri.parse('https://fc.yahoo.com'),
+          headers: {'User-Agent': 'Mozilla/5.0'});
+      final setCookie = res1.headers['set-cookie'];
+      if (setCookie != null) {
+        _yahooCookie = setCookie.split(';').first;
+      }
+      if (_yahooCookie != null) {
+        final res2 = await http.get(
+            Uri.parse('https://query1.finance.yahoo.com/v1/test/getcrumb'),
+            headers: {'User-Agent': 'Mozilla/5.0', 'Cookie': _yahooCookie!});
+        if (res2.statusCode == 200) {
+          _yahooCrumb = res2.body.trim();
+          _yahooAuthLastFetch = DateTime.now();
+        }
+      }
+    } catch (_) {
+    } finally {
+      _yahooAuthFetching = false;
+    }
+  }
+
   static Future<Map<String, dynamic>?> _fetchQuoteSummaryJson(
     String yahooSymbol, {
     String modules = 'financialData,defaultKeyStatistics',
   }) async {
     try {
+      await _ensureYahooAuth();
+      final crumbQuery = _yahooCrumb != null ? '&crumb=$_yahooCrumb' : '';
       final url = Uri.parse(
-        'https://query1.finance.yahoo.com/v10/finance/quoteSummary/$yahooSymbol?modules=$modules',
+        'https://query1.finance.yahoo.com/v10/finance/quoteSummary/$yahooSymbol?modules=$modules$crumbQuery',
       );
+      final headers = {'User-Agent': 'Mozilla/5.0'};
+      if (_yahooCookie != null) headers['Cookie'] = _yahooCookie!;
+
       final response = await http
-          .get(url, headers: {'User-Agent': 'Mozilla/5.0'})
+          .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return null;
       return jsonDecode(response.body) as Map<String, dynamic>;
