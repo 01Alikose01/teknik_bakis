@@ -19,4 +19,14 @@ class SettingsService {
   }
 
   static bool get isDarkMode => darkMode.value;
+
+  // İlk kurulumda tema seçimi için
+  static const String _kThemeSelected = 'themeSelectedOnFirstLaunch';
+  
+  static bool get isThemeSelectedFirstTime => 
+      _box.get(_kThemeSelected, defaultValue: false) as bool;
+      
+  static Future<void> markThemeSelected() async {
+    await _box.put(_kThemeSelected, true);
+  }
 }

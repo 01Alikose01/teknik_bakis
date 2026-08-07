@@ -10,6 +10,7 @@ import 'screens/ipo_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/premium_gate_screen.dart';
+import 'widgets/theme_selection_dialog.dart';
 import 'services/app_navigation.dart';
 import 'services/portfolio_service.dart';
 import 'services/notification_service.dart';
@@ -155,6 +156,16 @@ class MainNavigationState extends State<MainNavigation> {
       setState(() {
         _currentIndex = index;
       });
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!SettingsService.isThemeSelectedFirstTime) {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Kullanıcı mutlaka seçim yapmalı
+          builder: (ctx) => const ThemeSelectionDialog(),
+        );
+      }
     });
   }
 
