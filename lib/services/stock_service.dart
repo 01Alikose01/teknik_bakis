@@ -197,6 +197,7 @@ class StockService {
     Map<String, dynamic>? summaryJson,
   ) {
     if (summaryJson == null) return {'pdDd': 0, 'fk': 0};
+    
     final result = (summaryJson['quoteSummary']?['result'] as List?)?.first;
     if (result == null) return {'pdDd': 0, 'fk': 0};
 
@@ -213,6 +214,7 @@ class StockService {
     final forwardPe = _parseYahooRawValue(
       financialData?['forwardPE'] ?? defaultKeyStats?['forwardPE'],
     );
+    
     final fk = trailingPe > 0
         ? trailingPe
         : forwardPe > 0
@@ -229,8 +231,12 @@ class StockService {
     double pdDd = 0,
     double fk = 0,
   }) {
-    final meta = chartResult['meta'] as Map<String, dynamic>;
-    final quote = chartResult['indicators']?['quote']?[0];
+    final meta = chartResult['meta'] as Map<String, dynamic>?;
+    if (meta == null) return null;
+
+    final indicators = chartResult['indicators']?['quote'] as List?;
+    if (indicators == null || indicators.isEmpty) return null;
+    final quote = indicators.first as Map<String, dynamic>?;
     if (quote == null) return null;
 
     final closes = _toDoubleList(quote['close'] as List?, dropNulls: true);
@@ -255,6 +261,8 @@ class StockService {
       open: q.open,
       high: q.high,
       low: q.low,
+      pdDd: pdDd,
+      fk: fk,
       prices: allPrices,
       opens: opens,
       highs: highs,
