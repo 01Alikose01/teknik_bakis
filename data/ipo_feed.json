@@ -1,12 +1,12 @@
 {
-  "lastUpdated": "2026-08-07T14:08:33.003Z",
+  "lastUpdated": "2026-08-07T18:40:40.274Z",
   "source": "HalkArz Scraper",
   "items": [
     {
       "companyName": "Türker Vangölü Enerji Yatırım A.Ş.",
       "requestDates": "12-13-14 Ağustos 2026",
-      "requestStart": "2026-08-12T09:00:00.000Z",
-      "requestEnd": "2026-08-14T09:00:00.000Z",
+      "requestStart": "2026-08-12T12:00:00.000Z",
+      "requestEnd": "2026-08-14T12:00:00.000Z",
       "price": "136,00 TL",
       "lot": "65.000.000 Lot",
       "distributionType": "Eşit Dağıtım **",
@@ -15,13 +15,13 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fd9277b3110bc",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:23.028Z"
+      "publishedAt": "2026-08-07T18:40:27.337Z"
     },
     {
       "companyName": "Kapeks Kimya Sanayi A.Ş.",
       "requestDates": "12-13-14 Ağustos 2026",
-      "requestStart": "2026-08-12T09:00:00.000Z",
-      "requestEnd": "2026-08-14T09:00:00.000Z",
+      "requestStart": "2026-08-12T12:00:00.000Z",
+      "requestEnd": "2026-08-14T12:00:00.000Z",
       "price": "94,00 TL",
       "lot": "25.100.000 Lot",
       "distributionType": "Eşit Dağıtım **",
@@ -30,13 +30,28 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc3f019fdb5a6a12166b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:23.551Z"
+      "publishedAt": "2026-08-07T18:40:28.030Z"
+    },
+    {
+      "companyName": "Teknika Plast Teknik Kalıp Plastik San. ve Tic. A.Ş.",
+      "requestDates": "12-13-14 Ağustos 2026",
+      "requestStart": "2026-08-12T12:00:00.000Z",
+      "requestEnd": "2026-08-14T12:00:00.000Z",
+      "price": "85,40 TL",
+      "lot": "31.000.000 Lot",
+      "distributionType": "Eşit Dağıtım **",
+      "symbol": "TKNKA",
+      "status": "upcoming",
+      "listingDate": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fdbb9f42242a2",
+      "source": "HalkArz",
+      "publishedAt": "2026-08-07T18:40:28.756Z"
     },
     {
       "companyName": "Çitlekçi Mağazacılık Gıda A.Ş.",
       "requestDates": "10-11-12 Ağustos 2026",
-      "requestStart": "2026-08-10T09:00:00.000Z",
-      "requestEnd": "2026-08-12T09:00:00.000Z",
+      "requestStart": "2026-08-10T12:00:00.000Z",
+      "requestEnd": "2026-08-12T12:00:00.000Z",
       "price": "73,70 TL",
       "lot": "36.500.000 Lot",
       "distributionType": "Eşit Dağıtım **",
@@ -45,22 +60,7 @@
       "listingDate": "",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc40019fd7eb4af2321e",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:24.075Z"
-    },
-    {
-      "companyName": "Teknika Plast Teknik Kalıp Plastik San. ve Tic. A.Ş.",
-      "requestDates": "Hazırlanıyor...",
-      "requestStart": "",
-      "requestEnd": "",
-      "price": "85,40 TL",
-      "lot": "31.000.000 Lot",
-      "distributionType": "Eşit Dağıtım **",
-      "symbol": "TKNKA",
-      "status": "upcoming",
-      "listingDate": "",
-      "kapUrl": "",
-      "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:24.593Z"
+      "publishedAt": "2026-08-07T18:40:29.443Z"
     },
     {
       "companyName": "Quick Sigorta A.S.",
@@ -245,47 +245,47 @@
     {
       "companyName": "Beta Enerji ve Teknoloji A.Ş.",
       "requestDates": "23-24-25 Haziran 2026",
-      "requestStart": "2026-06-23T09:00:00.000Z",
-      "requestEnd": "2026-06-25T09:00:00.000Z",
+      "requestStart": "2026-06-23T12:00:00.000Z",
+      "requestEnd": "2026-06-25T12:00:00.000Z",
       "price": "40,00 TL",
       "lot": "60.750.000 Lot",
       "distributionType": "Eşit Dağıtım",
       "symbol": "BETAE",
       "status": "trading",
-      "listingDate": "2026-07-01T09:00:00.000Z",
+      "listingDate": "2026-07-01T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019ed910f3ea7a2d",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:31.957Z"
+      "publishedAt": "2026-08-07T18:40:39.020Z"
     },
     {
       "companyName": "Ekinciler Demir ve Çelik Sanayi A.Ş.",
       "requestDates": "13-14-15 Mayıs 2026",
-      "requestStart": "2026-05-13T09:00:00.000Z",
-      "requestEnd": "2026-05-15T09:00:00.000Z",
+      "requestStart": "2026-05-13T12:00:00.000Z",
+      "requestEnd": "2026-05-15T12:00:00.000Z",
       "price": "45,00 TL",
       "lot": "52.000.000 Lot",
       "distributionType": "Eşit Dağıtım **",
       "symbol": "EKDMR",
       "status": "trading",
-      "listingDate": "2026-05-22T09:00:00.000Z",
+      "listingDate": "2026-05-22T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9d7b22d3019e1d5491210e0b",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:32.485Z"
+      "publishedAt": "2026-08-07T18:40:39.703Z"
     },
     {
       "companyName": "Enpara Bank A.Ş.",
       "requestDates": "7 Nisan 2026 (Kısmi Bölünme)",
-      "requestStart": "2026-04-07T09:00:00.000Z",
-      "requestEnd": "2026-04-07T09:00:00.000Z",
+      "requestStart": "2026-04-07T12:00:00.000Z",
+      "requestEnd": "2026-04-07T12:00:00.000Z",
       "price": "-",
       "lot": "-",
       "distributionType": "-",
       "symbol": "ENPRA",
       "status": "trading",
-      "listingDate": "2026-04-07T09:00:00.000Z",
+      "listingDate": "2026-04-07T12:00:00.000Z",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-07T14:08:33.000Z"
+      "publishedAt": "2026-08-07T18:40:40.273Z"
     }
   ]
 }
