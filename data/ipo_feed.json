@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-08-21T18:22:46.956Z",
+  "lastUpdated": "2026-08-22T00:40:22.554Z",
   "source": "HalkArz Scraper",
   "items": [
     {
@@ -13,9 +13,9 @@
       "symbol": "INTET",
       "status": "upcoming",
       "listingDate": "",
-      "kapUrl": "",
+      "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc3f01a0258b515a7062",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:36.295Z"
+      "publishedAt": "2026-08-22T00:40:11.916Z"
     },
     {
       "companyName": "Bakırcı Gayrimenkul Yatırım Ortaklığı A.Ş.",
@@ -30,7 +30,7 @@
       "listingDate": "",
       "kapUrl": "",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:36.821Z"
+      "publishedAt": "2026-08-22T00:40:12.437Z"
     },
     {
       "companyName": "İntetra Teknoloji ve Bilişim Hizmetleri A.Ş.",
@@ -60,7 +60,7 @@
       "listingDate": "2026-08-21T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddc019fdb55869a285c",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:38.093Z"
+      "publishedAt": "2026-08-22T00:40:13.690Z"
     },
     {
       "companyName": "Türker Vangölü Enerji Yatırım A.Ş.",
@@ -75,7 +75,7 @@
       "listingDate": "2026-08-20T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fd9277b3110bc",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:37.454Z"
+      "publishedAt": "2026-08-22T00:40:13.064Z"
     },
     {
       "companyName": "Teknika Plast Teknik Kalıp Plastik San. ve Tic. A.Ş.",
@@ -90,7 +90,7 @@
       "listingDate": "2026-08-20T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddd019fdbb9f42242a2",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:38.723Z"
+      "publishedAt": "2026-08-22T00:40:14.315Z"
     },
     {
       "companyName": "Çitlekçi Mağazacılık Gıda A.Ş.",
@@ -105,7 +105,7 @@
       "listingDate": "2026-08-18T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9f52dc40019fd7eb4af2321e",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:39.352Z"
+      "publishedAt": "2026-08-22T00:40:14.939Z"
     },
     {
       "companyName": "Quick Sigorta A.S.",
@@ -300,7 +300,7 @@
       "listingDate": "2026-07-01T12:00:00.000Z",
       "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328c9ec11d3d019ed910f3ea7a2d",
       "source": "HalkArz",
-      "publishedAt": "2026-08-21T18:22:46.954Z"
+      "publishedAt": "2026-08-22T00:40:22.552Z"
     },
     {
       "companyName": "Ekinciler Demir ve Çelik Sanayi A.Ş.",
