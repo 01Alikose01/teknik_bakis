@@ -641,11 +641,9 @@ function deriveIpoStatus({ requestStart, requestEnd, listingDate }) {
 }
 
 async function fetchHalkArzItems() {
-  const { default: nodeFetch } = await import('node-fetch');
-
-  const homepageRes = await nodeFetch('https://halkarz.com/', {
+  const homepageRes = await fetch('https://halkarz.com/', {
     headers: { 'User-Agent': HALKARZ_USER_AGENT },
-    timeout: 20000,
+    signal: AbortSignal.timeout(20000),
   });
   if (!homepageRes.ok) throw new Error(`HalkArz ana sayfa: HTTP ${homepageRes.status}`);
 
@@ -672,7 +670,10 @@ async function fetchHalkArzItems() {
   for (const item of pageItems) {
     try {
       await new Promise(r => setTimeout(r, 500));
-      const detailRes = await nodeFetch(item.url, { headers: { 'User-Agent': HALKARZ_USER_AGENT }, timeout: 15000 });
+      const detailRes = await fetch(item.url, {
+        headers: { 'User-Agent': HALKARZ_USER_AGENT },
+        signal: AbortSignal.timeout(15000),
+      });
       if (!detailRes.ok) continue;
       const detailHtml = await detailRes.text();
 
