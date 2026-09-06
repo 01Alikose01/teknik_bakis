@@ -1,4 +1,4 @@
-enum IpoStatus { upcoming, collecting, trading }
+enum IpoStatus { upcoming, collecting, pendingListing, trading }
 
 class IpoItem {
   final String companyName;
@@ -139,6 +139,8 @@ class IpoItem {
         return 'Yaklaşan';
       case IpoStatus.collecting:
         return 'Talep Topluyor';
+      case IpoStatus.pendingListing:
+        return 'Listeleme Bekliyor';
       case IpoStatus.trading:
         return 'Borsada İşlem Görüyor';
     }
@@ -179,6 +181,11 @@ class IpoItem {
       case 'collecting':
       case 'active':
         return IpoStatus.collecting;
+      case 'listeleme_bekliyor':
+      case 'listeleme bekliyor':
+      case 'pending_listing':
+      case 'pendinglisting':
+        return IpoStatus.pendingListing;
       case 'borsada_islem_goruyor':
       case 'borsada işlem görüyor':
       case 'trading':
@@ -196,15 +203,28 @@ class IpoItem {
     required IpoStatus fallbackStatus,
   }) {
     final now = DateTime.now();
+
+    // listingDate geldi veya bugün → borsada işlem görüyor
     if (listingDate != null && !listingDate.isAfter(now)) {
       return IpoStatus.trading;
     }
 
     if (requestEnd != null && now.isAfter(_endOfDay(requestEnd))) {
-      if (listingDate == null || !listingDate.isAfter(now)) {
+      // Talep toplama bitti
+      if (listingDate != null && !listingDate.isAfter(now)) {
         return IpoStatus.trading;
       }
-      return IpoStatus.collecting;
+      if (listingDate != null && listingDate.isAfter(now)) {
+        // Listeleme tarihi belli, henüz gelmedi
+        return IpoStatus.pendingListing;
+      }
+      // Listeleme tarihi bilinmiyor:
+      // JSON'da açıkça "trading" yazılıysa trading döndür,
+      // aksi hâlde listeleme bekliyor
+      if (fallbackStatus == IpoStatus.trading) {
+        return IpoStatus.trading;
+      }
+      return IpoStatus.pendingListing;
     }
 
     if (requestStart != null) {

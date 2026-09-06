@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Trial koruması ────────────────────────────────────────────────────
+    match /trials/{deviceId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['trialStart', 'trialConsumed'])
+                    && request.resource.data.trialConsumed == false;
+      allow update: if request.resource.data.trialStart == resource.data.trialStart
+                    && request.resource.data.trialConsumed == true;
+      allow delete: if false;
+    }
+
+    // ── Temel göstergeler (Cloud Function yazar, uygulama okur) ──────────
+    match /fundamentals/{ticker} {
+      allow read:   if true;
+      allow write:  if false;
+    }
+
+    // ── KAP Bildirimleri (Cloud Function yazar, uygulama okur) ──────────
+    match /kap_disclosures/{docId} {
+      allow read:   if true;
+      allow write:  if false;
+    }
+
+    // ── KAP Şirket Listesi ────────────────────────────────────────────────
+    match /kap_members/{docId} {
+      allow read:   if true;
+      allow write:  if false;
+    }
+
+    // ── KAP Sync Logları (sadece okuma) ─────────────────────────────────
+    match /kap_sync_logs/{docId} {
+      allow read:   if false; // sadece admin konsol
+      allow write:  if false;
+    }
+
+    // ── Meta belge ────────────────────────────────────────────────────────
+    match /meta/{doc} {
+      allow read:   if true;
+      allow write:  if false;
+    }
+
+    // ── Halka Arz (IPO) — Cloud Function yazar, uygulama okur ────────────
+    match /ipo_items/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    match /ipo_meta/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+  }
+}

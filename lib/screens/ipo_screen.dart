@@ -19,6 +19,7 @@ class _IpoScreenState extends State<IpoScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   Timer? _refreshTimer;
+  Timer? _statusTimer;
 
   List<IpoItem> _items = [];
   DateTime? _lastSyncedAt;
@@ -32,15 +33,27 @@ class _IpoScreenState extends State<IpoScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _loadInitial();
+
+    // 45 dakikada bir HTTP/Firestore yenilemesi
     _refreshTimer = Timer.periodic(
       IpoService.refreshInterval,
       (_) => _refresh(silent: true),
+    );
+
+    // Her 5 dakikada bir sadece UI'ı yeniden hesapla
+    // (tarih bazlı durum geçişleri için — yeni HTTP isteği yapmaz)
+    _statusTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) {
+        if (mounted && _items.isNotEmpty) setState(() {});
+      },
     );
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _statusTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -133,8 +146,8 @@ class _IpoScreenState extends State<IpoScreen>
           tabs: const [
             Tab(text: 'Yaklaşan'),
             Tab(text: 'Talep Topluyor'),
+            Tab(text: 'Listeleme Bekliyor'),
             Tab(text: 'Borsada İşlem Görüyor'),
-            Tab(text: 'Tümü'),
           ],
         ),
       ),
@@ -156,17 +169,15 @@ class _IpoScreenState extends State<IpoScreen>
                         emptyText: 'Talep toplayan halka arz bulunmuyor.',
                       ),
                       _buildList(
+                        grouped.pendingListing,
+                        emptyText: 'Listeleme bekleyen halka arz bulunmuyor.',
+                      ),
+                      _buildList(
                         grouped.latestTrading,
                         emptyText:
                             'Borsada işlem görmeye başlayan halka arz bulunmuyor.',
                         infoText:
                             'Bu bölümde yalnızca en güncel 10 halka arz yer alır; yeni kayıtlar geldikçe en eski olanlar otomatik olarak listeden çıkar.',
-                      ),
-                      _buildList(
-                        grouped.latestAll,
-                        emptyText: 'Genel halka arz listesi boş.',
-                        infoText:
-                            'Tümü sekmesinde en güncel 10 halka arzı toplu olarak görürsünüz; yeni kayıtlar eklendikçe liste kendini otomatik yeniler.',
                       ),
                     ],
                   ),
@@ -201,16 +212,16 @@ class _IpoScreenState extends State<IpoScreen>
                 color: const Color(0xFFFF9500),
               ),
               _summaryChip(
+                icon: Icons.hourglass_top_outlined,
+                label: 'Listeleme Bekliyor',
+                value: grouped.pendingListing.length.toString(),
+                color: const Color(0xFF9B59B6),
+              ),
+              _summaryChip(
                 icon: Icons.candlestick_chart,
                 label: 'Borsada',
                 value: grouped.trading.length.toString(),
                 color: const Color(0xFF34C759),
-              ),
-              _summaryChip(
-                icon: Icons.list_alt_outlined,
-                label: 'Genel Liste',
-                value: grouped.all.length.toString(),
-                color: const Color(0xFF5856D6),
               ),
             ],
           ),
@@ -545,7 +556,7 @@ class _IpoScreenState extends State<IpoScreen>
         final bDate = b.requestStart ?? b.sortDate ?? DateTime(2099);
         return aDate.compareTo(bDate);
       });
-      
+
     final collecting = all
         .where((item) => item.status == IpoStatus.collecting)
         .toList()
@@ -554,16 +565,24 @@ class _IpoScreenState extends State<IpoScreen>
         final bDate = b.requestStart ?? b.sortDate ?? DateTime(2099);
         return aDate.compareTo(bDate);
       });
-      
+
+    final pendingListing = all
+        .where((item) => item.status == IpoStatus.pendingListing)
+        .toList()
+      ..sort((a, b) {
+        final aDate = a.listingDate ?? a.requestEnd ?? a.sortDate ?? DateTime(2099);
+        final bDate = b.listingDate ?? b.requestEnd ?? b.sortDate ?? DateTime(2099);
+        return aDate.compareTo(bDate);
+      });
+
     final trading = all
         .where((item) => item.status == IpoStatus.trading)
         .toList();
 
     return _IpoGroups(
-      all: all,
-      latestAll: all.take(10).toList(),
       upcoming: upcoming,
       collecting: collecting,
+      pendingListing: pendingListing,
       trading: trading,
       latestTrading: trading.take(10).toList(),
     );
@@ -596,6 +615,8 @@ class _IpoScreenState extends State<IpoScreen>
         return const Color(0xFF007AFF);
       case IpoStatus.collecting:
         return const Color(0xFFFF9500);
+      case IpoStatus.pendingListing:
+        return const Color(0xFF9B59B6);
       case IpoStatus.trading:
         return const Color(0xFF34C759);
     }
@@ -616,18 +637,16 @@ class _IpoScreenState extends State<IpoScreen>
 }
 
 class _IpoGroups {
-  final List<IpoItem> all;
-  final List<IpoItem> latestAll;
   final List<IpoItem> upcoming;
   final List<IpoItem> collecting;
+  final List<IpoItem> pendingListing;
   final List<IpoItem> trading;
   final List<IpoItem> latestTrading;
 
   const _IpoGroups({
-    required this.all,
-    required this.latestAll,
     required this.upcoming,
     required this.collecting,
+    required this.pendingListing,
     required this.trading,
     required this.latestTrading,
   });
