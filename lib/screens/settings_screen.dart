@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
+import 'payment_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onUpgrade;
@@ -271,21 +272,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '✅ Haberler & KAP Bildirimleri',
                     '✅ Anlık Push Bildirimleri',
                   ],
-                  onTap: () async {
-                    await SubscriptionService.selectMonthlyPlan();
-                    MainNavigation.refreshSubscription();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Aylık Plan seçildi. 10 gün ücretsiz deneme başlıyor!'),
-                          backgroundColor: const Color(0xFF34C759),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          duration: const Duration(seconds: 2),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PaymentScreen(
+                          plan: 'monthly',
+                          nextScreen: MainNavigation(),
                         ),
-                      );
-                      Navigator.of(context).pop();
-                    }
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -306,21 +302,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '✅ %30 daha ucuz',
                     '✅ Yıllık öncelikli destek',
                   ],
-                  onTap: () async {
-                    await SubscriptionService.selectYearlyPlan();
-                    MainNavigation.refreshSubscription();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Yıllık Plan seçildi. 10 gün ücretsiz deneme başlıyor!'),
-                          backgroundColor: const Color(0xFFFF9500),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          duration: const Duration(seconds: 2),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PaymentScreen(
+                          plan: 'yearly',
+                          nextScreen: MainNavigation(),
                         ),
-                      );
-                      Navigator.of(context).pop();
-                    }
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 16),

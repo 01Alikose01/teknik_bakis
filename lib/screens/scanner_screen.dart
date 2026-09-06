@@ -193,20 +193,11 @@ class _ScannerScreenState extends State<ScannerScreen>
       _tabController.index == 0 ? _trendFilters : _momentumFilters;
 
   bool _isFilterAvailableForFreePlan(String filterId) {
-    // Deneme süresi bittikten sonra ücretsiz kullanımda açık olan filtreler
-    const freeFilters = {
-      'MACD Bullish',  // MACD
-      'Golden Cross',  // EMA Kesişimi
-      'Death Cross',   // Death Cross
-    };
-    return freeFilters.contains(filterId);
+    return SubscriptionService.freeScannerFilters.contains(filterId);
   }
 
   bool _canUseFilter(String filterId) {
-    // Aktif deneme (10 gün) veya ücretli premium ise tüm filtreler açık
-    if (SubscriptionService.hasPremiumAccess) return true;
-    // Deneme bitmişse sadece ücretsiz filtreler
-    return _isFilterAvailableForFreePlan(filterId);
+    return SubscriptionService.canUseScannerFilter(filterId);
   }
 
   bool _matchFilters(AssetModel a, List<String> filterIds) {

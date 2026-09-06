@@ -7,6 +7,8 @@ class SubscriptionService {
   static const int freeAlarmLimit = 5;
 
   // Box key'leri
+  // `plan` yalnızca ücretli plan bilgisidir. Trial, trialStart ile bağımsız
+  // olarak takip edilir.
   static const String _kPlan = 'plan'; // 'monthly'|'yearly'|'guest'|'none'
   static const String _kTrialStart =
       'trialStart'; // ISO8601 — 10 günlük deneme başlangıcı
@@ -16,9 +18,12 @@ class SubscriptionService {
   static bool _initialized = false;
 
   static Future<void> init() async {
-    if (_initialized) return;
-    _box = await Hive.openBox<dynamic>(_boxName);
-    _initialized = true;
+    if (!_initialized) {
+      _box = await Hive.openBox<dynamic>(_boxName);
+      _initialized = true;
+    }
+
+    await _startTrialForNewUserIfNeeded();
   }
 
   // ─── Onboarding ───────────────────────────────────────────────────────────
@@ -31,10 +36,10 @@ class SubscriptionService {
 
   // ─── Plan başlatma ────────────────────────────────────────────────────────
 
-  /// Ücretli plan seçimi — 10 günlük trial + plan kaydeder.
+  /// Simüle edilmiş ödeme tamamlandığında ücretli planı etkinleştirir.
+  /// Trial başlangıcına dokunmaz; trial ve paid entitlement bağımsızdır.
   static Future<void> startPaidSubscription(String planKey) async {
     await _box.put(_kPlan, planKey);
-    await _box.put(_kTrialStart, DateTime.now().toIso8601String());
     await markOnboarded();
   }
 
@@ -44,15 +49,21 @@ class SubscriptionService {
   /// Ayarlar'dan yıllık plan seçildi
   static Future<void> selectYearlyPlan() => startPaidSubscription('yearly');
 
-  /// Misafir olarak devam — 10 günlük ücretsiz deneme başlar.
-  /// Trial başlangıcı kaydedilmişse güncellenmez (uygulama silinip kurulmadıkça).
+  /// 10 günlük ücretsiz denemeyi, daha önce başlamamışsa başlatır.
+  /// Trial başlangıcı kaydedilmişse hiçbir zaman güncellenmez.
   static Future<void> startGuestTrial() async {
-    await _box.put(_kPlan, 'guest');
-    // Daha önce başlatılmamışsa şimdi başlat
     if (_box.get(_kTrialStart) == null) {
       await _box.put(_kTrialStart, DateTime.now().toIso8601String());
     }
     await markOnboarded();
+  }
+
+  /// İlk kez uygulamayı kullanan kullanıcıya trial'ı otomatik tanımlar.
+  /// Eski ücretsiz (`guest`) kayıtlar ile mevcut ücretli kayıtlar korunur.
+  static Future<void> _startTrialForNewUserIfNeeded() async {
+    if (_box.get(_kTrialStart) != null) return;
+    if (plan != 'none') return;
+    await startGuestTrial();
   }
 
   // ─── Durum sorguları ──────────────────────────────────────────────────────
@@ -74,9 +85,8 @@ class SubscriptionService {
     return DateTime.now().difference(start).inDays;
   }
 
-  /// Deneme süresi aktif mi? (plan başlamış ve 10 gün dolmamış)
+  /// Deneme süresi aktif mi?
   static bool get isInFreeTrial {
-    if (plan == 'none') return false;
     if (trialStart == null) return false;
     return daysSinceTrial < 10;
   }
@@ -84,8 +94,9 @@ class SubscriptionService {
   /// Ücretli abone mi?
   static bool get isPaidSubscriber => plan == 'monthly' || plan == 'yearly';
 
-  /// Deneme süresi bitmiş misafir mi?
-  static bool get isExpiredGuest => plan == 'guest' && !isInFreeTrial;
+  /// Deneme süresi bitmiş ve ücretli erişimi olmayan kullanıcı mı?
+  static bool get isExpiredGuest =>
+      trialStart != null && !isInFreeTrial && !isPaidSubscriber;
 
   /// Ücretsiz plana geçilmiş mi?
   static bool get isFreePlanSelected => !hasPremiumAccess && !isPaidSubscriber;
@@ -130,14 +141,26 @@ class SubscriptionService {
     return freeFeatures.contains(feature);
   }
 
+  /// Deneme/paid erişimi yokken açık kalan mevcut Scanner filtreleri.
+  /// Filtre hesaplaması değil, yalnızca erişim kararı burada merkezileştirilir.
+  static const Set<String> freeScannerFilters = {
+    'MACD Bullish',
+    'Golden Cross',
+    'Death Cross',
+  };
+
+  static bool canUseScannerFilter(String filterId) =>
+      hasPremiumAccess || freeScannerFilters.contains(filterId);
+
   static bool canCreateAlarm(int currentAlarmCount) =>
       hasPremiumAccess || currentAlarmCount < freeAlarmLimit;
 
   // ─── Sıfırlama ────────────────────────────────────────────────────────────
 
-  /// Deneme hakkı kullanılmış, ücretsiz modda devam et
+  /// Ücretsiz plan seçimi trial kaydını değiştirmez. Aktif trial, kendi 10
+  /// günlük süresi dolana kadar erişim vermeye devam eder.
   static Future<void> selectFreePlan() async {
-    await _box.put(_kPlan, 'guest'); // plan 'guest' kalır, trial bitmiş sayılır
+    await _box.put(_kPlan, 'guest');
     await markOnboarded();
   }
 

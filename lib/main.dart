@@ -9,7 +9,6 @@ import 'screens/news_screen.dart';
 import 'screens/ipo_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
-import 'screens/premium_gate_screen.dart';
 import 'widgets/theme_selection_dialog.dart';
 import 'services/app_navigation.dart';
 import 'services/portfolio_service.dart';
@@ -38,17 +37,14 @@ class TeknikBakisApp extends StatefulWidget {
 
 class _TeknikBakisAppState extends State<TeknikBakisApp> {
   Widget _getInitialScreen() {
-    // Sadece ücretli aboneler direkt ana uygulamaya girsin. 
-    // Ücretsiz kullanıcılar (deneme sürümündekiler dahil) her açılışta Premium kapısını görsün.
-    if (SubscriptionService.isPaidSubscriber) {
+    // Aktif trial veya ücretli abonelik, Premium erişim verir.
+    if (SubscriptionService.hasPremiumAccess) {
       return MainNavigation(key: MainNavigation.navKey);
     }
-    // Ücretli değilse → premium gate
-    return PremiumGateScreen(
-      nextScreen: MainNavigation(key: MainNavigation.navKey),
-      embedded: false,
-      showGuestOption: !SubscriptionService.hasUsedTrialBefore,
-    );
+    // Trial bitmiş ve ücretli aboneliği olmayan kullanıcı ücretsiz/kısıtlı
+    // uygulama deneyimine doğrudan girer; ekranlar kendi erişim limitlerini
+    // SubscriptionService üzerinden uygular.
+    return MainNavigation(key: MainNavigation.navKey);
   }
 
   @override

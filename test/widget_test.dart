@@ -50,14 +50,50 @@ void main() {
     expect(find.text('Ayarlar'), findsOneWidget);
   });
 
-  test('Ücretsiz plan seçildiğinde premium erişim kapanır', () async {
+  test('Yeni kullanıcıda trial otomatik başlar ve Premium erişim verir', () async {
     await SubscriptionService.reset();
     await SubscriptionService.init();
-    await SubscriptionService.startGuestTrial();
 
-    await SubscriptionService.selectFreePlan();
+    expect(SubscriptionService.trialStart, isNotNull);
+    expect(SubscriptionService.isInFreeTrial, isTrue);
+    expect(SubscriptionService.hasPremiumAccess, isTrue);
+  });
 
+  test('Trial başlangıcı 10 günden eskiyse Premium erişim kapanır', () async {
+    await SubscriptionService.reset();
+    await SubscriptionService.init();
+    await Hive.box<dynamic>('subscription').put(
+      'trialStart',
+      DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+    );
+
+    expect(SubscriptionService.isInFreeTrial, isFalse);
     expect(SubscriptionService.hasPremiumAccess, isFalse);
+  });
+
+  test('Paid subscription trial başlangıcını değiştirmez', () async {
+    await SubscriptionService.reset();
+    await SubscriptionService.init();
+    final originalTrialStart = SubscriptionService.trialStart;
+
+    await SubscriptionService.startPaidSubscription('monthly');
+
+    expect(SubscriptionService.trialStart, originalTrialStart);
+    expect(SubscriptionService.isPaidSubscriber, isTrue);
+  });
+
+  test('Trial bitmiş olsa da aktif paid subscription Premium erişim verir',
+      () async {
+    await SubscriptionService.reset();
+    await SubscriptionService.init();
+    await Hive.box<dynamic>('subscription').put(
+      'trialStart',
+      DateTime.now().subtract(const Duration(days: 11)).toIso8601String(),
+    );
+    await SubscriptionService.startPaidSubscription('yearly');
+
+    expect(SubscriptionService.isInFreeTrial, isFalse);
+    expect(SubscriptionService.hasPremiumAccess, isTrue);
   });
 
   testWidgets('Ücretsiz plan seçildiğinde başarı mesajı gösterilir', (tester) async {
