@@ -68,10 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Hisse fiyat verisi cache
   final Map<String, AssetModel> _stockPriceCache = {};
 
-  // Anasayfa piyasa listesinde tüm hisseleri baz al
-  static final List<String> _topSymbols = kBistStocks
-      .map((e) => e['symbol']!)
-      .toList();
+  // Anasayfa piyasa listesi — kBistStocks dinamik olduğundan her sorguda taze okunur
+  static List<String> get _topSymbols =>
+      kBistStocks.map((e) => e['symbol']!).toList();
 
   // Yüklenen tüm piyasa verisi (filtreleme için saklanır)
   List<AssetModel> _allMarketAssets = [];
@@ -309,30 +308,27 @@ class _HomeScreenState extends State<HomeScreen> {
     List<AssetModel> filtered;
     switch (_marketTab) {
       case 0:
-        // En Çok Artan: önce yüzde artışı grubu, sonra aynı gruptaki hacim sıralaması
-        filtered =
-            _allMarketAssets
-                .where((a) => a.changePercent > 0 && a.changePercent <= 10.0)
-                .toList()
-              ..sort((a, b) {
-                final changeCmp = b.changePercent.compareTo(a.changePercent);
-                if (changeCmp != 0) return changeCmp;
-                return b.avgVolume.compareTo(a.avgVolume);
-              });
+        // En Çok Artan — sınır yok, yeni halka arz hisseler de dahil
+        filtered = _allMarketAssets
+            .where((a) => a.changePercent > 0)
+            .toList()
+          ..sort((a, b) {
+            final changeCmp = b.changePercent.compareTo(a.changePercent);
+            if (changeCmp != 0) return changeCmp;
+            return b.avgVolume.compareTo(a.avgVolume);
+          });
         filtered = filtered.take(10).toList();
         break;
       case 1:
-        // En Çok Azalan: önce daha düşük yüzde (örneğin -10%)
-        // sonra aynı yüzdeli hisseleri hacmi yüksekten düşüğe sıralar.
-        filtered =
-            _allMarketAssets
-                .where((a) => a.changePercent < 0 && a.changePercent >= -10.0)
-                .toList()
-              ..sort((a, b) {
-                final changeCmp = a.changePercent.compareTo(b.changePercent);
-                if (changeCmp != 0) return changeCmp;
-                return b.avgVolume.compareTo(a.avgVolume);
-              });
+        // En Çok Azalan — sınır yok
+        filtered = _allMarketAssets
+            .where((a) => a.changePercent < 0)
+            .toList()
+          ..sort((a, b) {
+            final changeCmp = a.changePercent.compareTo(b.changePercent);
+            if (changeCmp != 0) return changeCmp;
+            return b.avgVolume.compareTo(a.avgVolume);
+          });
         filtered = filtered.take(10).toList();
         break;
       default:
