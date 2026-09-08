@@ -340,6 +340,43 @@ class StockService {
     return results;
   }
 
+  /// Sadece fiyat + hacim — fundamentals yok, market listesi için hızlı çekim.
+  /// Batch boyutu daha büyük, gecikme daha az.
+  static Future<List<AssetModel>> fetchMarketBatch(
+    List<String> symbols, {
+    void Function(List<AssetModel> newBatch)? onBatch,
+  }) async {
+    final results = <AssetModel>[];
+    const batchSize = 30; // quoteSummary olmadığı için daha büyük batch
+    const delayMs = 80;
+
+    for (int i = 0; i < symbols.length; i += batchSize) {
+      final batch = symbols.skip(i).take(batchSize).toList();
+      final batchResults = await Future.wait(
+        batch.map((symbol) async {
+          try {
+            final chart = await _fetchChartJson('$symbol.IS', '1d');
+            if (chart == null) return null;
+            final stock = kBistStocks.firstWhere(
+              (s) => s['symbol'] == symbol,
+              orElse: () => {'symbol': symbol, 'name': symbol},
+            );
+            return _assetFromChart(chart, symbol: symbol, name: stock['name'] ?? symbol);
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      final valid = batchResults.whereType<AssetModel>().toList();
+      results.addAll(valid);
+      onBatch?.call(valid); // her batch'ten sonra callback — ekran hemen güncellenir
+      if (i + batchSize < symbols.length) {
+        await Future.delayed(const Duration(milliseconds: delayMs));
+      }
+    }
+    return results;
+  }
+
   static Future<AssetModel?> fetchGold() async {
     try {
       final chart = await _fetchChartJson('GC%3DF', '3mo');

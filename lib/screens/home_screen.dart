@@ -285,45 +285,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadMarketList() async {
-    // _marketList'i temizleme — mevcut liste görünmeye devam eder (no-flicker)
-    // _loadingMarket sadece ilk yüklemede (liste boşsa) true olur
     if (_allMarketAssets.isEmpty) {
       setState(() => _loadingMarket = true);
     }
 
-    // Öncelikli semboller: görünen favori + market listesi → öne al
-    final prioritySymbols = <String>{
-      ..._favoriteListA,
-      ..._favoriteListB,
-      ..._marketList.map((a) => a.symbol),
-    };
     final allSymbols = _topSymbols;
-    // Priority önce, geri kalanlar sonra
-    final orderedSymbols = [
-      ...prioritySymbols.where((s) => allSymbols.contains(s)),
-      ...allSymbols.where((s) => !prioritySymbols.contains(s)),
-    ];
 
-    // Priority batch'i hemen çek ve göster
-    final priorityBatch = orderedSymbols.take(prioritySymbols.length + 20).toList();
-    final priorityAssets = await StockService.fetchMultiple(priorityBatch, period: '1d');
+    // Her batch geldiğinde ekranı hemen güncelle — +10% olanlar hangi batch'te
+    // gelirse gelsin anında listeye girer
+    await StockService.fetchMarketBatch(
+      allSymbols,
+      onBatch: (newBatch) {
+        if (!mounted) return;
+        // Gelen hisseleri mevcut listeye ekle/güncelle
+        final map = <String, AssetModel>{
+          for (final a in _allMarketAssets) a.symbol: a,
+        };
+        for (final a in newBatch) { map[a.symbol] = a; }
+        _allMarketAssets = map.values.toList();
+        _applyMarketFilter();
+      },
+    );
     if (!mounted) return;
-
-    // Priority sonuçlarıyla market listesini hemen güncelle
-    final tempMap = <String, AssetModel>{};
-    for (final a in priorityAssets) { tempMap[a.symbol] = a; }
-    _allMarketAssets = [...priorityAssets, ..._allMarketAssets.where((a) => !tempMap.containsKey(a.symbol))];
-    _applyMarketFilter();
-
-    // Geri kalan semboller arka planda
-    final remaining = orderedSymbols.skip(priorityBatch.length).toList();
-    if (remaining.isEmpty) return;
-
-    final restAssets = await StockService.fetchMultiple(remaining, period: '1d');
-    if (!mounted) return;
-
-    for (final a in restAssets) { tempMap[a.symbol] = a; }
-    _allMarketAssets = [...priorityAssets, ...restAssets];
+    // Son geçişte tüm veri hazır, son kez filtrele
     _applyMarketFilter();
   }
 
