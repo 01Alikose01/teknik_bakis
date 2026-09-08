@@ -330,35 +330,43 @@ class _HomeScreenState extends State<HomeScreen> {
   void _applyMarketFilter() {
     if (!mounted) return;
     List<AssetModel> filtered;
+
+    // changePercent'i 2 ondalığa yuvarla — eşit yüzdeleri aynı grup olarak değerlendirir
+    double round2(double v) => (v * 100).roundToDouble() / 100;
+
     switch (_marketTab) {
       case 0:
-        // En Çok Artan — günlük tavan %10
+        // En Çok Artan — %10 tavan, önce % büyükten küçüğe, eşit %-de bugünkü hacim büyükten küçüğe
         filtered = _allMarketAssets
             .where((a) => a.changePercent > 0 && a.changePercent <= 10.0)
             .toList()
           ..sort((a, b) {
-            final changeCmp = b.changePercent.compareTo(a.changePercent);
-            if (changeCmp != 0) return changeCmp;
-            return b.avgVolume.compareTo(a.avgVolume);
+            final pctA = round2(a.changePercent);
+            final pctB = round2(b.changePercent);
+            final cmp = pctB.compareTo(pctA); // büyükten küçüğe
+            if (cmp != 0) return cmp;
+            return b.latestVolume.compareTo(a.latestVolume); // hacim büyükten küçüğe
           });
         filtered = filtered.take(10).toList();
         break;
       case 1:
-        // En Çok Azalan — günlük taban -%10
+        // En Çok Azalan — -%10 taban, önce % küçükten büyüğe (en negatif önce), eşit %-de hacim büyükten küçüğe
         filtered = _allMarketAssets
             .where((a) => a.changePercent < 0 && a.changePercent >= -10.0)
             .toList()
           ..sort((a, b) {
-            final changeCmp = a.changePercent.compareTo(b.changePercent);
-            if (changeCmp != 0) return changeCmp;
-            return b.avgVolume.compareTo(a.avgVolume);
+            final pctA = round2(a.changePercent);
+            final pctB = round2(b.changePercent);
+            final cmp = pctA.compareTo(pctB); // küçükten büyüğe (negatifler için)
+            if (cmp != 0) return cmp;
+            return b.latestVolume.compareTo(a.latestVolume); // hacim büyükten küçüğe
           });
         filtered = filtered.take(10).toList();
         break;
       default:
-        // Hacim liderleri
+        // Hacim liderleri — bugünkü hacim
         filtered = [..._allMarketAssets]
-          ..sort((a, b) => b.avgVolume.compareTo(a.avgVolume));
+          ..sort((a, b) => b.latestVolume.compareTo(a.latestVolume));
         filtered = filtered.take(10).toList();
     }
     setState(() {
