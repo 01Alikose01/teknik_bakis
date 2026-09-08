@@ -288,7 +288,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         decoration: BoxDecoration(
                           color: !above
                               ? const Color(0xFF34C759).withValues(alpha: 0.12)
-                              : const Color(0xFFF2F2F7),
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: !above
@@ -345,7 +345,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         decoration: BoxDecoration(
                           color: above
                               ? const Color(0xFFFF3B30).withValues(alpha: 0.10)
-                              : const Color(0xFFF2F2F7),
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: above
@@ -1093,7 +1093,7 @@ class _AddStockDialogState extends State<_AddStockDialog> {
                         decoration: BoxDecoration(
                           color: isChosen
                               ? const Color(0xFF34C759).withValues(alpha: 0.10)
-                              : const Color(0xFFF2F2F7),
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                           border: isChosen
                               ? Border.all(

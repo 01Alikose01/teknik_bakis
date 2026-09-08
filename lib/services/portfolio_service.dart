@@ -8,7 +8,7 @@ class PortfolioService {
   static const String _alarmBox = 'alarms';
 
   static const List<String> defaultFavoriteListA = ['THYAO', 'GARAN', 'AKBNK', 'SISE', 'ARCLK'];
-  static const List<String> defaultFavoriteListB = ['ISCTR', 'ASELS', 'ORTAK', 'KRDMD', 'YKBNK'];
+  static const List<String> defaultFavoriteListB = ['ISCTR', 'ASELS', 'KRDMD', 'YKBNK'];
 
   static Box<PortfolioItem> get portfolioBox =>
       Hive.box<PortfolioItem>(_portfolioBox);

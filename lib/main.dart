@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'screens/home_screen.dart';
@@ -15,6 +16,8 @@ import 'services/portfolio_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
 import 'services/subscription_service.dart';
+import 'services/bist100_service.dart';
+import 'services/home_price_cache.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,8 +25,10 @@ void main() async {
   await PortfolioService.init();
   await SettingsService.init();
   await SubscriptionService.init();
+  await HomePriceCache.init();
   await NotificationService.init();
   await NotificationService.requestPermission();
+  Bist100Service.init(); // arka planda başlat, await etme
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const TeknikBakisApp());
 }
@@ -55,6 +60,12 @@ class _TeknikBakisAppState extends State<TeknikBakisApp> {
         return MaterialApp(
           title: 'Teknik Bakış',
           debugShowCheckedModeBanner: false,
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const [
+            Locale('tr'),
+            Locale('en'),
+          ],
+          locale: const Locale('tr'),
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF2F2F7),

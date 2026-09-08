@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
+import '../services/home_price_cache.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
 import 'notifications_screen.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingMarket = false;
   bool _loadingQuick = false;
   StreamSubscription? _favoriteListSubscription;
+  Timer? _refreshTimer;
   final TextEditingController _searchCtrl = TextEditingController();
   List<Map<String, String>> _searchResults = [];
 
@@ -87,9 +89,64 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     _loadFavoriteLists();
+
+    // 1. Önce cache'den anında göster
+    _loadFromCache();
+
+    // 2. Arka planda gerçek veriyi çek
     _loadQuickPrices();
     _loadMarketList();
     _loadFavoritePrices();
+
+    // 3. Otomatik yenileme — borsa saatlerinde 5 dakikada bir
+    _startAutoRefresh();
+  }
+
+  /// BIST açık saatlerde (hafta içi 10:00–18:30 Türkiye saati) 5 dakikada bir
+  /// anlık fiyatları ve favori listesi fiyatlarını günceller.
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (!mounted) return;
+      if (_isBistOpen()) {
+        _loadQuickPrices();
+        _loadFavoritePrices();
+      }
+    });
+  }
+
+  /// BIST'in şu an açık olup olmadığını kontrol eder.
+  /// Açık saat: Pazartesi–Cuma, 10:00–18:30 (UTC+3, Türkiye saati).
+  bool _isBistOpen() {
+    final now = DateTime.now().toUtc().add(const Duration(hours: 3));
+    if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
+      return false;
+    }
+    final open  = DateTime(now.year, now.month, now.day, 10,  0);
+    final close = DateTime(now.year, now.month, now.day, 18, 30);
+    return now.isAfter(open) && now.isBefore(close);
+  }
+
+  /// Cache'den anlık olarak yükle — ağ beklenmez
+  void _loadFromCache() {
+    final cachedQuick = HomePriceCache.loadQuickPrices();
+    final cachedFavs = HomePriceCache.loadFavoritePrices();
+
+    if (cachedQuick.isEmpty && cachedFavs.isEmpty) return;
+
+    setState(() {
+      if (cachedQuick.containsKey('bist100')) _bist100 = cachedQuick['bist100'];
+      if (cachedQuick.containsKey('bist30'))  _bist30  = cachedQuick['bist30'];
+      if (cachedQuick.containsKey('goldgram')) _goldGram = cachedQuick['goldgram'];
+      if (cachedQuick.containsKey('silvertl')) _silverTl = cachedQuick['silvertl'];
+      if (cachedQuick.containsKey('palladiumtl')) _palladiumTl = cachedQuick['palladiumtl'];
+      if (cachedQuick.containsKey('platinumtl')) _platinumTl = cachedQuick['platinumtl'];
+      if (cachedQuick.containsKey('dollar')) _dollar = cachedQuick['dollar'];
+      if (cachedQuick.containsKey('euro'))   _euro   = cachedQuick['euro'];
+
+      for (final asset in cachedFavs) {
+        _stockPriceCache[asset.symbol] = asset;
+      }
+    });
   }
 
   void _loadFavoriteLists([String? key]) {
@@ -121,18 +178,30 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
     if (allFavs.isEmpty) return;
 
-    final results = await StockService.fetchMultiple(allFavs, period: '5d');
-    if (!mounted) return;
+    try {
+      final results = await StockService.fetchMultiple(allFavs, period: '5d')
+          .timeout(const Duration(seconds: 8), onTimeout: () => []);
+      if (!mounted) return;
 
-    setState(() {
-      for (final asset in results) {
-        _stockPriceCache[asset.symbol] = asset;
+      setState(() {
+        for (final asset in results) {
+          _stockPriceCache[asset.symbol] = asset;
+        }
+      });
+
+      // Cache'e kaydet
+      if (results.isNotEmpty) {
+        final allCached = _stockPriceCache.values.toList();
+        HomePriceCache.saveFavoritePrices(allCached);
       }
-    });
+    } catch (_) {
+      // Timeout veya network hatası — sessizce devam et
+    }
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _favoriteListSubscription?.cancel();
     _searchCtrl.dispose();
     super.dispose();
@@ -151,59 +220,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadQuickPrices() async {
     setState(() => _loadingQuick = true);
-    final needB100 = _selectedItems.contains('bist100');
-    final needB30 = _selectedItems.contains('bist30');
-    final needGold = _selectedItems.contains('goldgram');
-    final needSilver = _selectedItems.contains('silvertl');
-    final needPalladium = _selectedItems.contains('palladiumtl');
-    final needPlatinum = _selectedItems.contains('platinumtl');
-    final needDollar = _selectedItems.contains('dollar');
-    final needEuro = _selectedItems.contains('euro');
-    final stocks = _selectedItems
-        .where((s) => !_specialIds.contains(s))
-        .toList();
+    try {
+      final needB100 = _selectedItems.contains('bist100');
+      final needB30 = _selectedItems.contains('bist30');
+      final needGold = _selectedItems.contains('goldgram');
+      final needSilver = _selectedItems.contains('silvertl');
+      final needPalladium = _selectedItems.contains('palladiumtl');
+      final needPlatinum = _selectedItems.contains('platinumtl');
+      final needDollar = _selectedItems.contains('dollar');
+      final needEuro = _selectedItems.contains('euro');
+      final stocks = _selectedItems
+          .where((s) => !_specialIds.contains(s))
+          .toList();
 
-    final futures = <Future>[
-      if (needB100) StockService.fetchIndex('XU100.IS', 'BIST 100', 'BIST 100'),
-      if (needB30) StockService.fetchIndex('XU030.IS', 'BIST 30', 'BIST 30'),
-      if (needGold) StockService.fetchGoldGram(),
-      if (needSilver) StockService.fetchSilverTl(),
-      if (needPalladium) StockService.fetchPalladiumTl(),
-      if (needPlatinum) StockService.fetchPlatinumTl(),
-      if (needDollar) StockService.fetchDollar(),
-      if (needEuro) StockService.fetchEuro(),
-      ...stocks.map((s) => StockService.fetchStock(s, period: '5d')),
-    ];
-    final results = await Future.wait(futures);
-    if (!mounted) return;
+      final futures = <Future>[
+        if (needB100) StockService.fetchIndex('XU100.IS', 'BIST 100', 'BIST 100'),
+        if (needB30) StockService.fetchIndex('XU030.IS', 'BIST 30', 'BIST 30'),
+        if (needGold) StockService.fetchGoldGram(),
+        if (needSilver) StockService.fetchSilverTl(),
+        if (needPalladium) StockService.fetchPalladiumTl(),
+        if (needPlatinum) StockService.fetchPlatinumTl(),
+        if (needDollar) StockService.fetchDollar(),
+        if (needEuro) StockService.fetchEuro(),
+        ...stocks.map((s) => StockService.fetchStock(s, period: '5d')),
+      ];
+      final results = await Future.wait(futures)
+          .timeout(const Duration(seconds: 8), onTimeout: () => List.filled(futures.length, null));
+      if (!mounted) return;
 
-    int idx = 0;
-    AssetModel? b100, b30, gold, silver, palladium, platinum, dollar, euro;
-    final hisseler = <AssetModel>[];
-    if (needB100) b100 = results[idx++] as AssetModel?;
-    if (needB30) b30 = results[idx++] as AssetModel?;
-    if (needGold) gold = results[idx++] as AssetModel?;
-    if (needSilver) silver = results[idx++] as AssetModel?;
-    if (needPalladium) palladium = results[idx++] as AssetModel?;
-    if (needPlatinum) platinum = results[idx++] as AssetModel?;
-    if (needDollar) dollar = results[idx++] as AssetModel?;
-    if (needEuro) euro = results[idx++] as AssetModel?;
-    for (int i = idx; i < results.length; i++) {
-      final a = results[i] as AssetModel?;
-      if (a != null) hisseler.add(a);
+      int idx = 0;
+      AssetModel? b100, b30, gold, silver, palladium, platinum, dollar, euro;
+      final hisseler = <AssetModel>[];
+      if (needB100) b100 = results[idx++] as AssetModel?;
+      if (needB30) b30 = results[idx++] as AssetModel?;
+      if (needGold) gold = results[idx++] as AssetModel?;
+      if (needSilver) silver = results[idx++] as AssetModel?;
+      if (needPalladium) palladium = results[idx++] as AssetModel?;
+      if (needPlatinum) platinum = results[idx++] as AssetModel?;
+      if (needDollar) dollar = results[idx++] as AssetModel?;
+      if (needEuro) euro = results[idx++] as AssetModel?;
+      for (int i = idx; i < results.length; i++) {
+        final a = results[i] as AssetModel?;
+        if (a != null) hisseler.add(a);
+      }
+      setState(() {
+        _bist100 = b100 ?? _bist100;
+        _bist30 = b30 ?? _bist30;
+        _goldGram = gold ?? _goldGram;
+        _silverTl = silver ?? _silverTl;
+        _palladiumTl = palladium ?? _palladiumTl;
+        _platinumTl = platinum ?? _platinumTl;
+        _dollar = dollar ?? _dollar;
+        _euro = euro ?? _euro;
+        if (hisseler.isNotEmpty) _quickPrices = hisseler;
+      });
+
+      // Yeni veriyi cache'e kaydet
+      HomePriceCache.saveQuickPrices({
+        'bist100': _bist100,
+        'bist30': _bist30,
+        'goldgram': _goldGram,
+        'silvertl': _silverTl,
+        'palladiumtl': _palladiumTl,
+        'platinumtl': _platinumTl,
+        'dollar': _dollar,
+        'euro': _euro,
+      });
+    } catch (_) {
+      // Network hatası — sessizce devam et
+    } finally {
+      if (mounted) setState(() => _loadingQuick = false);
     }
-    setState(() {
-      _bist100 = b100;
-      _bist30 = b30;
-      _goldGram = gold;
-      _silverTl = silver;
-      _palladiumTl = palladium;
-      _platinumTl = platinum;
-      _dollar = dollar;
-      _euro = euro;
-      _quickPrices = hisseler;
-      _loadingQuick = false;
-    });
   }
 
   Future<void> _loadMarketList() async {
@@ -442,14 +529,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAddFavoriteSheet(int listIndex) {
-    final theme = Theme.of(context);
-    final surface = theme.colorScheme.surface;
-    final onSurfaceSecondary = theme.colorScheme.onSurface.withOpacity(0.65);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -457,6 +540,10 @@ class _HomeScreenState extends State<HomeScreen> {
         String query = '';
         return StatefulBuilder(
           builder: (ctx, setSheet) {
+            final sheetTheme = Theme.of(ctx);
+            final surface = sheetTheme.colorScheme.surface;
+            final onSurface = sheetTheme.colorScheme.onSurface;
+            final onSurfaceSecondary = onSurface.withValues(alpha: 0.65);
             final filtered = query.trim().isEmpty
                 ? kBistStocks
                 : (() {
@@ -498,6 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       onChanged: (value) => setSheet(() => query = value),
+                      style: TextStyle(color: onSurface),
                       decoration: InputDecoration(
                         hintText: 'Hisse ara...',
                         hintStyle: TextStyle(
@@ -536,7 +624,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             dense: true,
                             title: Text(
                               row['name']!,
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: onSurface,
+                              ),
                             ),
                             subtitle: Text(
                               symbol,
@@ -742,8 +833,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: RefreshIndicator(
           color: const Color(0xFF34C759),
           onRefresh: () async {
-            await _loadQuickPrices();
-            await _loadMarketList();
+            await Future.wait([
+              _loadQuickPrices(),
+              _loadMarketList(),
+              _loadFavoritePrices(),
+            ]).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () => [],
+            );
           },
           child: CustomScrollView(
             slivers: [

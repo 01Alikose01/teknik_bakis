@@ -826,3 +826,58 @@ void syncBistStocksWithIpoItems(List<IpoItem> ipoItems) {
       (a['symbol'] ?? '').toLowerCase().compareTo((b['symbol'] ?? '').toLowerCase()));
   kBistStocks = merged;
 }
+
+/// Borsa İstanbul BIST 100 Endeks Bileşenleri
+/// Kaynak: Borsa İstanbul resmi endeks listesi
+/// Son güncelleme: Eylül 2026 revizyonu (01.05.2026 – 30.09.2026 dönemi)
+/// Değişiklikler: AGHOL, TABGD, TUREX çıkarıldı; ODINE, IEYHO, ESEN eklendi.
+const List<String> kBist100Symbols = [
+  // ── Bankacılık ──────────────────────────────────────────
+  'AKBNK', 'ALBRK', 'GARAN', 'HALKB', 'ICBCT',
+  'ISCTR', 'ISFIN', 'ISKUR', 'KLNMA', 'SKBNK',
+  'TSKB', 'VAKBN', 'YKBNK',
+  // ── Holding & Yatırım ───────────────────────────────────
+  // AGHOL çıkarıldı (Eylül 2026 revizyonu)
+  'DOHOL', 'GLYHO', 'KCHOL', 'KOZAA',
+  'MPARK', 'SAHOL', 'TKFEN',
+  // ── Sanayi & Üretim ─────────────────────────────────────
+  'ARCLK', 'ASELS', 'ASTOR', 'CCOLA', 'CIMSA',
+  'DEVA', 'EREGL', 'FROTO', 'GUBRF', 'KRDMD',
+  'OTKAR', 'PETKM', 'PGSUS', 'SASA', 'THYAO',
+  'TOASO', 'TTRAK', 'TUPRS', 'VESTL',
+  // ── Enerji ──────────────────────────────────────────────
+  'AKFYE', 'AKSEN', 'AYDEM', 'AYEN', 'CWENE',
+  'ENKAI', 'EUPWR', 'GWIND', 'IZENR', 'ODAS',
+  'ZOREN',
+  // ── Eylül 2026 Eklenen Enerji: ESEN ─────────────────────
+  'ESEN',  // Esenboğa Elektrik
+  // ── Perakende & Tüketim ─────────────────────────────────
+  'BIMAS', 'LOGO', 'MAVI', 'MGROS', 'SOKM',
+  'ULKER',
+  // ── Gayrimenkul ─────────────────────────────────────────
+  'EKGYO', 'ISGYO', 'RYGYO', 'TRGYO',
+  // ── Teknoloji & Telekom ──────────────────────────────────
+  'ARDYZ', 'NETAS', 'SMART', 'TCELL', 'TTKOM',
+  // ── Eylül 2026 Eklenen Teknoloji: ODINE ─────────────────
+  'ODINE', // Odine Teknoloji
+  // ── Sigorta & Finans ────────────────────────────────────
+  'AKGRT', 'ANSGR', 'ISMEN',
+  // ── Otomotiv ────────────────────────────────────────────
+  'DOAS', 'KARSN',
+  // ── Kimya & İlaç ────────────────────────────────────────
+  'AKSA', 'BRISA', 'ECZYT', 'HEKTS',
+  // ── Gıda & İçecek ───────────────────────────────────────
+  // TABGD çıkarıldı (Eylül 2026 revizyonu)
+  'AEFES', 'AYGAZ', 'TATGD', 'TUKAS',
+  // ── Enerji Holding: IEYHO ───────────────────────────────
+  'IEYHO', // Işıklar Enerji Yapı Holding
+  // ── Çimento & İnşaat ────────────────────────────────────
+  'BUCIM', 'NUHCM',
+  // ── Tekstil & Diğer ─────────────────────────────────────
+  // TUREX çıkarıldı (Eylül 2026 revizyonu)
+  'ALKIM', 'ALTNY', 'BERA', 'BFREN', 'CANTE',
+  'EGEEN', 'GENIL', 'GESAN', 'GOLTS', 'KORDS',
+  'KOZAL', 'MIATK', 'PENTA', 'POLHO', 'SISE',
+  'TAVHL', 'TMSN', 'TRILC', 'ULUUN',
+];
+

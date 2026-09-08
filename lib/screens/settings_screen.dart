@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
@@ -115,7 +116,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       leadingColor: const Color(0xFF34C759),
                       trailingIcon: Icons.open_in_new,
                       onTap: () async {
-                        await SystemNavigator.pop();
+                        try {
+                          if (Platform.isAndroid) {
+                            const channel = MethodChannel('com.teknikbakis/settings');
+                            await channel.invokeMethod('openNotificationSettings');
+                          } else if (Platform.isIOS) {
+                            // iOS: uygulama ayarlarına yönlendir
+                            const channel = MethodChannel('com.teknikbakis/settings');
+                            await channel.invokeMethod('openNotificationSettings');
+                          }
+                        } catch (_) {
+                          // Hata durumunda sessizce devam et
+                        }
                       },
                     ),
                   ]),
@@ -177,23 +189,244 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showSss(BuildContext context) {
     final theme = Theme.of(context);
-    final surface = theme.colorScheme.surface;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Sık Sorulan Sorular', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            _FaqItem(q: 'Veriler güncel mi?', a: 'Evet, veriler Yahoo Finance üzerinden gerçek zamanlı çekilmektedir (15 dk gecikme).'),
-            _FaqItem(q: 'Tarama nasıl çalışır?', a: 'BIST hisselerini seçili teknik göstergeye göre filtreler ve uygun hisseleri listeler.'),
-            _FaqItem(q: 'RSI nasıl hesaplanır?', a: 'Wilder\'ın Smoothed RSI yöntemi kullanılır (14 periyot).'),
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        builder: (_, ctrl) => Column(
+          children: [
+            // Tutamaç çubuğu
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Sık Sorulan Sorular',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: ListView(
+                controller: ctrl,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                children: const [
+
+                  // ── Veriler & Fiyatlar ──────────────────────────────
+                  _FaqSection(title: '📊 Veriler & Fiyatlar'),
+                  _FaqItem(
+                    q: 'Fiyat verileri ne kadar güncel?',
+                    a: 'Veriler Yahoo Finance üzerinden çekilmektedir. Borsa saatleri içinde yaklaşık 15 dakika gecikme söz konusudur. Bu standart bir borsa veri gecikmesidir; anlık (0 gecikme) veri için borsa ekranları kullanılmalıdır.',
+                  ),
+                  _FaqItem(
+                    q: 'Sayfa açıldığında fiyatlar neden bazen gelmez?',
+                    a: 'İnternet bağlantınız yavaş veya kararsız olduğunda veri yüklenemeyebilir. Sayfayı aşağı kaydırarak yenilemeyi deneyin. Sorun devam ederse Wi-Fi bağlantısını kontrol edin.',
+                  ),
+                  _FaqItem(
+                    q: 'Veriler doğru mu? Farklı platformlarla uyuşmuyor.',
+                    a: 'Veriler Yahoo Finance kaynağından gelir. Küçük farklar veri sağlayıcısının güncelleme sıklığına ve kullandığı hesaplama yöntemine bağlıdır. Kesin işlemler için aracı kurumunuzu esas alın.',
+                  ),
+                  _FaqItem(
+                    q: 'Hafta sonu ve tatil günlerinde veri neden gelmiyor?',
+                    a: 'Borsa işlem günlerinde (Pazartesi–Cuma, 10:00–18:00) veri güncellenir. Tatil ve hafta sonu günlerinde en son kapanış fiyatı görünür.',
+                  ),
+                  _FaqItem(
+                    q: 'Altın, dolar ve euro verileri nereden geliyor?',
+                    a: 'Gram altın, dolar/TL ve euro/TL verileri de Yahoo Finance üzerinden anlık kur bilgisiyle hesaplanarak sunulmaktadır.',
+                  ),
+
+                  // ── Radar & Tarama ──────────────────────────────────
+                  _FaqSection(title: '🔍 Radar & Tarama'),
+                  _FaqItem(
+                    q: 'Tarama (Radar) nasıl çalışır?',
+                    a: 'Tarama ekranı BIST hisselerini seçtiğiniz teknik gösterge kriterine göre filtreler. Örneğin "RSI Aşırı Satım" filtresi RSI değeri 30\'un altına düşmüş hisseleri listeler. Sonuçlar anlık değil, en son kapanış verisine göre hesaplanır.',
+                  ),
+                  _FaqItem(
+                    q: 'Ücretsiz planda kaç tarama filtresi kullanabilirim?',
+                    a: 'Ücretsiz planda temel filtreler açıktır. RSI, hacim ve EMA gibi gelişmiş filtreler Premium\'a özeldir. Planlar ekranından hangi filtrelerin Premium olduğunu görebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Tarama sonuçları otomatik güncelleniyor mu?',
+                    a: 'Hayır. Sayfayı açtığınızda ya da sayfayı aşağı sürükleyerek yenilediğinizde en güncel veriye göre hesaplanır.',
+                  ),
+
+                  // ── Analiz & Grafikler ──────────────────────────────
+                  _FaqSection(title: '📈 Analiz & Grafikler'),
+                  _FaqItem(
+                    q: 'RSI nasıl hesaplanır?',
+                    a: 'Wilder\'ın Smoothed RSI yöntemi kullanılır (14 periyot). RSI 30\'un altı aşırı satım, 70\'in üstü aşırı alım bölgesi olarak kabul edilir.',
+                  ),
+                  _FaqItem(
+                    q: 'EMA 20 ve EMA 50 ne anlama gelir?',
+                    a: 'EMA (Üssel Hareketli Ortalama), son fiyatlara daha fazla ağırlık veren bir ortalamadır. EMA 20 kısa vadeli, EMA 50 orta vadeli trendi gösterir. Fiyatın bu ortalamaların üzerinde olması yükseliş eğilimine işaret eder.',
+                  ),
+                  _FaqItem(
+                    q: 'Supertrend göstergesi nedir?',
+                    a: 'Supertrend, ATR tabanlı bir trend takip göstergesidir. Yeşil çizgi al sinyali (yükseliş trendi), kırmızı çizgi sat sinyali (düşüş trendi) anlamına gelir. Trend dönüşlerini işaret eder.',
+                  ),
+                  _FaqItem(
+                    q: 'MACD ne işe yarar?',
+                    a: 'MACD (12, 26, 9 parametreli) momentum ve trend değişimlerini ölçer. MACD çizgisi sinyal çizgisini yukarı keserse alım, aşağı keserse satım sinyali olarak yorumlanabilir.',
+                  ),
+                  _FaqItem(
+                    q: 'TradingView grafiğini nasıl açabilirim?',
+                    a: 'Analiz ekranında bir hisseyi seçtikten sonra grafik alanının hemen altındaki "TradingView\'da Aç" butonuna tıklayın. TradingView\'ın tam özellikli grafiği açılır; yatay moda geçerek daha geniş görünüm elde edebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Grafik verileri neden gecikmeli görünüyor?',
+                    a: 'Uygulama içindeki fl_chart grafikleri, Yahoo Finance\'dan çekilen günlük kapanış verilerini kullanır. Gün içi anlık (tick) grafik için TradingView\'da Aç özelliğini kullanın.',
+                  ),
+
+                  // ── Portföy ─────────────────────────────────────────
+                  _FaqSection(title: '💼 Portföy'),
+                  _FaqItem(
+                    q: 'Portföye hisse nasıl eklerim?',
+                    a: 'Portföy ekranında sağ alttaki + butonuna basın. Hisse adını veya kodunu aratın, alış fiyatı ve adeti girin, ardından "Portföye Ekle"ye dokunun.',
+                  ),
+                  _FaqItem(
+                    q: 'Portföy verileri nerede saklanıyor? Telefonu değiştirirsem silinir mi?',
+                    a: 'Portföy verileri şu an cihazınızda yerel olarak saklanmaktadır. Telefon değişikliği veya uygulamanın silinmesi durumunda veriler kaybolabilir. Düzenli olarak not almanızı öneririz.',
+                  ),
+                  _FaqItem(
+                    q: 'Kar/zarar hesabı nasıl yapılıyor?',
+                    a: 'Kar/Zarar = (Anlık Fiyat − Alış Fiyatı) × Adet olarak hesaplanır. Komisyon ve vergiler dahil edilmez; yalnızca fiyat farkı esas alınır.',
+                  ),
+                  _FaqItem(
+                    q: 'Aynı hisseyi farklı fiyatlardan birden fazla kez ekleyebilir miyim?',
+                    a: 'Evet. Her alımı ayrı ayrı ekleyebilirsiniz. Uygulama, tüm alımlarınızı gruplayarak ortalama maliyet ve toplam kar/zarar hesaplar.',
+                  ),
+
+                  // ── Takip Listesi & Alarmlar ─────────────────────────
+                  _FaqSection(title: '🔔 Takip Listesi & Alarmlar'),
+                  _FaqItem(
+                    q: 'Takip listesi ile portföy arasındaki fark nedir?',
+                    a: 'Takip listesi (Watchlist) sadece fiyat izlemek için kullanılır; alım/satım bilgisi girmezsiniz. Portföy ise gerçek pozisyonlarınızı, alış maliyetinizi ve kar/zararınızı takip eder.',
+                  ),
+                  _FaqItem(
+                    q: 'Fiyat alarmı nasıl kurarım?',
+                    a: 'Takip Listesi ekranında bir hissenin üzerine tıklayın ve zil ikonuna basın. Hedef fiyatı ve alarm türünü (alış / satış) seçip kaydedin. Fiyat bu seviyeye geldiğinde bildirim alırsınız.',
+                  ),
+                  _FaqItem(
+                    q: 'Alarm bildirimi almak için ne yapmalıyım?',
+                    a: 'Telefonunuzun bildirim ayarlarından "Teknik Bakış" uygulamasına izin vermeniz gerekir. Ayarlar > Bildirim İzinlerini Yönet yolunu izleyerek kontrol edebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Ücretsiz planda kaç alarm kurabilirim?',
+                    a: 'Ücretsiz planda en fazla 3 aktif fiyat alarmı kurabilirsiniz. Sınırsız alarm için Premium\'a geçebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Alarm kurdum ama bildirim gelmiyor.',
+                    a: 'Şu kontrolleri yapın: 1) Telefonun bildirim izinlerinde uygulama izinli mi? 2) Güç tasarrufu modu arka plan uygulamalarını kısıtlıyor mu? 3) Telefon "Rahatsız Etme" modunda mı? 4) Uygulama tamamen kapatılmışsa arka planda çalışmıyor olabilir.',
+                  ),
+
+                  // ── Haberler & KAP ──────────────────────────────────
+                  _FaqSection(title: '📰 Haberler & KAP'),
+                  _FaqItem(
+                    q: 'Haberler nereden geliyor?',
+                    a: 'Haberler KAP (Kamuyu Aydınlatma Platformu) ve çeşitli finans haber kaynaklarından otomatik olarak derlenmektedir.',
+                  ),
+                  _FaqItem(
+                    q: 'KAP AI analizi nedir?',
+                    a: 'KAP bildirimleri; sermaye artırımı, temettü, yönetim değişikliği gibi kategorilere ayrılarak otomatik olarak yorumlanır. Bu yorum yatırım tavsiyesi değildir, sadece haberin ne hakkında olduğunu özetler.',
+                  ),
+                  _FaqItem(
+                    q: 'Belirli bir hissenin haberlerini nasıl görebilirim?',
+                    a: 'Analiz ekranında hisseyi seçtikten sonra "Haberler" sekmesine geçin. O hisseye ait son haberler listelenir.',
+                  ),
+
+                  // ── Halka Arz ────────────────────────────────────────
+                  _FaqSection(title: '🚀 Halka Arz'),
+                  _FaqItem(
+                    q: 'Halka arz takip ekranı ne işe yarar?',
+                    a: 'Yaklaşan ve güncel BIST halka arzlarını listeler. Talep tarihi, tahmini fiyat aralığı ve şirket bilgisi gibi detayları görebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Halka arz bildirimi alabilir miyim?',
+                    a: 'Evet, Premium planda halka arz alarmı kurabilirsiniz. Yeni bir halka arz duyurulduğunda veya talep tarihi yaklaştığında bildirim gelir.',
+                  ),
+
+                  // ── Premium & Abonelik ────────────────────────────────
+                  _FaqSection(title: '👑 Premium & Abonelik'),
+                  _FaqItem(
+                    q: '10 günlük deneme süresi nasıl başlar?',
+                    a: 'Uygulamayı ilk açışınızda onboarding ekranında "Ücretsiz Dene" seçeneğini seçtiğinizde 10 günlük deneme otomatik başlar. Bu sürede tüm Premium özelliklere erişebilirsiniz.',
+                  ),
+                  _FaqItem(
+                    q: 'Deneme süresinde kart bilgisi isteniyor mu?',
+                    a: 'Hayır. 10 günlük deneme süresinde herhangi bir kart bilgisi alınmaz ve 1 kuruş bile çekilmez.',
+                  ),
+                  _FaqItem(
+                    q: 'Premium aboneliği nasıl iptal edebilirim?',
+                    a: 'Aboneliğinizi Google Play Store üzerinden "Aboneliklerim" bölümünden istediğiniz zaman iptal edebilirsiniz. İptal sonrası mevcut dönemin sonuna kadar Premium erişiminiz devam eder.',
+                  ),
+                  _FaqItem(
+                    q: 'Aylık ve yıllık plan arasındaki fark nedir?',
+                    a: 'Yıllık plan aylık plana göre yaklaşık %30 daha ucuzdur (aylık yaklaşık ₺208\'e denk gelir). Her iki plan da aynı Premium özellikleri sunar; fark yalnızca fiyat ve ödeme sıklığındadır.',
+                  ),
+                  _FaqItem(
+                    q: 'Deneme sürem bitti, ücretsiz kullanmaya devam edebilir miyim?',
+                    a: 'Evet. Ücretsiz planda temel ekranlar, sınırlı tarama ve portföy özellikleri kullanılabilir. Premium özellikler (sınırsız alarm, gelişmiş tarama filtreleri, KAP AI vb.) kilitli kalır.',
+                  ),
+
+                  // ── Teknik & Diğer ──────────────────────────────────
+                  _FaqSection(title: '⚙️ Teknik & Diğer'),
+                  _FaqItem(
+                    q: 'Uygulama hangi platformlarda çalışıyor?',
+                    a: 'Teknik Bakış Android ve iOS platformlarında kullanılabilir.',
+                  ),
+                  _FaqItem(
+                    q: 'Gece modunu nasıl açabilirim?',
+                    a: 'Ayarlar ekranından "Gece Modu" anahtarını açabilirsiniz. Değişiklik anında uygulanır.',
+                  ),
+                  _FaqItem(
+                    q: 'Uygulamayı yeniden yüklersem verilerim silinir mi?',
+                    a: 'Portföy ve takip listesi gibi yerel veriler, uygulamayı kaldırırsanız silinir. Uygulama güncellemelerinde veriler korunur.',
+                  ),
+                  _FaqItem(
+                    q: 'Bu uygulama yatırım tavsiyesi veriyor mu?',
+                    a: 'Hayır. Teknik Bakış yalnızca bilgi ve analiz aracıdır. Gösterilen sinyaller, grafikler ve haberler yatırım tavsiyesi niteliği taşımaz. Tüm yatırım kararlarınızın sorumluluğu size aittir.',
+                  ),
+                  _FaqItem(
+                    q: 'Bir hata veya öneri bildirmek istiyorum.',
+                    a: 'Google Play Store\'daki değerlendirme bölümünden veya uygulama içi geri bildirim yoluyla bize ulaşabilirsiniz. Her türlü geri bildiriminiz uygulamamızı geliştirmemize yardımcı olur.',
+                  ),
+
+                  SizedBox(height: 8),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -542,22 +775,84 @@ class _SettingsItem extends StatelessWidget {
   }
 }
 
+class _FaqSection extends StatelessWidget {
+  final String title;
+  const _FaqSection({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
 class _FaqItem extends StatelessWidget {
   final String q, a;
   const _FaqItem({required this.q, required this.a});
 
   @override
   Widget build(BuildContext context) {
-    final onSurfaceSecondary = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceSecondary = onSurface.withValues(alpha: 0.7);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(q, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 2),
-          Text(a, style: TextStyle(color: onSurfaceSecondary, fontSize: 12)),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Q  ', style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                )),
+                Expanded(
+                  child: Text(q, style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: onSurface,
+                  )),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('A  ', style: TextStyle(
+                  color: onSurfaceSecondary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                )),
+                Expanded(
+                  child: Text(a, style: TextStyle(
+                    color: onSurfaceSecondary,
+                    fontSize: 12,
+                    height: 1.5,
+                  )),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -607,7 +902,7 @@ class _PremiumStatusCard extends StatelessWidget {
       borderColor = const Color(0xFFFF9500).withValues(alpha: 0.3);
       emoji       = '⚠️';
       title       = 'Deneme Süreniz Doldu';
-      subtitle    = 'Premium\'a geçerek tüm özellikleri kullanmaya devam edin.';
+      subtitle    = '10 günlük deneme süresi bitmiştir. Premium\'a geçerek tüm özellikleri kullanmaya devam edin.';
       showButton  = true;
     } else {
       bgColor     = theme.colorScheme.surface;

@@ -821,6 +821,7 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
       initialDate: _selectedDate,
       firstDate: DateTime(2010),
       lastDate: DateTime.now(),
+      locale: const Locale('tr'),
     );
     if (date == null || !mounted) return;
 
@@ -1075,7 +1076,8 @@ class _AddPortfolioDialogState extends State<_AddPortfolioDialog> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF34C759),
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade200,
+                disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                disabledForegroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 12),

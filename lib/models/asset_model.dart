@@ -303,6 +303,12 @@ class AssetModel {
     return hist[hist.length - 2] < 0 && hist.last >= 0;
   }
 
+  bool get isMacdBearish {
+    final hist = macd()['hist'] ?? [];
+    if (hist.length < 2) return false;
+    return hist[hist.length - 2] > 0 && hist.last <= 0;
+  }
+
   // EMA20'nin EMA50'yi yukarı kesip en az %0.20 üzerine çıkması
   bool get isEma20AboveEma50WithMargin {
     final e20 = ema(20);
@@ -580,5 +586,120 @@ class AssetModel {
     final uptrend = prices.length >= 6 && prices[i - 1] > prices[i - 5];
 
     return prevBullish && currBearish && engulfs && uptrend;
+  }
+
+  // ── RSI Tepe SAT ────────────────────────────────────────────────────────────
+  bool get isRsiAbove70 {
+    final r = rsi();
+    return r.isNotEmpty && r.last >= 70;
+  }
+
+  // ── Negatif Uyumsuzluk SAT ──────────────────────────────────────────────────
+  // Fiyat yüksek tepe yaparken RSI daha düşük tepe yapıyor.
+  bool get isBearishDivergence {
+    final r = rsi();
+    if (r.length < 14 || prices.length < 14) return false;
+    final n = prices.length - 1;
+    final prevHigh = prices.sublist(n - 13, n - 4).reduce((a, b) => a > b ? a : b);
+    if (prices[n] <= prevHigh) return false;
+    final rsiRecent = r.sublist(r.length - 10).reduce((a, b) => a > b ? a : b);
+    final rsiPrev   = r.sublist(r.length - 14, r.length - 4).reduce((a, b) => a > b ? a : b);
+    return rsiRecent < rsiPrev && rsiRecent < 70;
+  }
+
+  // ── Yükselen Üçgen SAT ──────────────────────────────────────────────────────
+  bool get isAscendingTriangleSell {
+    if (prices.length < 20) return false;
+    final slice = prices.sublist(prices.length - 20);
+    final maxP = slice.reduce((a, b) => a > b ? a : b);
+    final minP = slice.reduce((a, b) => a < b ? a : b);
+    final nearTop = slice.where((p) => p >= maxP * 0.98).length;
+    final firstMin = prices.sublist(prices.length - 20, prices.length - 10)
+        .reduce((a, b) => a < b ? a : b);
+    final secondMin = prices.sublist(prices.length - 10)
+        .reduce((a, b) => a < b ? a : b);
+    return nearTop >= 2 && secondMin > firstMin && (maxP - minP) / maxP > 0.03;
+  }
+
+  // ── RSI Dip AL ──────────────────────────────────────────────────────────────
+  bool get isRsiRecovery {
+    final r = rsi();
+    if (r.length < 3) return false;
+    final prev2 = r[r.length - 3];
+    final curr  = r.last;
+    final prev1 = r[r.length - 2];
+    return prev2 < 30 && curr > prev1 && curr >= 30 && curr <= 50;
+  }
+
+  // ── Hacim Patlaması AL ───────────────────────────────────────────────────────
+  bool get isVolumeBreakout {
+    if (volumes.length < 20) return false;
+    final avgVol = volumes.sublist(volumes.length - 20, volumes.length - 1)
+        .reduce((a, b) => a + b) / 19;
+    final lastVol = volumes.last;
+    final priceUp = prices.length >= 2 && prices.last > prices[prices.length - 2];
+    return priceUp && lastVol >= avgVol * 1.8;
+  }
+
+  // ── Pozitif Uyuşmazlık AL ────────────────────────────────────────────────────
+  // Fiyat daha düşük dip yaparken RSI daha yüksek dip yapıyor → momentum dönüşü
+  bool get isBullishDivergence {
+    final r = rsi();
+    if (prices.length < 10 || r.length < 10) return false;
+    final pricePrev = prices[prices.length - 5];
+    final priceCurr = prices.last;
+    final rsiPrev = r[r.length - 5];
+    final rsiCurr = r.last;
+    // Fiyat düştü ama RSI yükseldi → pozitif uyuşmazlık
+    return priceCurr < pricePrev && rsiCurr > rsiPrev && rsiCurr < 50;
+  }
+
+  // ── TOBO AL (Ters Omuz Baş Omuz) ────────────────────────────────────────────
+  // Düşüş trendinin sonunda oluşan dönüş formasyonu
+  bool get isToboPattern {
+    if (prices.length < 30) return false;
+    final slice = prices.sublist(prices.length - 30);
+    // Sol omuz, baş (en düşük), sağ omuz tespiti
+    double minVal = slice[0];
+    int minIdx = 0;
+    for (int i = 1; i < slice.length; i++) {
+      if (slice[i] < minVal) { minVal = slice[i]; minIdx = i; }
+    }
+    if (minIdx < 5 || minIdx > slice.length - 5) return false;
+    final leftShoulder = slice.sublist(0, minIdx).reduce((a, b) => a < b ? a : b);
+    final rightShoulder = slice.sublist(minIdx + 1).reduce((a, b) => a < b ? a : b);
+    final head = minVal;
+    // Baş her iki omuzdan da düşük olmalı
+    if (head >= leftShoulder || head >= rightShoulder) return false;
+    // Son fiyat neckline'ı kırmış olmalı (omuz seviyesinin üstünde)
+    final neckline = (leftShoulder + rightShoulder) / 2;
+    return prices.last > neckline;
+  }
+
+  // ── Alçalan Üçgen AL ─────────────────────────────────────────────────────────
+  // Yükselen dip pivotları + yatay direnç → kırılım AL sinyali
+  bool get isAscendingTriangleBuy {
+    if (prices.length < 30) return false;
+    final slice = prices.sublist(prices.length - 30);
+    // Yatay direnç: son 30 günün en yüksek noktasından %1 içinde birden fazla dokunuş
+    final maxPrice = slice.reduce((a, b) => a > b ? a : b);
+    final resistance = maxPrice;
+    int touches = slice.where((p) => (p - resistance).abs() / resistance < 0.01).length;
+    if (touches < 2) return false;
+    // Yükselen dipler: ilk yarının minimumu < ikinci yarının minimumu
+    final firstHalfMin = slice.sublist(0, 15).reduce((a, b) => a < b ? a : b);
+    final secondHalfMin = slice.sublist(15).reduce((a, b) => a < b ? a : b);
+    if (secondHalfMin <= firstHalfMin) return false;
+    // Kırılım: son fiyat direnç üstünde kapanış
+    return prices.last > resistance * 0.999;
+  }
+
+  // ── Donchian 20 AL ───────────────────────────────────────────────────────────
+  // Son 20 günün en yüksek seviyesini bugünkü kapanış kırmış
+  bool get isDonchian20Breakout {
+    if (prices.length < 21) return false;
+    final window = prices.sublist(prices.length - 21, prices.length - 1);
+    final highest = window.reduce((a, b) => a > b ? a : b);
+    return prices.last > highest;
   }
 }

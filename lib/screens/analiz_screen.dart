@@ -8,6 +8,7 @@ import '../services/portfolio_service.dart';
 import '../services/kap_news_service.dart';
 import '../models/portfolio_model.dart';
 import '../models/kap_news_item.dart';
+import 'tradingview_screen.dart';
 
 class AnalizScreen extends StatefulWidget {
   final String? initialSymbol;
@@ -440,6 +441,47 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                             child: Center(child: Text('Veri yüklenemedi', style: TextStyle(color: onSurfaceSecondary)))),
 
                       const SizedBox(height: 12),
+
+                      // TradingView butonu (sadece BIST hisseleri için)
+                      if (_assetCategory == 'bist')
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TradingViewScreen(
+                                  symbol: _selectedSymbol,
+                                  name: a?.name ?? _selectedSymbol,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1565C0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.show_chart, color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'TradingView\'da Aç',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
@@ -491,6 +533,33 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                             _SummaryItem(label: 'Günlük İşlem Adedi', value: a.latestVolume.toStringAsFixed(0)),
                             _SummaryItem(label: 'Günlük İşlem Hacmi', value: '${a.dailyTurnover.toStringAsFixed(2)} ₺'),
                           ]),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.orange.withOpacity(0.30)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Veriler geç gelebilir, değerleri kontrol ediniz. Bilgi amaçlıdır.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade300,
+                                      fontSize: 12,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ] else ...[
                         if (_assetCategory == 'bist') ...[
