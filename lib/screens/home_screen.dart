@@ -297,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadingMarket = true;
       _marketList = [];
     });
-    final assets = await StockService.fetchMultiple(_topSymbols, period: '5d');
+    final assets = await StockService.fetchMultiple(_topSymbols, period: '1d');
     if (!mounted) return;
     _allMarketAssets = assets;
     _applyMarketFilter();
@@ -308,9 +308,9 @@ class _HomeScreenState extends State<HomeScreen> {
     List<AssetModel> filtered;
     switch (_marketTab) {
       case 0:
-        // En Çok Artan — sınır yok, yeni halka arz hisseler de dahil
+        // En Çok Artan — günlük tavan %10
         filtered = _allMarketAssets
-            .where((a) => a.changePercent > 0)
+            .where((a) => a.changePercent > 0 && a.changePercent <= 10.0)
             .toList()
           ..sort((a, b) {
             final changeCmp = b.changePercent.compareTo(a.changePercent);
@@ -320,9 +320,9 @@ class _HomeScreenState extends State<HomeScreen> {
         filtered = filtered.take(10).toList();
         break;
       case 1:
-        // En Çok Azalan — sınır yok
+        // En Çok Azalan — günlük taban -%10
         filtered = _allMarketAssets
-            .where((a) => a.changePercent < 0)
+            .where((a) => a.changePercent < 0 && a.changePercent >= -10.0)
             .toList()
           ..sort((a, b) {
             final changeCmp = a.changePercent.compareTo(b.changePercent);
