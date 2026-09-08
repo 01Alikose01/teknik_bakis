@@ -637,8 +637,8 @@ class _ScannerScreenState extends State<ScannerScreen>
                   ],
                 ),
               ),
-              minHeight: 86,
-              maxHeight: 86,
+              minHeight: 100,
+              maxHeight: 100,
             ),
           ),
 
@@ -1425,11 +1425,17 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get minExtent => minHeight;
 
   @override
-  double get maxExtent => maxHeight;
+  double get maxExtent => maxHeight > minHeight ? maxHeight : minHeight;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return SizedBox.expand(child: child);
+    // OverflowBox ile sabit yükseklik sınırını aşmasına izin ver — taşma hatası olmaz
+    return OverflowBox(
+      minHeight: 0,
+      maxHeight: double.infinity,
+      alignment: Alignment.topCenter,
+      child: child,
+    );
   }
 
   @override
