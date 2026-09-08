@@ -619,8 +619,8 @@ class _ScannerScreenState extends State<ScannerScreen>
     );
 
     return DraggableScrollableSheet(
-      initialChildSize: 1.0, minChildSize: 0.45, maxChildSize: 1.0,
-      expand: true, snap: true, snapSizes: const [0.45, 1.0],
+      initialChildSize: 0.52, minChildSize: 0.45, maxChildSize: 1.0,
+      expand: true, snap: true, snapSizes: const [0.52, 1.0],
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
