@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "68388088590",
+    "project_id": "teknik-bakis",
+    "storage_bucket": "teknik-bakis.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:68388088590:android:f9ea8947bd58ba7a31c55f",
+        "android_client_info": {
+          "package_name": "com.teknikbakis.teknik_bakis"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1eB1Z0ut0QFtTvXdTi0NqGGdhG9eBaJg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

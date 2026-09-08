@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android Auto Backup kuralları (API 23+)
+    Trial tüketim bilgisinin Google Drive yedeğine alınmasını sağlar.
+    Uygulama silinip yeniden yüklendiğinde bu veri geri yüklenir.
+-->
+<full-backup-content>
+    <!-- flutter_secure_storage'ın encryptedSharedPreferences=false modundaki dosyası -->
+    <include domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <!-- Hive abonelik box'ı (documents dizini) -->
+    <include domain="database" path="subscription.hive" />
+    <include domain="database" path="subscription.lock" />
+</full-backup-content>
