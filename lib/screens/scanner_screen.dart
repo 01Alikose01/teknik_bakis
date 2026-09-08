@@ -618,105 +618,124 @@ class _ScannerScreenState extends State<ScannerScreen>
       ),
     );
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.52, minChildSize: 0.45, maxChildSize: 1.0,
-      expand: true, snap: true, snapSizes: const [0.52, 1.0],
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              header,
-              Divider(height: 1, color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+    return Container(
+      color: theme.colorScheme.surface,
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // Sabit header — kaydırılmaz
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _StickyHeaderDelegate(
+              child: Container(
+                color: theme.colorScheme.surface,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isMulti) ...[
-                      Wrap(
-                        spacing: 6, runSpacing: 6,
-                        children: matchedDefs.map((f) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: f.color.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: f.color.withValues(alpha: 0.35)),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(f.icon, size: 13, color: f.color),
-                            const SizedBox(width: 5),
-                            Text(f.cleanLabel, style: TextStyle(color: f.color, fontSize: 11, fontWeight: FontWeight.bold)),
-                          ]),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (!isMulti && primaryDef != null) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: accentColor.withValues(alpha: 0.2)),
-                        ),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Icon(Icons.info_outline, size: 14, color: accentColor),
-                            const SizedBox(width: 6),
-                            Text('Koşul', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ]),
-                          const SizedBox(height: 6),
-                          Text(primaryDef.subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.8), height: 1.5, fontSize: 13)),
-                        ]),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          const Text('🔍', style: TextStyle(fontSize: 14)),
-                          const SizedBox(width: 6),
-                          Text('Şu an bu formasyon oluşmamış',
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
-                        ]),
-                        const SizedBox(height: 8),
-                        Text(
-                          isMulti
-                              ? 'Seçtiğiniz ${matchedDefs.length} filtre koşulunu aynı anda sağlayan hisse bulunamadı. Daha az filtre seçin veya farklı bir periyot deneyin.'
-                              : '${primaryDef?.cleanLabel ?? "Bu sinyal"} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.75), height: 1.55, fontSize: 13),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(periodHint, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), height: 1.5, fontSize: 12, fontStyle: FontStyle.italic)),
-                      ]),
-                    ),
-                    SizedBox(height: screenHeight * 0.03),
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() { _activeFilters = []; _results = []; }),
-                      icon: const Icon(Icons.arrow_back, size: 16),
-                      label: const Text('Filtrelere Dön'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: accentColor,
-                        side: BorderSide(color: accentColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                    ),
+                    header,
+                    Divider(height: 1, color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
                   ],
                 ),
               ),
-            ],
+              minHeight: 86,
+              maxHeight: 86,
+            ),
           ),
-        );
-      },
+
+          // Kaydırılabilir içerik
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                if (isMulti) ...[
+                  Wrap(
+                    spacing: 6, runSpacing: 6,
+                    children: matchedDefs.map((f) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: f.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: f.color.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(f.icon, size: 13, color: f.color),
+                        const SizedBox(width: 5),
+                        Text(f.cleanLabel, style: TextStyle(color: f.color, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ]),
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (!isMulti && primaryDef != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Icon(Icons.info_outline, size: 14, color: accentColor),
+                        const SizedBox(width: 6),
+                        Text('Koşul', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(primaryDef.subtitle, style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.8), height: 1.5, fontSize: 13)),
+                    ]),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      const Text('🔍', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text('Şu an bu formasyon oluşmamış',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
+                    ]),
+                    const SizedBox(height: 8),
+                    Text(
+                      isMulti
+                          ? 'Seçtiğiniz ${matchedDefs.length} filtre koşulunu aynı anda sağlayan hisse bulunamadı. Daha az filtre seçin veya farklı bir periyot deneyin.'
+                          : '${primaryDef?.cleanLabel ?? "Bu sinyal"} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.75), height: 1.55, fontSize: 13),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(periodHint, style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      height: 1.5, fontSize: 12, fontStyle: FontStyle.italic)),
+                  ]),
+                ),
+                SizedBox(height: screenHeight * 0.03),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() { _activeFilters = []; _results = []; }),
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Filtrelere Dön'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: accentColor,
+                    side: BorderSide(color: accentColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+                // İkinci görseldeki gibi alt boşluk — içerik yukarı çekilince alt kısım boşalır
+                SizedBox(height: screenHeight * 0.4),
+              ]),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1387,4 +1406,33 @@ class _TargetPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(_TargetPainter old) => old.color != color;
+}
+
+// ─── Sticky Header Delegate ─────────────────────────────────────────────────
+
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double minHeight;
+  final double maxHeight;
+
+  const _StickyHeaderDelegate({
+    required this.child,
+    required this.minHeight,
+    required this.maxHeight,
+  });
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(_StickyHeaderDelegate old) =>
+      old.child != child || old.minHeight != minHeight || old.maxHeight != maxHeight;
 }
