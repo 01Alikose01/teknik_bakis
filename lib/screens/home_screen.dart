@@ -31,7 +31,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _dollar,
       _euro;
   bool _loadingMarket = false;
-  bool _loadingQuick = false;
   StreamSubscription? _favoriteListSubscription;
   Timer? _refreshTimer;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -182,20 +181,16 @@ class _HomeScreenState extends State<HomeScreen> {
           .timeout(const Duration(seconds: 8), onTimeout: () => []);
       if (!mounted) return;
 
-      setState(() {
-        for (final asset in results) {
-          _stockPriceCache[asset.symbol] = asset;
-        }
-      });
-
-      // Cache'e kaydet
+      // Her hisse geldiğinde sadece o hissenin rakamları değişir, diğerleri kaybolmaz
       if (results.isNotEmpty) {
-        final allCached = _stockPriceCache.values.toList();
-        HomePriceCache.saveFavoritePrices(allCached);
+        setState(() {
+          for (final asset in results) {
+            _stockPriceCache[asset.symbol] = asset;
+          }
+        });
+        HomePriceCache.saveFavoritePrices(_stockPriceCache.values.toList());
       }
-    } catch (_) {
-      // Timeout veya network hatası — sessizce devam et
-    }
+    } catch (_) {}
   }
 
   @override
@@ -218,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   Future<void> _loadQuickPrices() async {
-    setState(() => _loadingQuick = true);
+    // _loadingQuick'i true yapmıyoruz — mevcut veri görünmeye devam eder
     try {
       final needB100 = _selectedItems.contains('bist100');
       final needB30 = _selectedItems.contains('bist30');
@@ -262,15 +257,16 @@ class _HomeScreenState extends State<HomeScreen> {
         final a = results[i] as AssetModel?;
         if (a != null) hisseler.add(a);
       }
+      // Sadece gelen değerleri güncelle — mevcut görseli bozmadan rakamlar değişir
       setState(() {
-        _bist100 = b100 ?? _bist100;
-        _bist30 = b30 ?? _bist30;
-        _goldGram = gold ?? _goldGram;
-        _silverTl = silver ?? _silverTl;
-        _palladiumTl = palladium ?? _palladiumTl;
-        _platinumTl = platinum ?? _platinumTl;
-        _dollar = dollar ?? _dollar;
-        _euro = euro ?? _euro;
+        if (b100 != null) _bist100 = b100;
+        if (b30 != null) _bist30 = b30;
+        if (gold != null) _goldGram = gold;
+        if (silver != null) _silverTl = silver;
+        if (palladium != null) _palladiumTl = palladium;
+        if (platinum != null) _platinumTl = platinum;
+        if (dollar != null) _dollar = dollar;
+        if (euro != null) _euro = euro;
         if (hisseler.isNotEmpty) _quickPrices = hisseler;
       });
 
@@ -285,21 +281,49 @@ class _HomeScreenState extends State<HomeScreen> {
         'dollar': _dollar,
         'euro': _euro,
       });
-    } catch (_) {
-      // Network hatası — sessizce devam et
-    } finally {
-      if (mounted) setState(() => _loadingQuick = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadMarketList() async {
-    setState(() {
-      _loadingMarket = true;
-      _marketList = [];
-    });
-    final assets = await StockService.fetchMultiple(_topSymbols, period: '1d');
+    // _marketList'i temizleme — mevcut liste görünmeye devam eder (no-flicker)
+    // _loadingMarket sadece ilk yüklemede (liste boşsa) true olur
+    if (_allMarketAssets.isEmpty) {
+      setState(() => _loadingMarket = true);
+    }
+
+    // Öncelikli semboller: görünen favori + market listesi → öne al
+    final prioritySymbols = <String>{
+      ..._favoriteListA,
+      ..._favoriteListB,
+      ..._marketList.map((a) => a.symbol),
+    };
+    final allSymbols = _topSymbols;
+    // Priority önce, geri kalanlar sonra
+    final orderedSymbols = [
+      ...prioritySymbols.where((s) => allSymbols.contains(s)),
+      ...allSymbols.where((s) => !prioritySymbols.contains(s)),
+    ];
+
+    // Priority batch'i hemen çek ve göster
+    final priorityBatch = orderedSymbols.take(prioritySymbols.length + 20).toList();
+    final priorityAssets = await StockService.fetchMultiple(priorityBatch, period: '1d');
     if (!mounted) return;
-    _allMarketAssets = assets;
+
+    // Priority sonuçlarıyla market listesini hemen güncelle
+    final tempMap = <String, AssetModel>{};
+    for (final a in priorityAssets) { tempMap[a.symbol] = a; }
+    _allMarketAssets = [...priorityAssets, ..._allMarketAssets.where((a) => !tempMap.containsKey(a.symbol))];
+    _applyMarketFilter();
+
+    // Geri kalan semboller arka planda
+    final remaining = orderedSymbols.skip(priorityBatch.length).toList();
+    if (remaining.isEmpty) return;
+
+    final restAssets = await StockService.fetchMultiple(remaining, period: '1d');
+    if (!mounted) return;
+
+    for (final a in restAssets) { tempMap[a.symbol] = a; }
+    _allMarketAssets = [...priorityAssets, ...restAssets];
     _applyMarketFilter();
   }
 
@@ -1079,14 +1103,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // Fiyat kartları
+              // Fiyat kartları — cache'den anında gösterilir, spinner yok
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 132,
-                  child: _loadingQuick
+                  child: _buildPriceCards().isEmpty
                       ? const Center(
                           child: CircularProgressIndicator(
                             color: Color(0xFF34C759),
+                            strokeWidth: 2,
                           ),
                         )
                       : ListView(
@@ -1257,13 +1282,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                if (_loadingMarket)
+                if (_loadingMarket && _marketList.isEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.all(32),
                       child: Center(
                         child: CircularProgressIndicator(
                           color: theme.colorScheme.primary,
+                          strokeWidth: 2,
                         ),
                       ),
                     ),
