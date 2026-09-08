@@ -85,75 +85,104 @@ class _TradingViewScreenState extends State<TradingViewScreen> {
   Widget build(BuildContext context) {
     const surface = Color(0xFF1C1C1E);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF131722),
-      appBar: AppBar(
-        backgroundColor: surface,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.symbol,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            Text(
-              widget.name,
-              style: const TextStyle(color: Colors.white60, fontSize: 11),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70, size: 20),
-            tooltip: 'Yenile',
-            onPressed: () => _controller.reload(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.fullscreen, color: Colors.white70, size: 22),
-            tooltip: 'Yatay Tam Ekran',
-            onPressed: () {
-              SystemChrome.setPreferredOrientations([
-                DeviceOrientation.landscapeLeft,
-                DeviceOrientation.landscapeRight,
-              ]);
-            },
-          ),
-        ],
-      ),
-      // SafeArea tüm kenarları (üst/alt/sol/sağ) sistem UI'ından korur.
-      // Özellikle yatay modda sağdaki navigasyon butonları (üçgen/daire/kare)
-      // WebView içeriğinin üzerine binmesini bu şekilde engelleriz.
-      body: SafeArea(
-        top: false,    // AppBar zaten üstü kaplıyor
-        left: true,    // Yatay modda sol sistem UI
-        right: true,   // Yatay modda sağ sistem butonları (üçgen/daire/kare)
-        bottom: true,  // Alt gezinme çubuğu
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_loading)
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF34C759),
-                  strokeWidth: 2,
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        final isLandscape = orientation == Orientation.landscape;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFF131722),
+          // Yatay modda AppBar gizlenir — grafik tam ekran olur
+          appBar: isLandscape
+              ? null
+              : AppBar(
+                  backgroundColor: surface,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  titleSpacing: 0,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.symbol,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        widget.name,
+                        style: const TextStyle(color: Colors.white60, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white70, size: 20),
+                      tooltip: 'Yenile',
+                      onPressed: () => _controller.reload(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.fullscreen, color: Colors.white70, size: 22),
+                      tooltip: 'Yatay Tam Ekran',
+                      onPressed: () {
+                        SystemChrome.setPreferredOrientations([
+                          DeviceOrientation.landscapeLeft,
+                          DeviceOrientation.landscapeRight,
+                        ]);
+                      },
+                    ),
+                  ],
                 ),
-              ),
-          ],
-        ),
-      ),
+          body: SafeArea(
+            top: false,
+            left: isLandscape,
+            right: isLandscape,
+            bottom: true,
+            child: Stack(
+              children: [
+                WebViewWidget(controller: _controller),
+                // Yatay modda sol üste hafif geri butonu — sadece WebView üzerinde
+                if (isLandscape)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: SafeArea(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_loading)
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF34C759),
+                      strokeWidth: 2,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
