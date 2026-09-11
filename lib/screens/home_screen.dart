@@ -1501,9 +1501,8 @@ class _QuoteQuickCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPos = asset.changePercent >= 0;
     final chgColor = isPos ? const Color(0xFF34C759) : const Color(0xFFFF3B30);
-    final isCurrencyBadge = badge == r'$' || badge == '€';
-    final badgeSize = isCurrencyBadge ? 32.0 : 24.0;
-    final badgeFontSize = isCurrencyBadge ? 14.0 : 7.0;
+    const badgeSize = 32.0;
+    const badgeFontSize = 9.0;
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
     final onSurfaceSecondary = theme.colorScheme.onSurface.withOpacity(0.7);

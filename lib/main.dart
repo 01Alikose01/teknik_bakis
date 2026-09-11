@@ -143,7 +143,11 @@ class MainNavigationState extends State<MainNavigation> {
   String _analizSymbol = 'THYAO';
   String _analizName = 'Türk Hava Yolları';
 
+  /// Geri tuşu için sekme geçmişi (son sekme her zaman 0'dır)
+  final List<int> _tabHistory = [];
+
   void goToAnaliz(String symbol, String name) {
+    _pushTab(2);
     setState(() {
       _analizSymbol = symbol;
       _analizName = name;
@@ -156,10 +160,31 @@ class MainNavigationState extends State<MainNavigation> {
     if (mounted) setState(() {});
   }
 
+  void _pushTab(int index) {
+    if (_currentIndex != index) {
+      _tabHistory.add(_currentIndex);
+    }
+  }
+
+  bool _onPopInvoked() {
+    if (_tabHistory.isNotEmpty) {
+      setState(() {
+        _currentIndex = _tabHistory.removeLast();
+      });
+      return false; // pop yapma, biz hallettik
+    }
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return false; // ana sayfaya git
+    }
+    return true; // ana sayfadayız, uygulamayı kapat
+  }
+
   @override
   void initState() {
     super.initState();
     AppNavigation.registerTabSetter((index) {
+      _pushTab(index);
       setState(() {
         _currentIndex = index;
       });
@@ -179,7 +204,14 @@ class MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _onPopInvoked();
+        }
+      },
+      child: Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -198,7 +230,12 @@ class MainNavigationState extends State<MainNavigation> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) {
+          if (i != _currentIndex) {
+            _pushTab(i);
+            setState(() => _currentIndex = i);
+          }
+        },
         backgroundColor: theme.colorScheme.surface,
         selectedItemColor: theme.colorScheme.primary,
         unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
@@ -257,6 +294,7 @@ class MainNavigationState extends State<MainNavigation> {
             label: 'Ayarlar',
           ),
         ],
+      ),
       ),
     );
   }

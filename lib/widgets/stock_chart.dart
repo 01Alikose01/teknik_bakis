@@ -224,88 +224,126 @@ class _CandleChart extends StatelessWidget {
 
     final minY = lows.reduce((a, b) => a < b ? a : b) * 0.995;
     final maxY = highs.reduce((a, b) => a > b ? a : b) * 1.005;
-    final range = maxY - minY;
 
-    final barGroups = List.generate(count, (i) {
+    return SizedBox(
+      height: 200,
+      child: CustomPaint(
+        painter: _CandlePainter(
+          opens: opens,
+          closes: closes,
+          highs: highs,
+          lows: lows,
+          minY: minY,
+          maxY: maxY,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _CandlePainter extends CustomPainter {
+  final List<double> opens;
+  final List<double> closes;
+  final List<double> highs;
+  final List<double> lows;
+  final double minY;
+  final double maxY;
+
+  _CandlePainter({
+    required this.opens,
+    required this.closes,
+    required this.highs,
+    required this.lows,
+    required this.minY,
+    required this.maxY,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final count = opens.length;
+    if (count == 0) return;
+
+    final range = maxY - minY;
+    if (range <= 0) return;
+
+    // Grid çizgileri
+    final gridPaint = Paint()
+      ..color = Colors.white10
+      ..strokeWidth = 0.5;
+    for (int k = 0; k <= 4; k++) {
+      final y = size.height * k / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // Fiyat etiketleri için sağda boşluk
+    const rightPadding = 52.0;
+    const leftPadding = 4.0;
+    final chartWidth = size.width - rightPadding - leftPadding;
+
+    // Fiyat etiketleri
+    for (int k = 0; k <= 4; k++) {
+      final fraction = 1 - k / 4;
+      final price = minY + range * fraction;
+      final y = size.height * k / 4;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: price.toStringAsFixed(1),
+          style: const TextStyle(color: Colors.grey, fontSize: 9),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(size.width - rightPadding + 4, y - tp.height / 2));
+    }
+
+    final candleWidth = chartWidth / count;
+    final bodyWidth = (candleWidth * 0.6).clamp(2.0, 12.0);
+    final wickWidth = (candleWidth * 0.1).clamp(1.0, 2.0);
+
+    double priceToY(double price) {
+      return size.height - ((price - minY) / range) * size.height;
+    }
+
+    for (int i = 0; i < count; i++) {
       final open = opens[i];
       final close = closes[i];
       final high = highs[i];
       final low = lows[i];
       final isUp = close >= open;
-      final bodyTop = isUp ? close : open;
-      final bodyBottom = isUp ? open : close;
 
-      return BarChartGroupData(
-        x: i,
-        barRods: [
-          BarChartRodData(
-            fromY: low,
-            toY: high,
-            color: isUp ? const Color(0xFF00C853) : const Color(0xFFE53935),
-            width: 1.2,
-            borderRadius: BorderRadius.zero,
-          ),
-          BarChartRodData(
-            fromY: bodyBottom,
-            toY: bodyTop,
-            color: isUp ? const Color(0xFF00C853) : const Color(0xFFE53935),
-            width: 8,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ],
+      final color = isUp ? const Color(0xFF00C853) : const Color(0xFFE53935);
+      final cx = leftPadding + (i + 0.5) * candleWidth;
+
+      // Fitil (wick) — high'dan low'a
+      final wickPaint = Paint()
+        ..color = color
+        ..strokeWidth = wickWidth;
+      canvas.drawLine(
+        Offset(cx, priceToY(high)),
+        Offset(cx, priceToY(low)),
+        wickPaint,
       );
-    });
 
-    return SizedBox(
-      height: 200,
-      child: BarChart(
-        BarChartData(
-          minY: minY == maxY ? minY - 1 : minY,
-          maxY: maxY == minY ? maxY + 1 : maxY,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: range == 0 ? 1 : range / 4,
-            getDrawingHorizontalLine: (_) => const FlLine(color: Colors.white10, strokeWidth: 1),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            show: true,
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 52,
-                getTitlesWidget: (value, meta) => Text(
-                  value.toStringAsFixed(1),
-                  style: const TextStyle(color: Colors.grey, fontSize: 9),
-                ),
-              ),
-            ),
-          ),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => const Color(0xFF333355),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final idx = group.x.toInt();
-                final open = opens[idx];
-                final high = highs[idx];
-                final low = lows[idx];
-                final close = closes[idx];
-                return BarTooltipItem(
-                  'O: ${open.toStringAsFixed(2)}\nH: ${high.toStringAsFixed(2)}\nL: ${low.toStringAsFixed(2)}\nC: ${close.toStringAsFixed(2)}',
-                  const TextStyle(color: Colors.white, fontSize: 11),
-                );
-              },
-            ),
-          ),
-          barGroups: barGroups,
-        ),
-      ),
-    );
+      // Gövde (body) — open'dan close'a
+      final bodyTop = priceToY(isUp ? close : open);
+      final bodyBottom = priceToY(isUp ? open : close);
+      final bodyHeight = (bodyBottom - bodyTop).abs().clamp(1.0, double.infinity);
+
+      final bodyPaint = Paint()..color = color;
+      final bodyRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight),
+        const Radius.circular(1.5),
+      );
+      canvas.drawRRect(bodyRect, bodyPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CandlePainter oldDelegate) {
+    return oldDelegate.opens != opens ||
+        oldDelegate.closes != closes ||
+        oldDelegate.minY != minY ||
+        oldDelegate.maxY != maxY;
   }
 }
 

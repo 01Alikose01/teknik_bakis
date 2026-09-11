@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
 import '../services/subscription_service.dart';
@@ -21,6 +22,7 @@ class _ScannerScreenState extends State<ScannerScreen>
   static const int _maxMultiSelect = 3;
   List<AssetModel> _results = [];
   bool _scanning = false;
+  bool _isOffline = false;
   int _progress = 0;
   int _total = 0;
   String? _errorMsg;
@@ -408,11 +410,35 @@ class _ScannerScreenState extends State<ScannerScreen>
       }
       return;
     }
+
+    // ── İnternet bağlantısı kontrolü ────────────────────────────────────────
+    bool hasConnection = false;
+    try {
+      final result = await InternetAddress.lookup('query1.finance.yahoo.com')
+          .timeout(const Duration(seconds: 5));
+      hasConnection = result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    } catch (_) {
+      hasConnection = false;
+    }
+
+    if (!hasConnection) {
+      if (mounted) {
+        setState(() {
+          _isOffline = true;
+          _activeFilters = filterIds;
+          _lastScanScope = scope;
+        });
+      }
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     final symbols = _symbolsForScope(scope);
     setState(() {
       _activeFilters = filterIds;
       _lastScanScope = scope;
       _scanning = true;
+      _isOffline = false;
       _results = [];
       _progress = 0;
       _total = symbols.length;
@@ -426,7 +452,8 @@ class _ScannerScreenState extends State<ScannerScreen>
           if (mounted) setState(() => _progress = done);
         },
       );
-      final filtered = assets.where((a) => _matchFilters(a, filterIds)).toList();
+      final filtered = assets.where((a) => _matchFilters(a, filterIds)).toList()
+        ..sort((a, b) => a.symbol.compareTo(b.symbol));
       if (mounted) setState(() { _results = filtered; _scanning = false; });
     } catch (e) {
       if (mounted) setState(() { _scanning = false; _errorMsg = 'Hata: $e'; });
@@ -534,7 +561,9 @@ class _ScannerScreenState extends State<ScannerScreen>
 
             // İçerik
             Expanded(
-              child: _activeFilters.isNotEmpty && _results.isNotEmpty
+              child: _activeFilters.isNotEmpty && _isOffline
+                  ? _buildOfflineScreen()
+                  : _activeFilters.isNotEmpty && _results.isNotEmpty
                   ? _buildResults()
                   : _activeFilters.isNotEmpty && !_scanning && _results.isEmpty
                       ? _buildEmptyResult()
@@ -561,9 +590,149 @@ class _ScannerScreenState extends State<ScannerScreen>
     );
   }
 
+  Widget _buildOfflineScreen() {
+    final theme = Theme.of(context);
+    final allFilters = [..._trendFilters, ..._momentumFilters, ..._formationFilters];
+    final matchedDefs = allFilters.where((f) => _activeFilters.contains(f.id)).toList();
+    final accentColor = matchedDefs.isNotEmpty ? matchedDefs.first.color : theme.colorScheme.primary;
+
+    return Container(
+      color: theme.colorScheme.surface,
+      child: Center(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // İkon
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9500).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFF9500).withValues(alpha: 0.3), width: 2),
+                ),
+                child: const Icon(Icons.wifi_off_rounded, color: Color(0xFFFF9500), size: 42),
+              ),
+              const SizedBox(height: 24),
+
+              // Başlık
+              Text(
+                'İnternet Bağlantısı Yok',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  color: theme.colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+
+              // Alt mesaj
+              Text(
+                'Tarama işlemi gerçek zamanlı borsa verisi gerektirir. En güncel hisse fiyatları ve teknik göstergelerle doğru sinyal üretebilmek için lütfen internet bağlantınızı kontrol edin.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+                  height: 1.6,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // Bilgi kutusu
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    _OfflineInfoRow(
+                      icon: Icons.signal_wifi_statusbar_connected_no_internet_4_rounded,
+                      iconColor: const Color(0xFFFF9500),
+                      text: 'Wi-Fi veya mobil veri bağlantınızı açın',
+                    ),
+                    const SizedBox(height: 10),
+                    _OfflineInfoRow(
+                      icon: Icons.sync_rounded,
+                      iconColor: accentColor,
+                      text: 'Bağlantı sağlandıktan sonra taramayı yeniden başlatın',
+                    ),
+                    const SizedBox(height: 10),
+                    _OfflineInfoRow(
+                      icon: Icons.bar_chart_rounded,
+                      iconColor: const Color(0xFF34C759),
+                      text: 'Gerçek zamanlı veri olmadan teknik analiz yapılamaz',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Yeniden Dene butonu
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final filters = List<String>.from(_activeFilters);
+                    final scope = _lastScanScope;
+                    setState(() {
+                      _activeFilters = [];
+                      _isOffline = false;
+                    });
+                    _startScan(filters, scope: scope);
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  label: const Text(
+                    'Yeniden Dene',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF34C759),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Filtrelere dön
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    _activeFilters = [];
+                    _isOffline = false;
+                  }),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  label: const Text(
+                    'Filtrelere Dön',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                    side: BorderSide(color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyResult() {
     final theme = Theme.of(context);
-    final screenHeight = MediaQuery.of(context).size.height;
     final allFilters = [..._trendFilters, ..._momentumFilters, ..._formationFilters];
     final matchedDefs = allFilters.where((f) => _activeFilters.contains(f.id)).toList();
     final isMulti = matchedDefs.length > 1;
@@ -620,121 +789,102 @@ class _ScannerScreenState extends State<ScannerScreen>
 
     return Container(
       color: theme.colorScheme.surface,
-      child: CustomScrollView(
+      child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Sabit header — kaydırılmaz
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _StickyHeaderDelegate(
-              child: Container(
-                color: theme.colorScheme.surface,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    header,
-                    Divider(height: 1, color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
-                  ],
-                ),
-              ),
-              minHeight: 100,
-              maxHeight: 100,
-            ),
-          ),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header — scroll içinde, küçük ekranlarda kaydırılabilir
+            header,
+            Divider(height: 1, color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
+            const SizedBox(height: 16),
 
-          // Kaydırılabilir içerik
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                if (isMulti) ...[
-                  Wrap(
-                    spacing: 6, runSpacing: 6,
-                    children: matchedDefs.map((f) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: f.color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: f.color.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(f.icon, size: 13, color: f.color),
-                        const SizedBox(width: 5),
-                        Text(f.cleanLabel, style: TextStyle(color: f.color, fontSize: 11, fontWeight: FontWeight.bold)),
-                      ]),
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (!isMulti && primaryDef != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentColor.withValues(alpha: 0.2)),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Icon(Icons.info_outline, size: 14, color: accentColor),
-                        const SizedBox(width: 6),
-                        Text('Koşul', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(primaryDef.subtitle, style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.8), height: 1.5, fontSize: 13)),
-                    ]),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
+            if (isMulti) ...[
+              Wrap(
+                spacing: 6, runSpacing: 6,
+                children: matchedDefs.map((f) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    color: f.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: f.color.withValues(alpha: 0.35)),
                   ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Text('🔍', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                      Text('Şu an bu formasyon oluşmamış',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
-                    ]),
-                    const SizedBox(height: 8),
-                    Text(
-                      isMulti
-                          ? 'Seçtiğiniz ${matchedDefs.length} filtre koşulunu aynı anda sağlayan hisse bulunamadı. Daha az filtre seçin veya farklı bir periyot deneyin.'
-                          : '${primaryDef?.cleanLabel ?? "Bu sinyal"} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.75), height: 1.55, fontSize: 13),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(periodHint, style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      height: 1.5, fontSize: 12, fontStyle: FontStyle.italic)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(f.icon, size: 13, color: f.color),
+                    const SizedBox(width: 5),
+                    Text(f.cleanLabel, style: TextStyle(color: f.color, fontSize: 11, fontWeight: FontWeight.bold)),
                   ]),
+                )).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (!isMulti && primaryDef != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.2)),
                 ),
-                SizedBox(height: screenHeight * 0.03),
-                OutlinedButton.icon(
-                  onPressed: () => setState(() { _activeFilters = []; _results = []; }),
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Filtrelere Dön'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: accentColor,
-                    side: BorderSide(color: accentColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Icon(Icons.info_outline, size: 14, color: accentColor),
+                    const SizedBox(width: 6),
+                    Text('Koşul', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(primaryDef.subtitle, style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8), height: 1.5, fontSize: 13)),
+                ]),
+              ),
+              const SizedBox(height: 14),
+            ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Text('🔍', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Text('Şu an bu formasyon oluşmamış',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
+                ]),
+                const SizedBox(height: 8),
+                Text(
+                  isMulti
+                      ? 'Seçtiğiniz ${matchedDefs.length} filtre koşulunu aynı anda sağlayan hisse bulunamadı. Daha az filtre seçin veya farklı bir periyot deneyin.'
+                      : '${primaryDef?.cleanLabel ?? "Bu sinyal"} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75), height: 1.55, fontSize: 13),
                 ),
-                // İkinci görseldeki gibi alt boşluk — içerik yukarı çekilince alt kısım boşalır
-                SizedBox(height: screenHeight * 0.4),
+                const SizedBox(height: 10),
+                Text(periodHint, style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  height: 1.5, fontSize: 12, fontStyle: FontStyle.italic)),
               ]),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => setState(() { _activeFilters = []; _results = []; }),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Filtrelere Dön'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: accentColor,
+                side: BorderSide(color: accentColor),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 52),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -1327,6 +1477,46 @@ class _EmaRow extends StatelessWidget {
 
 class _Badge { final String label; final Color color; const _Badge({required this.label, required this.color}); }
 
+class _OfflineInfoRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+  const _OfflineInfoRow({required this.icon, required this.iconColor, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: iconColor, size: 17),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Tab Bar ────────────────────────────────────────────────────────────────
 
 class _ScannerTabBar extends StatefulWidget {
@@ -1349,7 +1539,7 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
     final idx = widget.controller.index;
     final theme = Theme.of(context);
     return Container(
-      height: 80,
+      height: 88,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
@@ -1357,34 +1547,54 @@ class _ScannerTabBarState extends State<_ScannerTabBar> {
       ),
       child: Row(children: [
         // SAT SİNYAL
-        Expanded(child: GestureDetector(
-          onTap: () { widget.controller.animateTo(0); widget.onTap(0); },
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.trending_down_rounded, size: 28, color: idx == 0 ? const Color(0xFFFF3B30) : Colors.grey.shade400),
-            const SizedBox(height: 4),
-            Text('SAT SİNYAL', style: TextStyle(color: idx == 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
-          ]),
+        Expanded(child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () { widget.controller.animateTo(0); widget.onTap(0); },
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(14), bottomLeft: Radius.circular(14)),
+            child: SizedBox(
+              height: 88,
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.trending_down_rounded, size: 32, color: idx == 0 ? const Color(0xFFFF3B30) : Colors.grey.shade400),
+                const SizedBox(height: 5),
+                Text('SAT SİNYAL', style: TextStyle(color: idx == 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.6)),
+              ]),
+            ),
+          ),
         )),
-        Container(width: 1, height: 50, color: theme.colorScheme.outline),
+        Container(width: 1, height: 54, color: theme.colorScheme.outline),
         // AL SİNYAL
-        Expanded(child: GestureDetector(
-          onTap: () { widget.controller.animateTo(1); widget.onTap(1); },
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.trending_up_rounded, size: 28, color: idx == 1 ? const Color(0xFF34C759) : Colors.grey.shade400),
-            const SizedBox(height: 4),
-            Text('AL SİNYAL', style: TextStyle(color: idx == 1 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
-          ]),
+        Expanded(child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () { widget.controller.animateTo(1); widget.onTap(1); },
+            child: SizedBox(
+              height: 88,
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.trending_up_rounded, size: 32, color: idx == 1 ? const Color(0xFF34C759) : Colors.grey.shade400),
+                const SizedBox(height: 5),
+                Text('AL SİNYAL', style: TextStyle(color: idx == 1 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.6)),
+              ]),
+            ),
+          ),
         )),
-        Container(width: 1, height: 50, color: theme.colorScheme.outline),
+        Container(width: 1, height: 54, color: theme.colorScheme.outline),
         // FORMASYON
-        Expanded(child: GestureDetector(
-          onTap: () { widget.controller.animateTo(2); widget.onTap(2); },
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            SizedBox(width: 28, height: 28,
-                child: CustomPaint(painter: _TargetPainter(color: idx == 2 ? const Color(0xFFFFB800) : Colors.grey.shade400))),
-            const SizedBox(height: 4),
-            Text('FORMASYON', style: TextStyle(color: idx == 2 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
-          ]),
+        Expanded(child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () { widget.controller.animateTo(2); widget.onTap(2); },
+            borderRadius: const BorderRadius.only(topRight: Radius.circular(14), bottomRight: Radius.circular(14)),
+            child: SizedBox(
+              height: 88,
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                SizedBox(width: 32, height: 32,
+                    child: CustomPaint(painter: _TargetPainter(color: idx == 2 ? const Color(0xFFFFB800) : Colors.grey.shade400))),
+                const SizedBox(height: 5),
+                Text('FORMASYON', style: TextStyle(color: idx == 2 ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.55), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.6)),
+              ]),
+            ),
+          ),
         )),
       ]),
     );
@@ -1410,35 +1620,3 @@ class _TargetPainter extends CustomPainter {
 
 // ─── Sticky Header Delegate ─────────────────────────────────────────────────
 
-class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  final double minHeight;
-  final double maxHeight;
-
-  const _StickyHeaderDelegate({
-    required this.child,
-    required this.minHeight,
-    required this.maxHeight,
-  });
-
-  @override
-  double get minExtent => minHeight;
-
-  @override
-  double get maxExtent => maxHeight > minHeight ? maxHeight : minHeight;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    // OverflowBox ile sabit yükseklik sınırını aşmasına izin ver — taşma hatası olmaz
-    return OverflowBox(
-      minHeight: 0,
-      maxHeight: double.infinity,
-      alignment: Alignment.topCenter,
-      child: child,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_StickyHeaderDelegate old) =>
-      old.child != child || old.minHeight != minHeight || old.maxHeight != maxHeight;
-}
