@@ -1448,27 +1448,32 @@ class _ResultCard extends StatelessWidget {
               if (ema100val.isNotEmpty) _EmaRow(label: 'EMA100', emaVal: ema100val.last, price: asset.price),
             ]),
           ]),
-          if (badges.isNotEmpty) ...[
+          if (badges.isNotEmpty || signalId != null) ...[
             const SizedBox(height: 10),
             const Divider(height: 1),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6, runSpacing: 4,
-              children: badges.map((b) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: b.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5), border: Border.all(color: b.color.withValues(alpha: 0.4))),
-                child: Text(b.label, style: TextStyle(color: b.color, fontSize: 11, fontWeight: FontWeight.w700)),
-              )).toList(),
-            ),
-          ],
-          if (signalId != null) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            _BacktestButton(
-              asset: asset,
-              signalId: signalId!,
-              signalLabel: signalLabel ?? signalId!,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 6, runSpacing: 4,
+                    children: badges.map((b) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: b.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5), border: Border.all(color: b.color.withValues(alpha: 0.4))),
+                      child: Text(b.label, style: TextStyle(color: b.color, fontSize: 11, fontWeight: FontWeight.w700)),
+                    )).toList(),
+                  ),
+                ),
+                if (signalId != null) ...[
+                  const SizedBox(width: 8),
+                  _BacktestButtonCompact(
+                    asset: asset,
+                    signalId: signalId!,
+                    signalLabel: signalLabel ?? signalId!,
+                  ),
+                ],
+              ],
             ),
           ],
         ]),
@@ -1516,11 +1521,11 @@ class _EmaRow extends StatelessWidget {
 
 class _Badge { final String label; final Color color; const _Badge({required this.label, required this.color}); }
 
-class _BacktestButton extends StatelessWidget {
+class _BacktestButtonCompact extends StatelessWidget {
   final AssetModel asset;
   final String signalId;
   final String signalLabel;
-  const _BacktestButton({
+  const _BacktestButtonCompact({
     required this.asset,
     required this.signalId,
     required this.signalLabel,
@@ -1531,10 +1536,6 @@ class _BacktestButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1A2A1A) : const Color(0xFFE8F5E9);
     final borderClr = const Color(0xFF34C759).withValues(alpha: isDark ? 0.45 : 0.40);
-    final titleClr = isDark ? Colors.white : const Color(0xFF1B5E20);
-    final subClr = isDark
-        ? Colors.white.withValues(alpha: 0.70)
-        : const Color(0xFF2E7D32);
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -1549,57 +1550,24 @@ class _BacktestButton extends StatelessWidget {
         ),
       ),
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderClr, width: 1.3),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: borderClr, width: 1.2),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759).withValues(alpha: isDark ? 0.20 : 0.15),
-                borderRadius: BorderRadius.circular(11),
+            Icon(Icons.science_rounded, color: const Color(0xFF34C759), size: 12),
+            const SizedBox(width: 4),
+            Text(
+              'Geçmişte Test Et',
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1B5E20),
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
               ),
-              child: const Icon(Icons.science_rounded, color: Color(0xFF34C759), size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Bu Sinyali Geçmişte Test Et',
-                    style: TextStyle(
-                      color: titleClr,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Geçmişte kaç kez oluştu? Ortalama getirisi ne?',
-                    style: TextStyle(
-                      color: subClr,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF34C759), size: 15),
             ),
           ],
         ),
