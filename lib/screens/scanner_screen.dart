@@ -998,7 +998,6 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   Widget _buildResults() {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final singleFilter = _activeFilters.length == 1;
     final singleFilterId    = singleFilter ? _activeFilters.first : '';
     final allFilterDefs     = [..._trendFilters, ..._momentumFilters, ..._formationFilters];
@@ -1030,100 +1029,17 @@ class _ScannerScreenState extends State<ScannerScreen>
         ),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, singleFilter ? 80 : 16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             itemCount: _results.length,
-            itemBuilder: (_, i) => _ResultCard(asset: _results[i], activeFilters: _activeFilters),
-          ),
-        ),
-        // ── "Bu Sinyali Test Et" butonu ─────────────────────────────────
-        if (singleFilter)
-          _buildBacktestBanner(
-            context: context,
-            signalId: singleFilterId,
-            signalLabel: signalLabel,
-            isDark: isDark,
-            symbol: _results.isNotEmpty ? _results.first.symbol : 'THYAO',
-            symbolName: _results.isNotEmpty ? _results.first.name : 'THYAO',
-          ),
-      ],
-    );
-  }
-
-  Widget _buildBacktestBanner({
-    required BuildContext context,
-    required String signalId,
-    required String signalLabel,
-    required bool isDark,
-    required String symbol,
-    required String symbolName,
-  }) {
-    final cardBg = isDark ? const Color(0xFF1A2A1A) : const Color(0xFFE8F5E9);
-    final border = const Color(0xFF34C759).withValues(alpha: isDark ? 0.35 : 0.30);
-    final titleClr = isDark ? Colors.white : const Color(0xFF1B5E20);
-    final subClr = isDark
-        ? Colors.white.withValues(alpha: 0.65)
-        : const Color(0xFF2E7D32);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BacktestScreen(
-              symbol: symbol,
-              symbolName: symbolName,
-              signalId: signalId,
-              signalLabel: signalLabel,
+            itemBuilder: (_, i) => _ResultCard(
+              asset: _results[i],
+              activeFilters: _activeFilters,
+              signalId: singleFilter ? singleFilterId : null,
+              signalLabel: singleFilter ? signalLabel : null,
             ),
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border, width: 1.2),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF34C759).withValues(alpha: isDark ? 0.18 : 0.12),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Icon(Icons.science_rounded,
-                    color: Color(0xFF34C759), size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bu Sinyali Geçmişte Test Et',
-                      style: TextStyle(
-                          color: titleClr,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Geçmişte kaç kez oluştu? Ortalama getirisi ne?',
-                      style: TextStyle(color: subClr, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  color: Color(0xFF34C759), size: 16),
-            ],
-          ),
-        ),
-      ),
+      ],
     );
   }
 
@@ -1414,7 +1330,14 @@ class _FilterCard extends StatelessWidget {
 class _ResultCard extends StatelessWidget {
   final AssetModel asset;
   final List<String> activeFilters;
-  const _ResultCard({required this.asset, required this.activeFilters});
+  final String? signalId;
+  final String? signalLabel;
+  const _ResultCard({
+    required this.asset,
+    required this.activeFilters,
+    this.signalId,
+    this.signalLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1538,6 +1461,16 @@ class _ResultCard extends StatelessWidget {
               )).toList(),
             ),
           ],
+          if (signalId != null) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            _BacktestButton(
+              asset: asset,
+              signalId: signalId!,
+              signalLabel: signalLabel ?? signalId!,
+            ),
+          ],
         ]),
       ),
     );
@@ -1582,6 +1515,98 @@ class _EmaRow extends StatelessWidget {
 }
 
 class _Badge { final String label; final Color color; const _Badge({required this.label, required this.color}); }
+
+class _BacktestButton extends StatelessWidget {
+  final AssetModel asset;
+  final String signalId;
+  final String signalLabel;
+  const _BacktestButton({
+    required this.asset,
+    required this.signalId,
+    required this.signalLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A2A1A) : const Color(0xFFE8F5E9);
+    final borderClr = const Color(0xFF34C759).withValues(alpha: isDark ? 0.45 : 0.40);
+    final titleClr = isDark ? Colors.white : const Color(0xFF1B5E20);
+    final subClr = isDark
+        ? Colors.white.withValues(alpha: 0.70)
+        : const Color(0xFF2E7D32);
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BacktestScreen(
+            symbol: asset.symbol,
+            symbolName: asset.name,
+            signalId: signalId,
+            signalLabel: signalLabel,
+          ),
+        ),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderClr, width: 1.3),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759).withValues(alpha: isDark ? 0.20 : 0.15),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Icon(Icons.science_rounded, color: Color(0xFF34C759), size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bu Sinyali Geçmişte Test Et',
+                    style: TextStyle(
+                      color: titleClr,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Geçmişte kaç kez oluştu? Ortalama getirisi ne?',
+                    style: TextStyle(
+                      color: subClr,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF34C759), size: 15),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _OfflineInfoRow extends StatelessWidget {
   final IconData icon;
