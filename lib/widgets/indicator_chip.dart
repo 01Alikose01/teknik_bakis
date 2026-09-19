@@ -28,26 +28,45 @@ class IndicatorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme   = Theme.of(context);
+    final isDark  = theme.brightness == Brightness.dark;
+
+    final activeBg     = const Color(0xFF34C759);
+    final inactiveBg   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final inactiveBorder = isDark
+        ? Colors.white.withValues(alpha: 0.15)
+        : Colors.grey.shade300;
+    final inactiveIcon  = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : Colors.grey;
+    final inactiveText  = isDark
+        ? Colors.white.withValues(alpha: 0.60)
+        : Colors.black54;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF34C759) : Colors.white,
+          color: isActive ? activeBg : inactiveBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isActive ? const Color(0xFF34C759) : Colors.grey.shade300,
+            color: isActive ? activeBg : inactiveBorder,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_getIcon(), size: 14, color: isActive ? Colors.white : Colors.grey),
+            Icon(
+              _getIcon(),
+              size: 14,
+              color: isActive ? Colors.white : inactiveIcon,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: isActive ? Colors.white : Colors.black54,
+                color: isActive ? Colors.white : inactiveText,
                 fontSize: 13,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),

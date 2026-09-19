@@ -6,6 +6,7 @@ import '../services/subscription_service.dart';
 import '../services/bist100_service.dart';
 import '../widgets/stock_quote_panel.dart';
 import 'buy_screen.dart';
+import 'backtest_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -997,6 +998,14 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   Widget _buildResults() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final singleFilter = _activeFilters.length == 1;
+    final singleFilterId    = singleFilter ? _activeFilters.first : '';
+    final allFilterDefs     = [..._trendFilters, ..._momentumFilters, ..._formationFilters];
+    final matchedDef        = allFilterDefs.cast<_FilterDef?>()
+        .firstWhere((f) => f?.id == singleFilterId, orElse: () => null);
+    final signalLabel       = matchedDef?.label ?? singleFilterId;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1021,12 +1030,100 @@ class _ScannerScreenState extends State<ScannerScreen>
         ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, singleFilter ? 80 : 16),
             itemCount: _results.length,
             itemBuilder: (_, i) => _ResultCard(asset: _results[i], activeFilters: _activeFilters),
           ),
         ),
+        // ── "Bu Sinyali Test Et" butonu ─────────────────────────────────
+        if (singleFilter)
+          _buildBacktestBanner(
+            context: context,
+            signalId: singleFilterId,
+            signalLabel: signalLabel,
+            isDark: isDark,
+            symbol: _results.isNotEmpty ? _results.first.symbol : 'THYAO',
+            symbolName: _results.isNotEmpty ? _results.first.name : 'THYAO',
+          ),
       ],
+    );
+  }
+
+  Widget _buildBacktestBanner({
+    required BuildContext context,
+    required String signalId,
+    required String signalLabel,
+    required bool isDark,
+    required String symbol,
+    required String symbolName,
+  }) {
+    final cardBg = isDark ? const Color(0xFF1A2A1A) : const Color(0xFFE8F5E9);
+    final border = const Color(0xFF34C759).withValues(alpha: isDark ? 0.35 : 0.30);
+    final titleClr = isDark ? Colors.white : const Color(0xFF1B5E20);
+    final subClr = isDark
+        ? Colors.white.withValues(alpha: 0.65)
+        : const Color(0xFF2E7D32);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BacktestScreen(
+              symbol: symbol,
+              symbolName: symbolName,
+              signalId: signalId,
+              signalLabel: signalLabel,
+            ),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border, width: 1.2),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF34C759).withValues(alpha: isDark ? 0.18 : 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(Icons.science_rounded,
+                    color: Color(0xFF34C759), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bu Sinyali Geçmişte Test Et',
+                      style: TextStyle(
+                          color: titleClr,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Geçmişte kaç kez oluştu? Ortalama getirisi ne?',
+                      style: TextStyle(color: subClr, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_ios_rounded,
+                  color: Color(0xFF34C759), size: 16),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1035,20 +1132,29 @@ class _ScannerScreenState extends State<ScannerScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Periyot Seç', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Periyot Seç',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ...['4S', 'G', 'H', 'A'].map((p) => ListTile(
-              title: Text(_periodLabel(p), style: theme.textTheme.bodyMedium),
-              trailing: _activePeriod == p ? const Icon(Icons.check, color: Color(0xFF34C759)) : null,
-              onTap: () { setState(() => _activePeriod = p); Navigator.pop(context); },
-            )),
+                  title: Text(_periodLabel(p),
+                      style: theme.textTheme.bodyMedium),
+                  trailing: _activePeriod == p
+                      ? const Icon(Icons.check, color: Color(0xFF34C759))
+                      : null,
+                  onTap: () {
+                    setState(() => _activePeriod = p);
+                    Navigator.pop(context);
+                  },
+                )),
           ],
         ),
       ),
@@ -1619,4 +1725,5 @@ class _TargetPainter extends CustomPainter {
 }
 
 // ─── Sticky Header Delegate ─────────────────────────────────────────────────
+
 

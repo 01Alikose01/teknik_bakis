@@ -22,11 +22,33 @@ class SettingsService {
 
   // İlk kurulumda tema seçimi için
   static const String _kThemeSelected = 'themeSelectedOnFirstLaunch';
-  
-  static bool get isThemeSelectedFirstTime => 
+
+  static bool get isThemeSelectedFirstTime =>
       _box.get(_kThemeSelected, defaultValue: false) as bool;
-      
+
   static Future<void> markThemeSelected() async {
     await _box.put(_kThemeSelected, true);
+  }
+
+  // ─── Öğretici Tooltip Bayrakları ─────────────────────────────────────────
+
+  /// TradingView butonu tooltip'i gösterildi mi?
+  static const String _kTradingViewTooltipSeen = 'tradingViewTooltipSeen';
+
+  static bool get isTradingViewTooltipSeen =>
+      _box.get(_kTradingViewTooltipSeen, defaultValue: false) as bool;
+
+  static Future<void> markTradingViewTooltipSeen() async {
+    await _box.put(_kTradingViewTooltipSeen, true);
+  }
+
+  /// "Stratejiyi Test Et" butonu tooltip'i gösterildi mi?
+  static const String _kBacktestTooltipSeen = 'backtestTooltipSeen';
+
+  static bool get isBacktestTooltipSeen =>
+      _box.get(_kBacktestTooltipSeen, defaultValue: false) as bool;
+
+  static Future<void> markBacktestTooltipSeen() async {
+    await _box.put(_kBacktestTooltipSeen, true);
   }
 }

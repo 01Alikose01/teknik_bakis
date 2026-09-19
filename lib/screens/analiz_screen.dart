@@ -4,11 +4,14 @@ import '../services/stock_service.dart';
 import '../widgets/stock_chart.dart';
 import '../widgets/indicator_chip.dart';
 import '../widgets/stock_quote_panel.dart';
+import '../widgets/tutorial_tooltip.dart';
 import '../services/portfolio_service.dart';
 import '../services/kap_news_service.dart';
+import '../services/settings_service.dart';
 import '../models/portfolio_model.dart';
 import '../models/kap_news_item.dart';
 import 'tradingview_screen.dart';
+import 'backtest_screen.dart';
 
 class AnalizScreen extends StatefulWidget {
   final String? initialSymbol;
@@ -32,6 +35,10 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
   final Set<String> _activeIndicators = {'RSI 30'};
   List<KapNewsItem> _symbolNews = [];
 
+  // Öğretici tooltip gösterim durumları
+  bool _showTvTooltip       = false;
+  bool _showBacktestTooltip = false;
+
   // Üst arama
   final TextEditingController _searchCtrl = TextEditingController();
   List<Map<String, String>> _searchResults = [];
@@ -54,6 +61,15 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
     _selectedSymbol = widget.initialSymbol ?? 'THYAO';
     _tabController = TabController(length: 1, vsync: this);
     _load();
+
+    // Tooltip'leri Hive'dan oku — build sonrasında setState ile göster
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _showTvTooltip       = !SettingsService.isTradingViewTooltipSeen;
+        _showBacktestTooltip = !SettingsService.isBacktestTooltipSeen;
+      });
+    });
   }
 
   @override
@@ -61,6 +77,27 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
     _tabController.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  /// Aktif indikatöre göre sinyal ID'si döner (backtest için)
+  String _resolveSignalId() {
+    if (_activeIndicators.contains('MACD')) return 'MACD Bullish';
+    if (_activeIndicators.contains('Supertrend')) return 'Supertrend AL';
+    if (_activeIndicators.contains('EMA 20') &&
+        _activeIndicators.contains('EMA 50')) return 'Golden Cross';
+    if (_activeIndicators.contains('RSI 30')) return 'RSI 40';
+    // Varsayılan
+    return 'MACD Bullish';
+  }
+
+  /// Aktif indikatöre göre kullanıcı dostu etiket döner
+  String _resolveSignalLabel() {
+    if (_activeIndicators.contains('MACD')) return '📊 MACD AL Sinyali';
+    if (_activeIndicators.contains('Supertrend')) return '⚡ Supertrend AL';
+    if (_activeIndicators.contains('EMA 20') &&
+        _activeIndicators.contains('EMA 50')) return '✨ Golden Cross AL';
+    if (_activeIndicators.contains('RSI 30')) return '📊 RSI Dip AL';
+    return '📊 MACD AL Sinyali';
   }
 
   void _onSearch(String val) {
@@ -444,42 +481,120 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
 
                       // TradingView butonu (sadece BIST hisseleri için)
                       if (_assetCategory == 'bist')
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TradingViewScreen(
-                                  symbol: _selectedSymbol,
-                                  name: a?.name ?? _selectedSymbol,
-                                ),
-                              ),
-                            );
+                        TutorialTooltip(
+                          visible: _showTvTooltip,
+                          icon: Icons.show_chart,
+                          iconColor: const Color(0xFF1565C0),
+                          title: 'TradingView ile Gelişmiş Grafik',
+                          body:
+                              'TradingView, dünyaca tanınan profesyonel bir grafik platformudur. '
+                              'Bu butona tıklayarak ${_selectedSymbol} hissesini '
+                              'onlarca indikatör, çizim aracı ve farklı zaman dilimleriyle '
+                              'derinlemesine inceleyebilirsiniz.',
+                          onDismiss: () {
+                            SettingsService.markTradingViewTooltipSeen();
+                            setState(() => _showTvTooltip = false);
                           },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1565C0),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.show_chart, color: Colors.white, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'TradingView\'da Aç',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TradingViewScreen(
+                                    symbol: _selectedSymbol,
+                                    name: a?.name ?? _selectedSymbol,
                                   ),
                                 ),
-                              ],
+                              );
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1565C0),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.show_chart, color: Colors.white, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'TradingView\'da Aç',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
+
+                      // ── Stratejiyi Test Et butonu (sadece BIST hisseleri)
+                      if (_assetCategory == 'bist') ...[
+                        const SizedBox(height: 10),
+                        TutorialTooltip(
+                          visible: _showBacktestTooltip,
+                          icon: Icons.science_rounded,
+                          iconColor: const Color(0xFF34C759),
+                          title: 'Stratejiyi Test Et — Backtest',
+                          body:
+                              'Aktif indikatörlerinizi (RSI, MACD, Supertrend vb.) '
+                              'geçmiş fiyat verileri üzerinde test edin. '
+                              'Sinyal kaç kez oluştu, ortalama getirisi ne oldu, '
+                              'başarı oranı ne? Gerçek parayla işlem yapmadan önce '
+                              'stratejinizin güçlü olup olmadığını görün.',
+                          onDismiss: () {
+                            SettingsService.markBacktestTooltipSeen();
+                            setState(() => _showBacktestTooltip = false);
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              // Aktif indikatörden sinyal belirle
+                              final signalId    = _resolveSignalId();
+                              final signalLabel = _resolveSignalLabel();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BacktestScreen(
+                                    symbol:      _selectedSymbol,
+                                    symbolName:  a?.name ?? _selectedSymbol,
+                                    signalId:    signalId,
+                                    signalLabel: signalLabel,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF34C759),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.science_rounded,
+                                      color: Colors.white, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Stratejiyi Test Et',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 12),
                       Container(
