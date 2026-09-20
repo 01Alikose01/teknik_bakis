@@ -494,16 +494,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   badgeColor: SubscriptionService.plan == 'monthly' ? const Color(0xFF34C759) : null,
                   note: 'Taahhütsüz • İstediğin zaman iptal',
                   trialNote: '🎁 İlk 10 gün ücretsiz',
+                  trialUsed: SubscriptionService.isExpiredGuest,
                   accent: const Color(0xFF34C759),
                   features: const [
                     '✅ Sınırsız Radar Taraması',
-                    '✅ AI Sinyal (RSI, EMA, MA)',
+                    '✅ SAT SİNYAL ve AL SİNYAL Özelliği',
                     '✅ AI KAP Analizi',
                     '✅ Sınırsız Fiyat Alarmı',
                     '✅ Tüm Teknik Formasyonlar',
                     '✅ Halka Arz Takibi & Alarmı',
                     '✅ Haberler & KAP Bildirimleri',
                     '✅ Anlık Push Bildirimleri',
+                    '✅ Backtesting Test Et',
                   ],
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -529,6 +531,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   badgeColor: SubscriptionService.plan == 'yearly' ? const Color(0xFF34C759) : const Color(0xFFFF9500),
                   note: 'Ayda sadece ₺208 • En avantajlı',
                   trialNote: '🎁 İlk 10 gün ücretsiz',
+                  trialUsed: SubscriptionService.isExpiredGuest,
                   accent: const Color(0xFFFF9500),
                   features: const [
                     '✅ Aylık plandaki her şey',
@@ -550,26 +553,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 16),
 
                 // ── Ücretsiz Kullanım ─────────────────────────────────────
-                GestureDetector(
-                  onTap: () async {
-                    await SubscriptionService.selectFreePlan();
-                    MainNavigation.refreshSubscription();
-                    if (!context.mounted) return;
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ücretsiz plana geçildi.'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  child: Container(
+                Builder(builder: (context) {
+                  final isCurrentlyFree = SubscriptionService.isFreePlanSelected ||
+                      SubscriptionService.isExpiredGuest;
+                  return Container(
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: SubscriptionService.isFreePlanSelected
+                        color: isCurrentlyFree
                             ? const Color(0xFF007AFF)
                             : const Color(0xFF007AFF).withValues(alpha: 0.3),
                         width: 1.5,
@@ -602,10 +594,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   children: [
                                     Text(
                                       'Ücretsiz Plan',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF007AFF),
+                                        color: Color(0xFF007AFF),
                                       ),
                                     ),
                                     Text(
@@ -618,6 +610,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ],
                                 ),
                               ),
+                              // "Kullanımda" rozeti
+                              if (isCurrentlyFree)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF007AFF),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Kullanımda',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -638,7 +646,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: () async {
+                              // Zaten ücretsiz plandaysa buton devre dışı
+                              onPressed: isCurrentlyFree ? null : () async {
                                 await SubscriptionService.selectFreePlan();
                                 setState(() {});
                                 if (!context.mounted) return;
@@ -655,18 +664,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF007AFF),
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.35),
+                                disabledForegroundColor: Colors.white.withValues(alpha: 0.6),
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              child: const Text('Ücretsiz\'i Keşfet', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              child: const Text('Ücretsiz Plan Keşfet', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
+                  );
+                }),
                 const SizedBox(height: 20),
 
                 // Yasal not
@@ -980,6 +991,7 @@ class _PlanDetailCard extends StatelessWidget {
   final Color? badgeColor;
   final String note;
   final String trialNote;
+  final bool trialUsed;
   final Color accent;
   final List<String> features;
   final VoidCallback? onTap;
@@ -993,6 +1005,7 @@ class _PlanDetailCard extends StatelessWidget {
     required this.badgeColor,
     required this.note,
     required this.trialNote,
+    this.trialUsed = false,
     required this.accent,
     required this.features,
     required this.onTap,
@@ -1088,11 +1101,34 @@ class _PlanDetailCard extends StatelessWidget {
           // Deneme notu
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-            child: Text(trialNote,
-                style: TextStyle(
-                    color: accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
+            child: trialUsed
+                ? Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: trialNote,
+                          style: TextStyle(
+                              color: accent.withValues(alpha: 0.5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: accent.withValues(alpha: 0.5)),
+                        ),
+                        TextSpan(
+                          text: '  (Kullanıldı)',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                              fontSize: 11,
+                              fontWeight: FontWeight.normal),
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(trialNote,
+                    style: TextStyle(
+                        color: accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
           ),
 
           // Özellik listesi
@@ -1130,7 +1166,9 @@ class _PlanDetailCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
-                    'Ücretsiz Dene · $price$period',
+                    trialUsed
+                        ? 'Premium $price$period'
+                        : 'Ücretsiz Dene · $price$period',
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.bold),
                   ),

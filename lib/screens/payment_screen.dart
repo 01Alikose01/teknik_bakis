@@ -27,8 +27,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
       widget.plan == 'monthly' ? 'Aylık Plan' : 'Yıllık Plan';
   String get _priceLabel =>
       widget.plan == 'monthly' ? '₺299/ay' : '₺2499/yıl';
+
+  /// Deneme daha önce kullanılmışsa trialNote farklı gösterilir
+  bool get _trialUsed => SubscriptionService.isExpiredGuest;
+
   String get _trialNote =>
-      'İlk 10 gün ücretsiz. Sonra $_priceLabel';
+      _trialUsed ? 'İlk 10 gün ücretsiz (Kullanıldı)' : 'İlk 10 gün ücretsiz. Sonra $_priceLabel';
   Color get _accent => const Color(0xFF34C759);
 
   Future<void> _processPurchase() async {
@@ -54,11 +58,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _showSuccessSheet() async {
+    final theme = Theme.of(context);
     await showModalBottomSheet(
       context: context,
       isDismissible: false,
       enableDrag: false,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => _SuccessSheet(
@@ -87,32 +92,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final scaffoldBg = isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF5F5F7);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F5F7),
+        backgroundColor: scaffoldBg,
         elevation: 0,
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
                     blurRadius: 6)
               ],
             ),
-            child: const Icon(Icons.arrow_back_ios,
-                size: 16, color: Colors.black87),
+            child: Icon(Icons.arrow_back_ios,
+                size: 16, color: theme.colorScheme.onSurface),
           ),
         ),
         title: Text(
           _planLabel,
-          style: const TextStyle(
-              color: Colors.black87,
+          style: TextStyle(
+              color: theme.colorScheme.onSurface,
               fontSize: 17,
               fontWeight: FontWeight.bold),
         ),
@@ -129,6 +138,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               plan: widget.plan,
               priceLabel: _priceLabel,
               trialNote: _trialNote,
+              trialUsed: _trialUsed,
               accent: _accent,
             ),
             const SizedBox(height: 24),
@@ -138,12 +148,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
             const SizedBox(height: 24),
 
             // ── Dahil olanlar ─────────────────────────────────────────────
-            const Text(
+            Text(
               'Planınıza Dahil Olanlar',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87),
+                  color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 12),
             _IncludedFeaturesList(accent: _accent),
@@ -159,6 +169,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       bottomSheet: _PaymentBottomBar(
         priceLabel: _priceLabel,
         trialNote: _trialNote,
+        trialUsed: _trialUsed,
         processing: _processing,
         accent: _accent,
         onTap: _processPurchase,
@@ -175,17 +186,20 @@ class _PlanSummaryCard extends StatelessWidget {
   final String plan;
   final String priceLabel;
   final String trialNote;
+  final bool trialUsed;
   final Color accent;
 
   const _PlanSummaryCard({
     required this.plan,
     required this.priceLabel,
     required this.trialNote,
+    required this.trialUsed,
     required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isYearly = plan == 'yearly';
     return Container(
       width: double.infinity,
@@ -258,16 +272,19 @@ class _PlanSummaryCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   isYearly ? '/yıl' : '/ay',
-                  style:
-                      const TextStyle(color: Colors.grey, fontSize: 14)),
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      fontSize: 14)),
               ),
               if (isYearly) ...[
                 const Spacer(),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Ayda sadece',
-                        style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    Text('Ayda sadece',
+                        style: TextStyle(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                            fontSize: 11)),
                     Text('₺208',
                         style: TextStyle(
                             color: accent,
@@ -283,13 +300,36 @@ class _PlanSummaryCard extends StatelessWidget {
             children: [
               const Text('🎁', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 6),
-              Text(
-                trialNote,
-                style: TextStyle(
-                    color: accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
-              ),
+              trialUsed
+                  ? Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'İlk 10 gün ücretsiz',
+                            style: TextStyle(
+                                color: accent.withValues(alpha: 0.5),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: accent.withValues(alpha: 0.5)),
+                          ),
+                          TextSpan(
+                            text: '  (Kullanıldı)',
+                            style: TextStyle(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                                fontSize: 11,
+                                fontWeight: FontWeight.normal),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      trialNote,
+                      style: TextStyle(
+                          color: accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
             ],
           ),
         ],
@@ -308,6 +348,7 @@ class _TrustBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final badges = [
       ('🔒', 'Güvenli Ödeme'),
       ('↩️', 'Anında İptal'),
@@ -320,11 +361,11 @@ class _TrustBadges extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
                           blurRadius: 6)
                     ],
                   ),
@@ -334,9 +375,9 @@ class _TrustBadges extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         b.$2,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 10,
-                            color: Colors.black54,
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                             fontWeight: FontWeight.w600),
                         textAlign: TextAlign.center,
                       ),
@@ -359,15 +400,17 @@ class _IncludedFeaturesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final features = [
       ('🎯', 'Gelişmiş Filtreler & Taramalar', 'MACD, RSI, Bollinger, Supertrend ve daha fazlası'),
-      ('📊', 'Sinyal & Radar Özelliği', 'Hisseleri otomatik olarak bulur ve listeler'),
+      ('📊', 'SAT SİNYAL ve AL SİNYAL Özelliği', 'Hisseleri otomatik olarak bulur ve listeler'),
       ('🤖', 'AI KAP ve Haberleri', 'Yapay zeka destekli KAP analizi ve haberler'),
       ('🔔', 'Gerçek Zamanlı Alarmlar', 'Fiyat alarmları, anında push bildirimi'),
       ('💼', 'Portföy Kâr/Zarar Takibi', 'Hedef kâra ulaşınca otomatik bildirim'),
       ('⚡', 'Teknik Sinyal Bildirimleri', 'MACD, Supertrend dönüşlerinde anlık uyarı'),
       ('🧩', 'Özel Portföy Analizi', 'Risk dağılımı, sektör ağırlıkları, performans'),
       ('🚀', 'Halka Arz Alarmları', 'Başvuru süreleri dolmadan hatırlatma'),
+      ('📈', 'Backtesting Test Et', 'Stratejileri geçmiş verilerle test et ve analiz et'),
     ];
 
     return Column(
@@ -377,11 +420,11 @@ class _IncludedFeaturesList extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
                         blurRadius: 6)
                   ],
                 ),
@@ -394,13 +437,14 @@ class _IncludedFeaturesList extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(f.$2,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87)),
+                                  color: theme.colorScheme.onSurface)),
                           Text(f.$3,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
                         ],
                       ),
                     ),
@@ -424,37 +468,42 @@ class _CancelPolicy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.grey, size: 16),
-              SizedBox(width: 6),
+              Icon(Icons.info_outline,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  size: 16),
+              const SizedBox(width: 6),
               Text(
                 'İptal & İade Politikası',
                 style: TextStyle(
-                    color: Colors.black87,
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 13),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '• 10 günlük deneme süresinde 1₺ bile çekilmez.\n'
             '• Deneme süresi içinde istediğiniz zaman iptal edebilirsiniz.\n'
             '• İptal sonrası dönem sonuna kadar erişim devam eder.\n'
             '• Bu uygulama yatırım tavsiyesi niteliği taşımaz.',
             style: TextStyle(
-                color: Colors.grey, fontSize: 12, height: 1.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                fontSize: 12,
+                height: 1.6),
           ),
         ],
       ),
@@ -469,6 +518,7 @@ class _CancelPolicy extends StatelessWidget {
 class _PaymentBottomBar extends StatelessWidget {
   final String priceLabel;
   final String trialNote;
+  final bool trialUsed;
   final bool processing;
   final Color accent;
   final VoidCallback onTap;
@@ -476,6 +526,7 @@ class _PaymentBottomBar extends StatelessWidget {
   const _PaymentBottomBar({
     required this.priceLabel,
     required this.trialNote,
+    required this.trialUsed,
     required this.processing,
     required this.accent,
     required this.onTap,
@@ -483,13 +534,14 @@ class _PaymentBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.07),
               blurRadius: 16,
               offset: const Offset(0, -4)),
         ],
@@ -518,7 +570,9 @@ class _PaymentBottomBar extends StatelessWidget {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
-                      'Ücretsiz Denemeyi Başlat · $priceLabel',
+                      trialUsed
+                          ? 'Premium · $priceLabel'
+                          : 'Ücretsiz Denemeyi Başlat · $priceLabel',
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold),
                     ),
@@ -527,7 +581,9 @@ class _PaymentBottomBar extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             trialNote,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                fontSize: 12),
           ),
         ],
       ),
@@ -547,12 +603,12 @@ class _SuccessSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Başarı animasyonu yerine emoji
           Container(
             width: 80,
             height: 80,
@@ -565,12 +621,12 @@ class _SuccessSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Premium\'a Hoş Geldiniz!',
             style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87),
+                color: theme.colorScheme.onSurface),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
@@ -578,8 +634,10 @@ class _SuccessSheet extends StatelessWidget {
             plan == 'monthly'
                 ? '10 günlük ücretsiz denemeniz başladı.\nSonra aylık ₺299 üzerinden devam eder.'
                 : '10 günlük ücretsiz denemeniz başladı.\nSonra yıllık ₺2499 üzerinden devam eder.',
-            style: const TextStyle(
-                color: Colors.grey, fontSize: 14, height: 1.5),
+            style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                fontSize: 14,
+                height: 1.5),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -597,8 +655,7 @@ class _SuccessSheet extends StatelessWidget {
               ),
               child: const Text(
                 'Uygulamayı Keşfet',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
