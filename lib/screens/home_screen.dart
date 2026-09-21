@@ -4,9 +4,11 @@ import '../models/asset_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
 import '../services/home_price_cache.dart';
+import '../services/app_navigation.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
 import 'notifications_screen.dart';
+import 'ipo_screen.dart' show newUpcomingIposNotifier;
 import '../widgets/stock_quote_panel.dart';
 import '../main.dart';
 
@@ -98,6 +100,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 3. Otomatik yenileme — borsa saatlerinde 5 dakikada bir
     _startAutoRefresh();
+
+    // 4. Yeni Yaklaşan IPO bildirimleri için dinleyici
+    newUpcomingIposNotifier.addListener(_onNewIposDetected);
+  }
+
+  void _onNewIposDetected() {
+    final items = newUpcomingIposNotifier.value;
+    if (items.isEmpty || !mounted) return;
+    // Bir sonraki frame'de dialog göster (build tamamlandıktan sonra)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showNewIpoDialog(items);
+    });
+  }
+
+  void _showNewIpoDialog(List ipoItems) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _NewIpoDialog(ipoItems: List.from(ipoItems)),
+    ).then((_) {
+      // Dialog kapandıktan sonra notifier'ı sıfırla
+      newUpcomingIposNotifier.value = [];
+    });
   }
 
   /// BIST açık saatlerde (hafta içi 10:00–18:30 Türkiye saati) 5 dakikada bir
@@ -198,6 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshTimer?.cancel();
     _favoriteListSubscription?.cancel();
     _searchCtrl.dispose();
+    newUpcomingIposNotifier.removeListener(_onNewIposDetected);
     super.dispose();
   }
 
@@ -1949,6 +1976,172 @@ class _TabChip extends StatelessWidget {
             color: isActive ? theme.colorScheme.onPrimary : onSurfaceSecondary,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yeni Halka Arz Duyurusu Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NewIpoDialog extends StatelessWidget {
+  final List ipoItems;
+
+  const _NewIpoDialog({required this.ipoItems});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final count = ipoItems.length;
+
+    // İlk şirketi al
+    final first = ipoItems.first;
+    final companyName = (first.companyName as String).isNotEmpty
+        ? first.companyName as String
+        : first.symbol as String;
+    final symbol = first.symbol as String;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [const Color(0xFF1C2B1C), const Color(0xFF0A1F0A)]
+                : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF34C759).withValues(alpha: 0.3),
+              blurRadius: 30,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Konfeti / roket ikonu
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF34C759).withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: const Color(0xFF34C759).withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                ),
+                child: const Center(
+                  child: Text(
+                    '🎉',
+                    style: TextStyle(fontSize: 36),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Başlık
+              Text(
+                count == 1 ? 'Yeni Halka Arz!' : '$count Yeni Halka Arz!',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF34C759),
+                  fontSize: 22,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Şirket adı
+              Text(
+                count == 1
+                    ? '$companyName${symbol.isNotEmpty ? ' ($symbol)' : ''}'
+                    : '$companyName${symbol.isNotEmpty ? ' ($symbol)' : ''} ve ${count - 1} diğer',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+
+              // Alt açıklama
+              Text(
+                count == 1
+                    ? 'Yakında halka arz oluyor! Detayları Halka Arz bölümünden takip edebilirsiniz.'
+                    : 'Yakında halka arz oluyorlar! Tüm detayları Halka Arz bölümünden takip edebilirsiniz.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Butonlar
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        side: BorderSide(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        'Tamam',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        // Halka Arz sekmesine git (index 4)
+                        AppNavigation.goToTab(4);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF34C759),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Takip Et',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

@@ -19,6 +19,12 @@ class NotificationService {
           description: 'Hisse teknik analiz sinyal bildirimleri',
           importance: Importance.high,
         ),
+        AndroidNotificationChannel(
+          'ipo_alerts',
+          'Halka Arz Bildirimleri',
+          description: 'Yeni yaklaşan halka arz bildirimleri',
+          importance: Importance.high,
+        ),
       ];
 
   static Future<void> init() async {
@@ -100,6 +106,39 @@ class NotificationService {
       '${symbol}_signal'.hashCode,
       '$symbol - $signal',
       '$symbol hissesi için $signal tespit edildi',
+      details,
+    );
+  }
+
+  static Future<void> showIpoAlert({
+    required String companyName,
+    required String symbol,
+    int count = 1,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'ipo_alerts',
+      'Halka Arz Bildirimleri',
+      channelDescription: 'Yeni yaklaşan halka arz bildirimleri',
+      importance: Importance.high,
+      priority: Priority.high,
+      styleInformation: BigTextStyleInformation(''),
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+
+    final title = count == 1
+        ? '🎉 Yeni Halka Arz!'
+        : '🎉 $count Yeni Halka Arz!';
+    final body = count == 1
+        ? '$companyName${symbol.isNotEmpty ? ' ($symbol)' : ''} halka arz oluyor! Halka Arz bölümünden takip edebilirsiniz.'
+        : '$companyName ve diğerleri halka arz oluyor! Halka Arz bölümünden takip edebilirsiniz.';
+
+    await _plugin.show(
+      'ipo_alert'.hashCode,
+      title,
+      body,
       details,
     );
   }

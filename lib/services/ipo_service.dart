@@ -9,6 +9,10 @@ import 'package:http/http.dart' as http;
 import '../models/ipo_item.dart';
 import 'bist_stocks.dart';
 
+/// Yeni Yaklaşan halka arz ikazı için callback tipi.
+/// [newItems]: bu yenilemede ilk kez görülen Yaklaşan IPO listesi.
+typedef IpoNewUpcomingCallback = void Function(List<IpoItem> newItems);
+
 class IpoFeedData {
   final List<IpoItem> items;
   final DateTime? lastSyncedAt;
@@ -29,6 +33,9 @@ class IpoService {
   static const String _cacheItemsKey = 'items_json';
   static const String _cacheLastSyncedAtKey = 'last_synced_at';
   static const String _cacheSourceKey = 'source';
+
+  /// Daha önce bildirim gönderilmiş IPO sembollerini saklayan Hive anahtarı.
+  static const String _notifiedSymbolsKey = 'notified_ipo_symbols';
 
   // ── GitHub fallback (Firestore çalışmazsa) ─────────────────────────────────
   static const String _defaultFeedUrl =
@@ -297,5 +304,45 @@ class IpoService {
   static Future<Box<dynamic>> _openBox() async {
     if (Hive.isBoxOpen(_cacheBoxName)) return Hive.box(_cacheBoxName);
     return Hive.openBox(_cacheBoxName);
+  }
+
+  // ── Yeni Yaklaşan IPO tespiti ─────────────────────────────────────────────
+
+  /// [items] listesindeki Yaklaşan (upcoming) IPO'lardan daha önce
+  /// bildirilmemiş olanları döndürür.
+  /// Dönen liste boş değilse çağıran taraf bildirim göstermelidir.
+  static Future<List<IpoItem>> detectNewUpcomingIpos(
+    List<IpoItem> items,
+  ) async {
+    final box = await _openBox();
+    final raw = box.get(_notifiedSymbolsKey)?.toString() ?? '';
+    final notified = raw.isEmpty
+        ? <String>{}
+        : Set<String>.from(
+            (jsonDecode(raw) as List).map((e) => e.toString()),
+          );
+
+    final upcoming = items
+        .where((item) => item.status == IpoStatus.upcoming)
+        .toList();
+
+    final newOnes = upcoming.where((item) {
+      final key = item.symbol.isNotEmpty
+          ? item.symbol.toUpperCase()
+          : item.companyName.trim().toLowerCase();
+      return !notified.contains(key);
+    }).toList();
+
+    if (newOnes.isNotEmpty) {
+      for (final item in newOnes) {
+        final key = item.symbol.isNotEmpty
+            ? item.symbol.toUpperCase()
+            : item.companyName.trim().toLowerCase();
+        notified.add(key);
+      }
+      await box.put(_notifiedSymbolsKey, jsonEncode(notified.toList()));
+    }
+
+    return newOnes;
   }
 }

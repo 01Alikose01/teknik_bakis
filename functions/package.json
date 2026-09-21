@@ -1,0 +1,16 @@
+{
+  "name": "teknik-bakis-functions",
+  "description": "Firebase Cloud Functions — Temel göstergeler güncelleyici",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

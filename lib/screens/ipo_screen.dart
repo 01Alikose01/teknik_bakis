@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../models/ipo_item.dart';
 import '../services/ipo_service.dart';
+import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import '../services/app_navigation.dart';
 import 'premium_gate_screen.dart';
+
+/// Anasayfanın dinleyeceği "yeni Yaklaşan IPO" bildirimi.
+/// HomeScreen bu notifier'ı izler ve yeni değer geldiğinde dialog gösterir.
+final ValueNotifier<List<IpoItem>> newUpcomingIposNotifier =
+    ValueNotifier<List<IpoItem>>([]);
 
 class IpoScreen extends StatefulWidget {
   const IpoScreen({super.key});
@@ -23,7 +29,6 @@ class _IpoScreenState extends State<IpoScreen>
 
   List<IpoItem> _items = [];
   DateTime? _lastSyncedAt;
-  String _source = 'Yerel yedek veri';
   bool _loading = true;
   bool _refreshing = false;
   String? _error;
@@ -65,7 +70,6 @@ class _IpoScreenState extends State<IpoScreen>
     setState(() {
       _items = localFeed.items;
       _lastSyncedAt = localFeed.lastSyncedAt;
-      _source = localFeed.source;
       _loading = false;
     });
 
@@ -73,7 +77,6 @@ class _IpoScreenState extends State<IpoScreen>
       await _refresh(silent: _items.isNotEmpty);
     }
   }
-
   Future<void> _refresh({bool silent = false}) async {
     if (_refreshing) return;
 
@@ -92,8 +95,22 @@ class _IpoScreenState extends State<IpoScreen>
       setState(() {
         _items = feed.items;
         _lastSyncedAt = feed.lastSyncedAt;
-        _source = feed.source;
       });
+
+      // Yeni Yaklaşan IPO'ları tespit et ve bildir
+      final newIpos = await IpoService.detectNewUpcomingIpos(feed.items);
+      if (newIpos.isNotEmpty) {
+        // Push notification gönder
+        await NotificationService.showIpoAlert(
+          companyName: newIpos.first.companyName.isNotEmpty
+              ? newIpos.first.companyName
+              : newIpos.first.symbol,
+          symbol: newIpos.first.symbol,
+          count: newIpos.length,
+        );
+        // Anasayfa popup'ını tetikle
+        newUpcomingIposNotifier.value = newIpos;
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
@@ -227,14 +244,7 @@ class _IpoScreenState extends State<IpoScreen>
           ),
           const SizedBox(height: 10),
           Text(
-            'Son senkron: ${_formatDateTime(_lastSyncedAt)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Kaynak: $_source',
+            'Son Güncelleme: ${_formatDateTime(_lastSyncedAt)}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
             ),

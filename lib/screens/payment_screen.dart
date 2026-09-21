@@ -23,13 +23,17 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _processing = false;
 
+  // Ödeme başlamadan önce anlık değer saklanır — startPaidSubscription sonrası
+  // isExpiredGuest false döneceğinden getter kullanmak hatalı sonuç verir.
+  late bool _trialWasUsed = SubscriptionService.isExpiredGuest;
+
   String get _planLabel =>
       widget.plan == 'monthly' ? 'Aylık Plan' : 'Yıllık Plan';
   String get _priceLabel =>
       widget.plan == 'monthly' ? '₺299/ay' : '₺2499/yıl';
 
   /// Deneme daha önce kullanılmışsa trialNote farklı gösterilir
-  bool get _trialUsed => SubscriptionService.isExpiredGuest;
+  bool get _trialUsed => _trialWasUsed;
 
   String get _trialNote =>
       _trialUsed ? 'İlk 10 gün ücretsiz (Kullanıldı)' : 'İlk 10 gün ücretsiz. Sonra $_priceLabel';
@@ -37,6 +41,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _processPurchase() async {
     if (_processing) return;
+    // Ödeme başlamadan önce deneme durumunu yakala
+    _trialWasUsed = SubscriptionService.isExpiredGuest;
     setState(() => _processing = true);
     HapticFeedback.mediumImpact();
 
@@ -68,6 +74,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => _SuccessSheet(
         plan: widget.plan,
+        trialUsed: _trialUsed,
         onContinue: () {
           Navigator.of(ctx).pop();
           _goToApp();
@@ -597,9 +604,14 @@ class _PaymentBottomBar extends StatelessWidget {
 
 class _SuccessSheet extends StatelessWidget {
   final String plan;
+  final bool trialUsed;
   final VoidCallback onContinue;
 
-  const _SuccessSheet({required this.plan, required this.onContinue});
+  const _SuccessSheet({
+    required this.plan,
+    required this.trialUsed,
+    required this.onContinue,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -630,16 +642,17 @@ class _SuccessSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          Text(
-            plan == 'monthly'
-                ? '10 günlük ücretsiz denemeniz başladı.\nSonra aylık ₺299 üzerinden devam eder.'
-                : '10 günlük ücretsiz denemeniz başladı.\nSonra yıllık ₺2499 üzerinden devam eder.',
-            style: TextStyle(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-                fontSize: 14,
-                height: 1.5),
-            textAlign: TextAlign.center,
-          ),
+          if (!trialUsed)
+            Text(
+              plan == 'monthly'
+                  ? '10 günlük ücretsiz denemeniz başladı.\nSonra aylık ₺299 üzerinden devam eder.'
+                  : '10 günlük ücretsiz denemeniz başladı.\nSonra yıllık ₺2499 üzerinden devam eder.',
+              style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                  fontSize: 14,
+                  height: 1.5),
+              textAlign: TextAlign.center,
+            ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,

@@ -23,9 +23,23 @@ class _AlarmScreenState extends State<AlarmScreen> {
   }
 
   void _loadAlarms() {
+    final alarms = PortfolioService.getAlarms();
+
+    // Hisse adı değişmişse Hive'daki alarmı güncelle
+    for (final alarm in alarms) {
+      final stock = kBistStocks.firstWhere(
+        (s) => s['symbol'] == alarm.symbol,
+        orElse: () => {},
+      );
+      final currentName = stock['name'];
+      if (currentName != null && currentName.isNotEmpty && currentName != alarm.name) {
+        alarm.name = currentName;
+        alarm.save();
+      }
+    }
+
     setState(() {
-      _alarms = PortfolioService.getAlarms()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _alarms = alarms..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     });
   }
 
@@ -713,15 +727,19 @@ class _AlarmScreenState extends State<AlarmScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Text(
-                                            alarm.name,
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.bold,
-                                              color: onSurface,
+                                          Expanded(
+                                            child: Text(
+                                              alarm.name,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: onSurface,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
                                             ),
                                           ),
-                                          const Spacer(),
+                                          const SizedBox(width: 8),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 10,
