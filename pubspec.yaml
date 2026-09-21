@@ -23,6 +23,7 @@ dependencies:
   timezone: ^0.9.4
   cloud_firestore: ^5.6.12
   webview_flutter: ^4.10.0
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +37,7 @@ flutter:
     - assets/data/ipo_seed.json
     - assets/teknik.jpg
     - assets/tek.png
+    - assets/teknik_bakis_splash.mp4
     - çöp.png
     - king.png
 

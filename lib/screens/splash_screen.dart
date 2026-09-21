@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:video_player/video_player.dart';
 
 class SplashScreen extends StatefulWidget {
   final Widget nextScreen;
@@ -9,93 +9,91 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _fadeAnim;
-  late Animation<double> _scaleAnim;
+class _SplashScreenState extends State<SplashScreen> {
+  late VideoPlayerController _controller;
+  bool _videoFailed = false;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
-    _fadeAnim  = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _scaleAnim = Tween<double>(begin: 0.85, end: 1.0)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
-    _ctrl.forward();
+    _initVideo();
+  }
 
-    // 2.5 saniye sonra ana ekrana geç
-    Timer(const Duration(milliseconds: 2500), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
-          transitionsBuilder: (context, anim, secondaryAnimation, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-      );
-    });
+  Future<void> _initVideo() async {
+    _controller = VideoPlayerController.asset(
+      'assets/teknik_bakis_splash.mp4',
+    );
+
+    try {
+      await _controller.initialize();
+      _controller.setLooping(false);
+      _controller.setVolume(1.0);
+
+      // Video bitince ana ekrana geç
+      _controller.addListener(_onVideoProgress);
+
+      if (mounted) {
+        setState(() {});
+        _controller.play();
+      }
+    } catch (e) {
+      // Video yüklenemezse fallback splash göster
+      if (mounted) setState(() => _videoFailed = true);
+      _navigateToHome();
+    }
+  }
+
+  void _onVideoProgress() {
+    if (!mounted) return;
+    final pos = _controller.value.position;
+    final dur = _controller.value.duration;
+    if (dur.inMilliseconds > 0 && pos >= dur) {
+      _controller.removeListener(_onVideoProgress);
+      _navigateToHome();
+    }
+  }
+
+  void _navigateToHome() {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            widget.nextScreen,
+        transitionsBuilder: (context, anim, _, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _controller.removeListener(_onVideoProgress);
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final imgSize = screenWidth * 0.80; // ekranın %80'i, ~telefonda 288px, tablette daha büyük
+    // Video başarısız olduysa siyah ekran göster (geçiş zaten tetiklendi)
+    if (_videoFailed) {
+      return const Scaffold(backgroundColor: Colors.black);
+    }
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(32),
-                  child: Image.asset(
-                    'assets/tek.png',
-                    width: imgSize,
-                    height: imgSize,
-                    fit: BoxFit.contain,
-                  ),
+      backgroundColor: Colors.black,
+      body: _controller.value.isInitialized
+          ? SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Teknik Bakış',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF34C759),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Teknik Analiz & Hisse Tarama',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 40),
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Color(0xFF34C759),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
+            )
+      : const SizedBox.shrink(),
     );
   }
 }

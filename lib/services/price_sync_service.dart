@@ -10,7 +10,9 @@ import '../services/notification_service.dart';
 ///
 /// Açılış saatleri (10:00–10:30): 1 dakikada bir günceller.
 /// Normal seans saatleri (10:30–18:30): 15 dakikada bir günceller.
-/// Seans dışı: güncelleme yapmaz.
+/// Kapanış grace period (18:30–18:45): Kapanış fiyatını yakalamak için
+///   seans bitiminden sonra en fazla 1 kez daha günceller.
+/// Seans dışı: güncelleme yapmaz (kapanış sync yapılmışsa).
 class PriceSyncService {
   PriceSyncService._();
 
@@ -33,6 +35,28 @@ class PriceSyncService {
     _timer = Timer.periodic(const Duration(seconds: 30), (_) => _tick());
     // Uygulama açılışında da hemen bir kez çalıştır
     _tick();
+    // Eğer seans bitti ama kapanış sync'i henüz yapılmadıysa (ör. uygulama
+    // akşam açıldı) hemen bir kez çek — Hive'daki eski cache yerine
+    // güncel kapanış fiyatı gösterilsin.
+    _syncIfClosedWithoutFinalPrice();
+  }
+
+  static void _syncIfClosedWithoutFinalPrice() {
+    final now = _nowTR();
+    if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) return;
+    final today = DateTime(now.year, now.month, now.day);
+    final close = DateTime(now.year, now.month, now.day, 18, 30);
+    // Seans bitmişse ve bugün için closing sync yapılmamışsa
+    if (now.isAfter(close)) {
+      final alreadySynced = _closingSyncDate != null &&
+          _closingSyncDate!.year == today.year &&
+          _closingSyncDate!.month == today.month &&
+          _closingSyncDate!.day == today.day;
+      if (!alreadySynced) {
+        _closingSyncDate = today;
+        _sync();
+      }
+    }
   }
 
   static void stop() {
@@ -44,6 +68,9 @@ class PriceSyncService {
 
   static DateTime? _lastSync;
 
+  /// Kapanış sonrası final sync yapıldı mı? (günlük, her gün sıfırlanır)
+  static DateTime? _closingSyncDate;
+
   static void _tick() {
     final now = _nowTR();
 
@@ -52,14 +79,31 @@ class PriceSyncService {
       return;
     }
 
+    final today    = DateTime(now.year, now.month, now.day);
     final open     = DateTime(now.year, now.month, now.day, 10, 0);
     final midpoint = DateTime(now.year, now.month, now.day, 10, 30);
     final close    = DateTime(now.year, now.month, now.day, 18, 30);
+    // Kapanış fiyatının Yahoo'ya yansıması için 5 dakika grace period
+    final graceEnd = DateTime(now.year, now.month, now.day, 18, 45);
 
-    // Seans dışı → pas geç
-    if (now.isBefore(open) || now.isAfter(close)) return;
+    // ── Kapanış grace period (18:30 – 18:45): bir kez final sync ──────────
+    if (now.isAfter(close) && now.isBefore(graceEnd)) {
+      // Bu gün için closing sync henüz yapılmadıysa yap
+      final alreadySynced = _closingSyncDate != null &&
+          _closingSyncDate!.year == today.year &&
+          _closingSyncDate!.month == today.month &&
+          _closingSyncDate!.day == today.day;
+      if (!alreadySynced) {
+        _closingSyncDate = today;
+        _sync();
+      }
+      return;
+    }
 
-    // Gereken interval
+    // ── Seans dışı → pas geç ───────────────────────────────────────────────
+    if (now.isBefore(open) || now.isAfter(graceEnd)) return;
+
+    // ── Seans içi: normal güncelleme ──────────────────────────────────────
     final intervalMinutes = now.isBefore(midpoint) ? 1 : 15;
 
     // Son senkronizasyondan bu yana yeterli süre geçti mi?
