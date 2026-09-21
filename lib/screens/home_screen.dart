@@ -4,6 +4,7 @@ import '../models/asset_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
 import '../services/home_price_cache.dart';
+import '../services/price_sync_service.dart';
 import '../services/app_navigation.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
@@ -34,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _euro;
   bool _loadingMarket = false;
   StreamSubscription? _favoriteListSubscription;
-  Timer? _refreshTimer;
   final TextEditingController _searchCtrl = TextEditingController();
   List<Map<String, String>> _searchResults = [];
 
@@ -85,24 +85,39 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (event.key == 'listA' || event.key == 'listB') {
         _loadFavoriteLists(event.key as String);
-        _loadFavoritePrices();
+        // Favori listesi değişince PriceSyncService'e bildir
+        _updateActiveFavorites();
       }
     });
     _loadFavoriteLists();
+    _updateActiveFavorites();
 
     // 1. Önce cache'den anında göster
     _loadFromCache();
 
-    // 2. Arka planda gerçek veriyi çek
+    // 2. Arka planda quick prices çek (BIST100, dolar vb.)
     _loadQuickPrices();
     _loadMarketList();
-    _loadFavoritePrices();
 
-    // 3. Otomatik yenileme — borsa saatlerinde 5 dakikada bir
-    _startAutoRefresh();
+    // 3. PriceSyncService fiyat güncellemelerini dinle
+    PriceSyncService.lastSyncTime.addListener(_onPriceSyncUpdate);
 
     // 4. Yeni Yaklaşan IPO bildirimleri için dinleyici
     newUpcomingIposNotifier.addListener(_onNewIposDetected);
+  }
+
+  /// PriceSyncService yeni fiyatları cache'e yazınca çağrılır.
+  void _onPriceSyncUpdate() {
+    if (!mounted) return;
+    _loadFavoritePricesFromCache();
+  }
+
+  /// Favori sembolleri PriceSyncService'e bildir.
+  void _updateActiveFavorites() {
+    PriceSyncService.activeFavorites.value = [
+      ..._favoriteListA,
+      ..._favoriteListB,
+    ];
   }
 
   void _onNewIposDetected() {
@@ -126,36 +141,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// BIST açık saatlerde (hafta içi 10:00–18:30 Türkiye saati) 5 dakikada bir
-  /// anlık fiyatları ve favori listesi fiyatlarını günceller.
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-      if (!mounted) return;
-      if (_isBistOpen()) {
-        _loadQuickPrices();
-        _loadFavoritePrices();
-      }
-    });
-  }
-
-  /// BIST'in şu an açık olup olmadığını kontrol eder.
-  /// Açık saat: Pazartesi–Cuma, 10:00–18:30 (UTC+3, Türkiye saati).
-  bool _isBistOpen() {
-    final now = DateTime.now().toUtc().add(const Duration(hours: 3));
-    if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
-      return false;
-    }
-    final open  = DateTime(now.year, now.month, now.day, 10,  0);
-    final close = DateTime(now.year, now.month, now.day, 18, 30);
-    return now.isAfter(open) && now.isBefore(close);
-  }
-
   /// Cache'den anlık olarak yükle — ağ beklenmez
   void _loadFromCache() {
     final cachedQuick = HomePriceCache.loadQuickPrices();
-    final cachedFavs = HomePriceCache.loadFavoritePrices();
-
-    if (cachedQuick.isEmpty && cachedFavs.isEmpty) return;
+    final cachedStocks = HomePriceCache.loadStockPricesMap();
 
     setState(() {
       if (cachedQuick.containsKey('bist100')) _bist100 = cachedQuick['bist100'];
@@ -167,8 +156,21 @@ class _HomeScreenState extends State<HomeScreen> {
       if (cachedQuick.containsKey('dollar')) _dollar = cachedQuick['dollar'];
       if (cachedQuick.containsKey('euro'))   _euro   = cachedQuick['euro'];
 
-      for (final asset in cachedFavs) {
-        _stockPriceCache[asset.symbol] = asset;
+      for (final entry in cachedStocks.entries) {
+        _stockPriceCache[entry.key] = entry.value;
+      }
+    });
+  }
+
+  /// PriceSyncService'in cache'e yazdığı fiyatları okuyup ekranı günceller.
+  void _loadFavoritePricesFromCache() {
+    if (!mounted) return;
+    final cachedStocks = HomePriceCache.loadStockPricesMap();
+    if (cachedStocks.isEmpty) return;
+
+    setState(() {
+      for (final entry in cachedStocks.entries) {
+        _stockPriceCache[entry.key] = entry.value;
       }
     });
   }
@@ -195,33 +197,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await PortfolioService.saveFavoriteLists(_favoriteListA, _favoriteListB);
   }
 
-  Future<void> _loadFavoritePrices({List<String>? symbols}) async {
-    final allFavs = (symbols ?? [..._favoriteListA, ..._favoriteListB])
-        .where((s) => s.trim().isNotEmpty)
-        .toSet()
-        .toList();
-    if (allFavs.isEmpty) return;
-
-    try {
-      final results = await StockService.fetchMultiple(allFavs, period: '5d')
-          .timeout(const Duration(seconds: 8), onTimeout: () => []);
-      if (!mounted) return;
-
-      // Her hisse geldiğinde sadece o hissenin rakamları değişir, diğerleri kaybolmaz
-      if (results.isNotEmpty) {
-        setState(() {
-          for (final asset in results) {
-            _stockPriceCache[asset.symbol] = asset;
-          }
-        });
-        HomePriceCache.saveFavoritePrices(_stockPriceCache.values.toList());
-      }
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    PriceSyncService.lastSyncTime.removeListener(_onPriceSyncUpdate);
     _favoriteListSubscription?.cancel();
     _searchCtrl.dispose();
     newUpcomingIposNotifier.removeListener(_onNewIposDetected);
@@ -694,7 +672,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 });
                                 _saveFavoriteLists();
-                                _loadFavoritePrices(symbols: [symbol]);
+                                _updateActiveFavorites();
+                                PriceSyncService.forceSync();
                                 Navigator.pop(ctx);
                               }
                             },
@@ -875,11 +854,12 @@ class _HomeScreenState extends State<HomeScreen> {
             await Future.wait([
               _loadQuickPrices(),
               _loadMarketList(),
-              _loadFavoritePrices(),
+              PriceSyncService.forceSync(),
             ]).timeout(
-              const Duration(seconds: 10),
+              const Duration(seconds: 25),
               onTimeout: () => [],
             );
+            _loadFavoritePricesFromCache();
           },
           child: CustomScrollView(
             slivers: [
@@ -1208,7 +1188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _favoriteListA.remove(symbol);
                           });
                           _saveFavoriteLists();
-                          _loadFavoritePrices();
+                          _updateActiveFavorites();
                         },
                         onSelectSymbol: (symbol, name) =>
                             MainNavigation.goToAnaliz(symbol, name),
@@ -1223,7 +1203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ..addAll(items);
                           });
                           _saveFavoriteLists();
-                          _loadFavoritePrices();
+                          _updateActiveFavorites();
                         },
                         priceCache: _stockPriceCache,
                       ),
@@ -1243,7 +1223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _favoriteListB.remove(symbol);
                           });
                           _saveFavoriteLists();
-                          _loadFavoritePrices();
+                          _updateActiveFavorites();
                         },
                         onSelectSymbol: (symbol, name) =>
                             MainNavigation.goToAnaliz(symbol, name),
@@ -1258,7 +1238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ..addAll(items);
                           });
                           _saveFavoriteLists();
-                          _loadFavoritePrices();
+                          _updateActiveFavorites();
                         },
                         priceCache: _stockPriceCache,
                       ),
@@ -1987,161 +1967,348 @@ class _TabChip extends StatelessWidget {
 // Yeni Halka Arz Duyurusu Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _NewIpoDialog extends StatelessWidget {
+class _NewIpoDialog extends StatefulWidget {
   final List ipoItems;
 
   const _NewIpoDialog({required this.ipoItems});
 
   @override
+  State<_NewIpoDialog> createState() => _NewIpoDialogState();
+}
+
+class _NewIpoDialogState extends State<_NewIpoDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _scaleAnim = Tween<double>(begin: 0.82, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    );
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.6)),
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _dismiss() async {
+    await _ctrl.reverse();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final count = ipoItems.length;
+    final count = widget.ipoItems.length;
 
-    // İlk şirketi al
-    final first = ipoItems.first;
+    final first = widget.ipoItems.first;
     final companyName = (first.companyName as String).isNotEmpty
         ? first.companyName as String
         : first.symbol as String;
     final symbol = first.symbol as String;
 
+    // Gece/Gündüz renk paleti
+    final cardBg = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+    const accentGreen = Color(0xFF34C759);
+    final accentGold = isDark ? const Color(0xFFFFD60A) : const Color(0xFFFF9F0A);
+    final subtitleColor = isDark
+        ? Colors.white.withValues(alpha: 0.65)
+        : const Color(0xFF3A3A3C);
+    final captionColor = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : const Color(0xFF8E8E93);
+    final dividerColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFE5E5EA);
+
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [const Color(0xFF1C2B1C), const Color(0xFF0A1F0A)]
-                : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF34C759).withValues(alpha: 0.3),
-              blurRadius: 30,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Konfeti / roket ikonu
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF34C759).withValues(alpha: 0.15),
-                  border: Border.all(
-                    color: const Color(0xFF34C759).withValues(alpha: 0.4),
-                    width: 2,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: SlideTransition(
+          position: _slideAnim,
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: Container(
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(32),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentGreen.withValues(alpha: isDark ? 0.22 : 0.14),
+                    blurRadius: 48,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
                   ),
-                ),
-                child: const Center(
-                  child: Text(
-                    '🎉',
-                    style: TextStyle(fontSize: 36),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Başlık
-              Text(
-                count == 1 ? 'Yeni Halka Arz!' : '$count Yeni Halka Arz!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF34C759),
-                  fontSize: 22,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-
-              // Şirket adı
-              Text(
-                count == 1
-                    ? '$companyName${symbol.isNotEmpty ? ' ($symbol)' : ''}'
-                    : '$companyName${symbol.isNotEmpty ? ' ($symbol)' : ''} ve ${count - 1} diğer',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-
-              // Alt açıklama
-              Text(
-                count == 1
-                    ? 'Yakında halka arz oluyor! Detayları Halka Arz bölümünden takip edebilirsiniz.'
-                    : 'Yakında halka arz oluyorlar! Tüm detayları Halka Arz bölümünden takip edebilirsiniz.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-
-              // Butonlar
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        side: BorderSide(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(
-                        'Tamam',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        // Halka Arz sekmesine git (index 4)
-                        AppNavigation.goToTab(4);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF34C759),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Takip Et',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-            ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Üst renkli bant ──────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDark
+                              ? [
+                                  const Color(0xFF0D3320),
+                                  const Color(0xFF143D28),
+                                ]
+                              : [
+                                  const Color(0xFFECFDF3),
+                                  const Color(0xFFD1FAE5),
+                                ],
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          // Kapat butonu sağda
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: GestureDetector(
+                              onTap: _dismiss,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: (isDark ? Colors.white : Colors.black)
+                                      .withValues(alpha: 0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: (isDark ? Colors.white : Colors.black)
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+
+                          // Konfeti emoji — büyük
+                          const Text('🎉', style: TextStyle(fontSize: 52)),
+                          const SizedBox(height: 12),
+
+                          // Başlık
+                          Text(
+                            count == 1
+                                ? 'Yeni Halka Arz!'
+                                : '$count Yeni Halka Arz!',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: accentGreen,
+                              letterSpacing: -0.3,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+
+                          // Şirket adı chip
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: accentGreen.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: accentGreen.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              count == 1
+                                  ? '$companyName${symbol.isNotEmpty ? '  •  $symbol' : ''}'
+                                  : '$companyName${symbol.isNotEmpty ? '  •  $symbol' : ''} +${count - 1} diğer',
+                              style: TextStyle(
+                                color: accentGreen,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Alt içerik ───────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                      child: Column(
+                        children: [
+                          // Bilgi satırı
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : const Color(0xFFF9F9F9),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: dividerColor),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        accentGold.withValues(alpha: 0.14),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '⭐',
+                                      style:
+                                          const TextStyle(fontSize: 17),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    count == 1
+                                        ? 'Yakında halka arz oluyor. Halka Arz bölümü → "Yaklaşan" sekmesinden detayları takip edebilirsiniz.'
+                                        : 'Birden fazla yeni şirket halka arz oluyor. Halka Arz bölümü → "Yaklaşan" sekmesinden tümünü görüntüleyebilirsiniz.',
+                                    style: TextStyle(
+                                      color: subtitleColor,
+                                      fontSize: 13,
+                                      height: 1.45,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Butonlar
+                          Row(
+                            children: [
+                              // Tamam — ghost
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _dismiss,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.06)
+                                          : const Color(0xFFF2F2F7),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Tamam',
+                                        style: TextStyle(
+                                          color: captionColor,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // Takip Et — vurgulu
+                              Expanded(
+                                flex: 2,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    _ctrl.reverse().then((_) {
+                                      if (mounted) {
+                                        Navigator.of(context).pop();
+                                        AppNavigation.goToTab(4);
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          accentGreen,
+                                          const Color(0xFF2DB84B),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: accentGreen.withValues(
+                                              alpha: 0.35),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '🚀',
+                                          style: TextStyle(fontSize: 16),
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'Halka Arz\'a Git',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -18,6 +18,7 @@ import 'services/settings_service.dart';
 import 'services/subscription_service.dart';
 import 'services/bist100_service.dart';
 import 'services/home_price_cache.dart';
+import 'services/price_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,10 +30,10 @@ void main() async {
   await NotificationService.init();
   await NotificationService.requestPermission();
   Bist100Service.init(); // arka planda başlat, await etme
+  PriceSyncService.start(); // tek merkezi fiyat senkronizasyonu
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const TeknikBakisApp());
 }
-
 class TeknikBakisApp extends StatefulWidget {
   const TeknikBakisApp({super.key});
 
@@ -60,6 +61,7 @@ class _TeknikBakisAppState extends State<TeknikBakisApp> {
         return MaterialApp(
           title: 'Teknik Bakış',
           debugShowCheckedModeBanner: false,
+          navigatorKey: appNavigatorKey,
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           supportedLocales: const [
             Locale('tr'),
@@ -115,6 +117,9 @@ class _TeknikBakisAppState extends State<TeknikBakisApp> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Ana navigasyon — GlobalKey ile hisse seçilince Analiz sekmesine yönlendirme
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Navigator key — overlay için context sağlar
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -188,6 +193,13 @@ class MainNavigationState extends State<MainNavigation> {
       setState(() {
         _currentIndex = index;
       });
+    });
+
+    // Alarm overlay için context sağlayıcıyı kaydet
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService.registerContextProvider(
+        () => appNavigatorKey.currentContext,
+      );
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

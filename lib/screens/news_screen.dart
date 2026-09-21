@@ -211,7 +211,7 @@ class _NewsScreenState extends State<NewsScreen>
   DateTime? _tryParsePubDate(String raw) {
     if (raw.isEmpty) return null;
     try {
-      return DateTime.parse(raw);
+      return DateTime.parse(raw).toLocal();
     } catch (_) {}
     try {
       final months = {
@@ -228,6 +228,7 @@ class _NewsScreenState extends State<NewsScreen>
         'Nov': 11,
         'Dec': 12,
       };
+      // Örnek format: "Mon, 21 Sep 2026 10:00:00 +0000" veya "Mon, 21 Sep 2026 10:00:00 GMT"
       final parts = raw.replaceAll(',', '').trim().split(RegExp(r'\s+'));
       if (parts.length >= 5) {
         final day = int.tryParse(parts[1]) ?? 1;
@@ -235,9 +236,26 @@ class _NewsScreenState extends State<NewsScreen>
         final year = int.tryParse(parts[3]) ?? 2026;
         final timeParts = parts[4].split(':');
         final hour = int.tryParse(timeParts[0]) ?? 0;
-        final min =
-            int.tryParse(timeParts.length > 1 ? timeParts[1] : '0') ?? 0;
-        return DateTime(year, month, day, hour, min);
+        final min = int.tryParse(timeParts.length > 1 ? timeParts[1] : '0') ?? 0;
+
+        // Timezone offset'i parse et (örn: +0300, -0500, GMT, UTC, Z)
+        int offsetMinutes = 0;
+        if (parts.length >= 6) {
+          final tz = parts[5].trim().toUpperCase();
+          if (tz == 'GMT' || tz == 'UTC' || tz == 'Z') {
+            offsetMinutes = 0;
+          } else if (RegExp(r'^[+-]\d{4}$').hasMatch(tz)) {
+            final sign = tz[0] == '+' ? 1 : -1;
+            final tzHour = int.tryParse(tz.substring(1, 3)) ?? 0;
+            final tzMin = int.tryParse(tz.substring(3, 5)) ?? 0;
+            offsetMinutes = sign * (tzHour * 60 + tzMin);
+          }
+        }
+
+        // UTC'ye çevir, sonra yerel saate dönüştür
+        final utc = DateTime.utc(year, month, day, hour, min)
+            .subtract(Duration(minutes: offsetMinutes));
+        return utc.toLocal();
       }
     } catch (_) {}
     return null;

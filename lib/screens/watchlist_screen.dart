@@ -3,6 +3,8 @@ import '../models/asset_model.dart';
 import '../models/portfolio_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart'; // kBistStocks de buradan export ediliyor
+import '../services/home_price_cache.dart';
+import '../services/price_sync_service.dart';
 import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import '../widgets/stock_quote_panel.dart';
@@ -26,6 +28,27 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   void initState() {
     super.initState();
     _loadWatchlist();
+    // PriceSyncService güncelleyince ekranı yenile
+    PriceSyncService.lastSyncTime.addListener(_onPriceSyncUpdate);
+  }
+
+  @override
+  void dispose() {
+    PriceSyncService.lastSyncTime.removeListener(_onPriceSyncUpdate);
+    super.dispose();
+  }
+
+  void _onPriceSyncUpdate() {
+    if (!mounted) return;
+    // Sadece fiyatları cache'den güncelle, listeyi yeniden çekme
+    final cached = HomePriceCache.loadStockPricesMap();
+    if (cached.isEmpty) return;
+    setState(() {
+      for (final item in _items) {
+        final asset = cached[item.symbol.toUpperCase()];
+        if (asset != null) _assets[item.symbol] = asset;
+      }
+    });
   }
 
   Future<void> _loadWatchlist() async {
@@ -40,12 +63,26 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       _items = watchlist;
       _alarms = alarms;
       _alarmMap = alarmMap;
-      _loading = _items.isNotEmpty;
     });
     if (_items.isEmpty) return;
 
+    // Önce cache'den anında göster
+    final cached = HomePriceCache.loadStockPricesMap();
+    if (cached.isNotEmpty) {
+      setState(() {
+        for (final item in _items) {
+          final asset = cached[item.symbol.toUpperCase()];
+          if (asset != null) _assets[item.symbol] = asset;
+        }
+        _loading = false;
+      });
+      return;
+    }
+
+    // Cache boşsa API'den çek (ilk açılış)
+    setState(() => _loading = true);
     for (final item in _items) {
-      final asset = await StockService.fetchStock(item.symbol, period: '1mo');
+      final asset = await StockService.fetchStock(item.symbol, period: '5d');
       if (asset != null) {
         _checkAlertsForSymbol(item, asset.price);
         if (mounted) {

@@ -4,6 +4,8 @@ import '../widgets/stock_quote_panel.dart';
 import '../models/portfolio_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
+import '../services/home_price_cache.dart';
+import '../services/price_sync_service.dart';
 
 // ─────────────────────────────────────────────
 // Gruplu hisse modeli (aynı sembol = bir grup)
@@ -56,6 +58,25 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   void initState() {
     super.initState();
     _loadPortfolio();
+    PriceSyncService.lastSyncTime.addListener(_onPriceSyncUpdate);
+  }
+
+  @override
+  void dispose() {
+    PriceSyncService.lastSyncTime.removeListener(_onPriceSyncUpdate);
+    super.dispose();
+  }
+
+  void _onPriceSyncUpdate() {
+    if (!mounted) return;
+    final cached = HomePriceCache.loadStockPricesMap();
+    if (cached.isEmpty) return;
+    setState(() {
+      for (final g in _groups) {
+        final asset = cached[g.symbol.toUpperCase()];
+        if (asset != null) _assets[g.symbol] = asset;
+      }
+    });
   }
 
   Future<void> _loadPortfolio() async {
@@ -73,8 +94,22 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       lots: e.value..sort((a, b) => b.buyDate.compareTo(a.buyDate)),
     )).toList();
 
-    // Fiyatları çek
+    // Önce cache'den anında göster
+    final cached = HomePriceCache.loadStockPricesMap();
     final assets = <String, AssetModel>{};
+    for (final g in groups) {
+      final cachedAsset = cached[g.symbol.toUpperCase()];
+      if (cachedAsset != null) {
+        assets[g.symbol] = cachedAsset;
+      }
+    }
+
+    if (assets.isNotEmpty) {
+      if (mounted) setState(() { _groups = groups; _assets = assets; _loading = false; });
+      return;
+    }
+
+    // Cache boşsa API'den çek (ilk açılış)
     for (final g in groups) {
       final asset = await StockService.fetchStock(g.symbol, period: '5d');
       if (asset != null) assets[g.symbol] = asset;

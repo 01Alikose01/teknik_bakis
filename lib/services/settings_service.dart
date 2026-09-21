@@ -11,6 +11,7 @@ class SettingsService {
   static Future<void> init() async {
     _box = await Hive.openBox<dynamic>(_boxName);
     darkMode.value = _box.get(_darkModeKey, defaultValue: false) as bool;
+    _loadNotificationSettings();
   }
 
   static Future<void> setDarkMode(bool value) async {
@@ -28,6 +29,32 @@ class SettingsService {
 
   static Future<void> markThemeSelected() async {
     await _box.put(_kThemeSelected, true);
+  }
+
+  // ─── Uygulama İçi Bildirim Ayarları ──────────────────────────────────────
+
+  static const String _kInAppAlarmNotification = 'inAppAlarmNotification';
+  static const String _kInAppIpoNotification = 'inAppIpoNotification';
+
+  static final ValueNotifier<bool> inAppAlarmNotification = ValueNotifier(true);
+  static final ValueNotifier<bool> inAppIpoNotification = ValueNotifier(true);
+
+  /// Uygulama başladığında çağrılır — init() içinde zaten tetikleniyor.
+  static void _loadNotificationSettings() {
+    inAppAlarmNotification.value =
+        _box.get(_kInAppAlarmNotification, defaultValue: true) as bool;
+    inAppIpoNotification.value =
+        _box.get(_kInAppIpoNotification, defaultValue: true) as bool;
+  }
+
+  static Future<void> setInAppAlarmNotification(bool value) async {
+    await _box.put(_kInAppAlarmNotification, value);
+    inAppAlarmNotification.value = value;
+  }
+
+  static Future<void> setInAppIpoNotification(bool value) async {
+    await _box.put(_kInAppIpoNotification, value);
+    inAppIpoNotification.value = value;
   }
 
   // ─── Öğretici Tooltip Bayrakları ─────────────────────────────────────────

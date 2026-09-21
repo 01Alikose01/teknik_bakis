@@ -131,6 +131,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   ]),
+                  const SizedBox(height: 8),
+                  _SectionLabel('Uygulama İçi Bildirimler'),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: SettingsService.inAppAlarmNotification,
+                    builder: (context, isEnabled, _) {
+                      return _SettingsGroup(items: [
+                        _SettingsItem(
+                          title: 'Fiyat Alarmı Bildirimi',
+                          subtitle: 'Alarm tetiklenince ekranda bildirim göster',
+                          leadingIcon: Icons.price_change_outlined,
+                          leadingColor: const Color(0xFF007AFF),
+                          trailing: Switch(
+                            value: isEnabled,
+                            activeThumbColor: const Color(0xFF007AFF),
+                            onChanged: (value) async {
+                              await SettingsService.setInAppAlarmNotification(value);
+                              setState(() {});
+                            },
+                          ),
+                          onTap: () async {
+                            await SettingsService.setInAppAlarmNotification(!isEnabled);
+                            setState(() {});
+                          },
+                        ),
+                      ]);
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: SettingsService.inAppIpoNotification,
+                    builder: (context, isEnabled, _) {
+                      return _SettingsGroup(items: [
+                        _SettingsItem(
+                          title: 'Halka Arz Bildirimi',
+                          subtitle: 'Yeni halka arz duyurulunca ekranda bildirim göster',
+                          leadingIcon: Icons.rocket_launch_outlined,
+                          leadingColor: const Color(0xFFFF9500),
+                          trailing: Switch(
+                            value: isEnabled,
+                            activeThumbColor: const Color(0xFFFF9500),
+                            onChanged: (value) async {
+                              await SettingsService.setInAppIpoNotification(value);
+                              setState(() {});
+                            },
+                          ),
+                          onTap: () async {
+                            await SettingsService.setInAppIpoNotification(!isEnabled);
+                            setState(() {});
+                          },
+                        ),
+                      ]);
+                    },
+                  ),
 
                   const SizedBox(height: 20),
                   _SectionLabel('Yardım & Destek'),
@@ -754,6 +807,7 @@ class _SettingsGroup extends StatelessWidget {
 
 class _SettingsItem extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final Widget? trailing;
   final IconData? leadingIcon;
   final Color? leadingColor;
@@ -762,6 +816,7 @@ class _SettingsItem extends StatelessWidget {
 
   const _SettingsItem({
     required this.title,
+    this.subtitle,
     this.trailing,
     this.leadingIcon,
     this.leadingColor,
@@ -778,6 +833,9 @@ class _SettingsItem extends StatelessWidget {
           ? Icon(leadingIcon, color: leadingColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.65), size: 20)
           : null,
       title: Text(title, style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurface)),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.55)))
+          : null,
       trailing: trailing ??
           (onTap != null
               ? Icon(trailingIcon ?? Icons.chevron_right, color: theme.colorScheme.onSurface.withValues(alpha: 0.65), size: 20)

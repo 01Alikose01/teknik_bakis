@@ -111,13 +111,14 @@ class AlarmItemAdapter extends TypeAdapter<AlarmItem> {
       alertAbove: fields[3] as bool,
       alertType: fields[4] as String,
       createdAt: fields[5] as DateTime,
+      repeatMode: fields[6] as String? ?? 'once',
     );
   }
 
   @override
   void write(BinaryWriter writer, AlarmItem obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.symbol)
       ..writeByte(1)
@@ -129,7 +130,9 @@ class AlarmItemAdapter extends TypeAdapter<AlarmItem> {
       ..writeByte(4)
       ..write(obj.alertType)
       ..writeByte(5)
-      ..write(obj.createdAt);
+      ..write(obj.createdAt)
+      ..writeByte(6)
+      ..write(obj.repeatMode);
   }
 
   @override

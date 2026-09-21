@@ -80,6 +80,9 @@ class AlarmItem extends HiveObject {
   @HiveField(5)
   DateTime createdAt;
 
+  @HiveField(6)
+  String repeatMode; // 'once' = 1 Kere Çal, 'repeat' = Sürekli Çal
+
   AlarmItem({
     required this.symbol,
     required this.name,
@@ -87,5 +90,6 @@ class AlarmItem extends HiveObject {
     this.alertAbove = true,
     this.alertType = 'price',
     DateTime? createdAt,
+    this.repeatMode = 'once',
   }) : createdAt = createdAt ?? DateTime.now();
 }

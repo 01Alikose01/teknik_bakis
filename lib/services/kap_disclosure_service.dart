@@ -15,8 +15,10 @@ class KapDisclosureService {
   static final _db = FirebaseFirestore.instance;
 
   // In-memory cache — aynı seansta Firestore'u tekrar yüklemeyi önler
+  // TTL: 3 dakika — Cloud Function 15dk'da bir sync yaptığı için
+  // kullanıcı en fazla 3dk gecikmeli veri görür (açılışta 5dk sync = maks 8dk)
   static final Map<String, _CachedDisclosures> _cache = {};
-  static const Duration _cacheTtl = Duration(minutes: 10);
+  static const Duration _cacheTtl = Duration(minutes: 3);
 
   static DateTime? _lastSyncTime;
 

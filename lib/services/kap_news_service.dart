@@ -329,7 +329,7 @@ class KapNewsService {
   static DateTime? _tryParseDate(String raw) {
     if (raw.isEmpty) return null;
     try {
-      return DateTime.parse(raw);
+      return DateTime.parse(raw).toLocal();
     } catch (_) {}
     try {
       final parts = raw.split(' ');

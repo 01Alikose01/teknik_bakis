@@ -1,10 +1,5 @@
 /**
- * Firebase Cloud Function — Temel Göstergeler Güncelleyici
- *
- * BilancoVeri.com'dan 587 BIST hissesinin temel verilerini çeker,
- * Firestore'daki fundamentals/{ticker} belgelerine yazar.
- *
- * Zamanlama: Her gün 08:00, 12:00 ve 18:00 (Türkiye saati = UTC+3)
+ * Firebase Cloud Function — KAP Bildirim + Temel Göstergeler Güncelleyici
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * KAP MKK BİLDİRİM SYNC SİSTEMİ
@@ -12,6 +7,21 @@
  * MKK VYK API'sinden KAP bildirimlerini merkezi olarak çeker.
  * Flutter uygulaması KAP API'ye HİÇBİR ZAMAN direkt bağlanmaz.
  * API credentials sadece Cloud Function environment'ında tutulur.
+ * 1000+ kullanıcı Firestore'dan okur → KAP/MKK API'ye tek istek biz atarız.
+ *
+ * Zamanlama stratejisi (Türkiye saati = UTC+3):
+ *
+ *   syncKapOpeningWindow  — Her gün 06:55–07:30 UTC (09:55–10:30 TR)
+ *                           Her 5 dakikada bir → borsa açılış verilerini hızlı yakalar
+ *                           cron: 55 6 * * *        → 09:55 TR
+ *                                 0,5,10,15,20,25,30 7 * * *  → 10:00–10:30 TR
+ *
+ *   syncKapDisclosures    — Her gün sürekli, 15 dakikada bir (tüm gün)
+ *                           cron: '* /15 * * * *' → günde 96x çalışır
+ *                           Açılış penceresi dışındaki saatleri kapsar.
+ *                           openingWindow zaten 09:55–10:30 arası daha sık çalışır,
+ *                           15dk'lık genel sync onları da kapsadığı için
+ *                           ikisi birlikte çalışmak sorun değil (idempotent UPSERT).
  *
  * Firestore yapısı:
  *   kap_members/{id}         — Şirket listesi
@@ -357,11 +367,54 @@ async function runKapSync(apiKey, token, trigger = 'scheduled') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULED FUNCTION — Günde 3x: 08:00, 14:00, 20:00 Türkiye (= 05, 11, 17 UTC)
+// SCHEDULED FUNCTION 1 — Açılış Penceresi: 09:55–10:30 Türkiye (UTC+3)
+//
+//   Her 5 dakikada bir çalışır, borsa açılışında bildirimleri hızlı yakalar.
+//   Türkiye 09:55 = UTC 06:55  →  cron: 55 6 * * *
+//   Türkiye 10:00–10:30        →  cron: 0,5,10,15,20,25,30 7 * * *
+//
+//   1000+ kullanıcı varken bile KAP/MKK API'ye tek istek biz atarız,
+//   kullanıcılar Firestore'dan okur → rate-limit veya block riski sıfır.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 09:55 TR (UTC 06:55) — açılış öncesi son hazırlık
+exports.syncKapOpeningPre = onSchedule({
+  schedule:       '55 6 * * *',
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [KAP_API_KEY, KAP_TOKEN],
+}, async () => {
+  const apiKey = KAP_API_KEY.value();
+  const token  = KAP_TOKEN.value();
+  await runKapSync(apiKey, token, 'opening-pre');
+});
+
+// 10:00, 10:05, 10:10, 10:15, 10:20, 10:25, 10:30 TR (UTC 07:xx) — açılış penceresi
+exports.syncKapOpeningWindow = onSchedule({
+  schedule:       '0,5,10,15,20,25,30 7 * * *',
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [KAP_API_KEY, KAP_TOKEN],
+}, async () => {
+  const apiKey = KAP_API_KEY.value();
+  const token  = KAP_TOKEN.value();
+  await runKapSync(apiKey, token, 'opening-window');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULED FUNCTION 2 — Sürekli Sync: Her 15 dakikada bir (tüm gün)
+//
+//   Açılış penceresi dışındaki tüm seansı ve gün içi bildirimleri yakalar.
+//   Açılış penceresiyle çakışsa da UPSERT idempotent olduğu için sorun yok.
+//   Günde 96 çalışır; Firestore yazma maliyeti ihmal edilebilir seviyede.
 // ─────────────────────────────────────────────────────────────────────────────
 
 exports.syncKapDisclosures = onSchedule({
-  schedule:       '0 5,11,17 * * *',
+  schedule:       '*/15 * * * *',
   timeZone:       'UTC',
   region:         'europe-west1',
   memory:         '512MiB',

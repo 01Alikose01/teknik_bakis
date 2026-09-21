@@ -3,6 +3,7 @@ import '../models/asset_model.dart';
 import '../models/portfolio_model.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
+import '../services/home_price_cache.dart';
 import '../services/subscription_service.dart';
 import 'premium_gate_screen.dart';
 
@@ -261,6 +262,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
   void _showCreateAlarmDialog(WatchlistItem item) {
     final priceCtrl = TextEditingController();
     bool above = true;
+    String? repeatMode; // null = seçilmedi, 'once' veya 'repeat'
     AssetModel? selectedAsset;
     bool isLoadingPrice = true;
     bool didFetchPrice = false;
@@ -284,17 +286,30 @@ class _AlarmScreenState extends State<AlarmScreen> {
 
           if (!didFetchPrice) {
             didFetchPrice = true;
-            StockService.fetchStock(
-              item.symbol,
-              period: '1d',
-              interval: '1d',
-            ).then((asset) {
-              if (!ctx.mounted) return;
-              setDialogState(() {
-                selectedAsset = asset;
-                isLoadingPrice = false;
+            // Önce cache'den anında göster
+            final cached = HomePriceCache.getStockPrice(item.symbol);
+            if (cached != null) {
+              // Cache'de var — hemen göster, arka planda taze veri de çek
+              Future.microtask(() {
+                if (!ctx.mounted) return;
+                setDialogState(() {
+                  selectedAsset = cached;
+                  isLoadingPrice = false;
+                });
               });
-            });
+            } else {
+              // Cache boşsa API'den çek
+              StockService.fetchStock(
+                item.symbol,
+                period: '5d',
+              ).then((asset) {
+                if (!ctx.mounted) return;
+                setDialogState(() {
+                  selectedAsset = asset;
+                  isLoadingPrice = false;
+                });
+              });
+            }
           }
 
           return AlertDialog(
@@ -516,6 +531,111 @@ class _AlarmScreenState extends State<AlarmScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  'Alarm Tipi',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setDialogState(() => repeatMode = 'once'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: repeatMode == 'once'
+                                ? const Color(0xFF007AFF).withValues(alpha: 0.12)
+                                : toggleBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: repeatMode == 'once'
+                                  ? const Color(0xFF007AFF)
+                                  : borderColor,
+                              width: repeatMode == 'once' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.looks_one_rounded,
+                                color: repeatMode == 'once'
+                                    ? const Color(0xFF007AFF)
+                                    : hintColor,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '1 Kere Çal',
+                                style: TextStyle(
+                                  color: repeatMode == 'once'
+                                      ? const Color(0xFF007AFF)
+                                      : hintColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setDialogState(() => repeatMode = 'repeat'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: repeatMode == 'repeat'
+                                ? const Color(0xFFFF9500).withValues(alpha: 0.12)
+                                : toggleBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: repeatMode == 'repeat'
+                                  ? const Color(0xFFFF9500)
+                                  : borderColor,
+                              width: repeatMode == 'repeat' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.repeat_rounded,
+                                color: repeatMode == 'repeat'
+                                    ? const Color(0xFFFF9500)
+                                    : hintColor,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Sürekli Çal',
+                                style: TextStyle(
+                                  color: repeatMode == 'repeat'
+                                      ? const Color(0xFFFF9500)
+                                      : hintColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             actions: [
@@ -543,6 +663,16 @@ class _AlarmScreenState extends State<AlarmScreen> {
                     priceCtrl.text.replaceAll(',', '.'),
                   );
                   if (price == null || price <= 0) return;
+                  if (repeatMode == null) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lütfen "1 Kere Çal" veya "Sürekli Çal" seçiniz.'),
+                        duration: Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
                   if (!SubscriptionService.canCreateAlarm(_alarms.length)) {
                     if (ctx.mounted) Navigator.pop(ctx);
                     _showAlarmLimitSheet();
@@ -556,6 +686,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
                       alertPrice: price,
                       alertAbove: above,
                       alertType: above ? 'sell' : 'buy',
+                      repeatMode: repeatMode!,
                     ),
                   );
 
@@ -761,6 +892,28 @@ class _AlarmScreenState extends State<AlarmScreen> {
                                               ),
                                             ),
                                           ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: alarm.repeatMode == 'repeat'
+                                                  ? const Color(0xFFFF9500).withValues(alpha: 0.13)
+                                                  : const Color(0xFF007AFF).withValues(alpha: 0.13),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(
+                                              alarm.repeatMode == 'repeat'
+                                                  ? Icons.repeat_rounded
+                                                  : Icons.looks_one_rounded,
+                                              size: 13,
+                                              color: alarm.repeatMode == 'repeat'
+                                                  ? const Color(0xFFFF9500)
+                                                  : const Color(0xFF007AFF),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 6),
@@ -784,7 +937,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
-                                            '${alarm.createdAt.day.toString().padLeft(2, '0')}.${alarm.createdAt.month.toString().padLeft(2, '0')}.${alarm.createdAt.year} ${alarm.createdAt.hour.toString().padLeft(2, '0')}:${alarm.createdAt.minute.toString().padLeft(2, '0')}',
+                                            '${alarm.createdAt.toLocal().day.toString().padLeft(2, '0')}.${alarm.createdAt.toLocal().month.toString().padLeft(2, '0')}.${alarm.createdAt.toLocal().year} ${alarm.createdAt.toLocal().hour.toString().padLeft(2, '0')}:${alarm.createdAt.toLocal().minute.toString().padLeft(2, '0')}',
                                             style: TextStyle(
                                               color: onSurfaceSecondary,
                                               fontSize: 12,
