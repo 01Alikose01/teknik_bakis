@@ -11,6 +11,7 @@ import 'watchlist_screen.dart';
 import 'notifications_screen.dart';
 import 'ipo_screen.dart' show newUpcomingIposNotifier;
 import '../widgets/stock_quote_panel.dart';
+import 'dart:ui';
 import '../main.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _mainScrollCtrl = ScrollController();
   int _marketTab = 0;
   int _homeSection = 0; // 0 = Favori Listeleri, 1 = Hisseler
   int _homePanel = 0; // Takip 1 / Takip 2
@@ -202,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
     PriceSyncService.lastSyncTime.removeListener(_onPriceSyncUpdate);
     _favoriteListSubscription?.cancel();
     _searchCtrl.dispose();
+    _mainScrollCtrl.dispose();
     newUpcomingIposNotifier.removeListener(_onNewIposDetected);
     super.dispose();
   }
@@ -336,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
             if (cmp != 0) return cmp;
             return b.latestVolume.compareTo(a.latestVolume); // hacim büyükten küçüğe
           });
-        filtered = filtered.take(10).toList();
+        // Sınır kaldırıldı: Tüm artanlar gösteriliyor
+        // filtered = filtered.take(10).toList(); 
         break;
       case 1:
         // En Çok Azalan — -%10 taban, önce % küçükten büyüğe (en negatif önce), eşit %-de hacim büyükten küçüğe
@@ -350,7 +354,8 @@ class _HomeScreenState extends State<HomeScreen> {
             if (cmp != 0) return cmp;
             return b.latestVolume.compareTo(a.latestVolume); // hacim büyükten küçüğe
           });
-        filtered = filtered.take(10).toList();
+        // Sınır kaldırıldı: Tüm azalanlar gösteriliyor
+        // filtered = filtered.take(10).toList(); 
         break;
       default:
         // Hacim liderleri — bugünkü hacim
@@ -834,6 +839,78 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildFloatingScrollButtons(ThemeData theme) {
+    // Sadece 'Hisseler' bölümündeysek (liste uzun olduğu için) göster
+    if (_homeSection != 1) return const SizedBox.shrink();
+
+    final isDark = theme.brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
+        child: Container(
+          width: 36,
+          decoration: BoxDecoration(
+            color: isDark 
+                ? Colors.black.withOpacity(0.25) 
+                : Colors.white.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark 
+                  ? Colors.white.withOpacity(0.12)
+                  : Colors.white.withOpacity(0.7),
+              width: 1.0,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    if (_mainScrollCtrl.hasClients) {
+                      _mainScrollCtrl.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 600),
+                        curve: Curves.easeOutCubic,
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Icon(Icons.keyboard_arrow_up_rounded, color: theme.colorScheme.onSurface, size: 24),
+                  ),
+                ),
+                Container(
+                  height: 1,
+                  width: 24,
+                  color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.1),
+                ),
+                InkWell(
+                  onTap: () {
+                    if (_mainScrollCtrl.hasClients) {
+                      _mainScrollCtrl.animateTo(
+                        _mainScrollCtrl.position.maxScrollExtent,
+                        duration: const Duration(milliseconds: 600),
+                        curve: Curves.easeOutCubic,
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.onSurface, size: 24),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -847,6 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButton: _buildFloatingScrollButtons(theme),
       body: SafeArea(
         child: RefreshIndicator(
           color: const Color(0xFF34C759),
@@ -862,6 +940,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _loadFavoritePricesFromCache();
           },
           child: CustomScrollView(
+            controller: _mainScrollCtrl,
             slivers: [
               // Başlık
               SliverToBoxAdapter(
@@ -1393,7 +1472,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
               ],
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)), // Fiyat ve % oranının Scroll butonlarının altında kalmaması için artırıldı
             ],
           ),
         ),
