@@ -2014,27 +2014,68 @@ class _TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final surface = theme.colorScheme.surface;
-    final onSurfaceSecondary = theme.colorScheme.onSurface.withOpacity(0.65);
-    final shadowColor = theme.brightness == Brightness.light
-        ? Colors.black.withValues(alpha: 0.05)
-        : Colors.white.withOpacity(0.04);
+    final isDark = theme.brightness == Brightness.dark;
+    final onSurfaceSecondary = theme.colorScheme.onSurface.withValues(alpha: 0.58);
 
+    // ── Pasif buton ──────────────────────────────────────────────────────────
+    if (!isActive) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.black.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(50), // iOS capsule
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: onSurfaceSecondary,
+              fontWeight: FontWeight.normal,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Aktif buton — iOS Glassmorphism ───────────────────────────────────────
+    // Buzlu cam efekti: BackdropFilter + yarı-saydam katman + ince kenarlık
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? theme.colorScheme.primary : surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: shadowColor, blurRadius: 4)],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? theme.colorScheme.onPrimary : onSurfaceSecondary,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(50), // iOS capsule
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              // Dinamik renk uyumu: tema primary rengi + yarı-saydam tabaka
+              // → arkaplanın tonuna göre hafif karışır (iOS davranışı)
+              color: isDark
+                  ? theme.colorScheme.primary.withValues(alpha: 0.28)
+                  : theme.colorScheme.primary.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(
+                color: isDark
+                    ? theme.colorScheme.primary.withValues(alpha: 0.55)
+                    : theme.colorScheme.primary.withValues(alpha: 0.45),
+                width: 1.0,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                // Karanlık modda beyaz, açık modda primary'ye yakın koyu ton
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.92)
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
           ),
         ),
       ),

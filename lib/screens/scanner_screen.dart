@@ -752,52 +752,53 @@ class _ScannerScreenState extends State<ScannerScreen>
       _    => 'Farklı bir periyot veya filtre deneyebilirsiniz.',
     };
 
-    final header = Container(
-      color: theme.colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
-      child: Row(
-        children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-            ),
-            child: Icon(isMulti ? Icons.search_off : (primaryDef?.icon ?? Icons.search_off), color: accentColor, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isMulti ? '${matchedDefs.length} Filtre — Sonuç Bulunamadı' : (primaryDef?.label ?? 'Sonuç Bulunamadı'),
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface, fontSize: 16),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                  child: Text('$periodMsg Tarama', style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    final isFormation = _tabController.index == 2;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final extraBottom = screenHeight * 0.45;
 
     return Container(
       color: theme.colorScheme.surface,
       child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+        physics: const ClampingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(20, 0, 20, extraBottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header — scroll içinde, küçük ekranlarda kaydırılabilir
-            header,
+            // ── Header — scroll içinde, küçük ekranlarda kaydırılabilir ──────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 20, 0, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52, height: 52,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                    ),
+                    child: Icon(isMulti ? Icons.search_off : (primaryDef?.icon ?? Icons.search_off), color: accentColor, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isMulti ? '${matchedDefs.length} Filtre — Sonuç Bulunamadı' : (primaryDef?.label ?? 'Sonuç Bulunamadı'),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface, fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                          child: Text('$periodMsg Tarama', style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Divider(height: 1, color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
             const SizedBox(height: 16),
 
@@ -853,7 +854,8 @@ class _ScannerScreenState extends State<ScannerScreen>
                 Row(children: [
                   const Text('🔍', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 6),
-                  Text('Şu an bu formasyon oluşmamış',
+                  Text(
+                    isFormation ? 'Şu an bu formasyon oluşmamış' : 'Şu an bu sinyal oluşmamış',
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
                 ]),
@@ -861,7 +863,7 @@ class _ScannerScreenState extends State<ScannerScreen>
                 Text(
                   isMulti
                       ? 'Seçtiğiniz ${matchedDefs.length} filtre koşulunu aynı anda sağlayan hisse bulunamadı. Daha az filtre seçin veya farklı bir periyot deneyin.'
-                      : '${primaryDef?.cleanLabel ?? "Bu sinyal"} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
+                      : '${primaryDef?.cleanLabel ?? (isFormation ? "Bu formasyon" : "Bu sinyal")} şu an için BIST\'te oluşmamış. Bu tür sinyaller piyasa koşullarına bağlı olarak belirli zamanlarda ortaya çıkar; her gün görülmesi beklenmez.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.75), height: 1.55, fontSize: 13),
                 ),
@@ -883,12 +885,12 @@ class _ScannerScreenState extends State<ScannerScreen>
                 minimumSize: const Size(double.infinity, 52),
               ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildFilterList() {
     final filters = _currentFilters;
