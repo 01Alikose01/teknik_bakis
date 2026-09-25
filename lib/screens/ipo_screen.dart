@@ -252,7 +252,7 @@ class _IpoScreenState extends State<IpoScreen>
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
-              _error!,
+              _friendlyError(_error!),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: const Color(0xFFD92D20),
                 fontWeight: FontWeight.w600,
@@ -630,6 +630,22 @@ class _IpoScreenState extends State<IpoScreen>
       case IpoStatus.trading:
         return const Color(0xFF34C759);
     }
+  }
+
+  /// Ham hata mesajını kullanıcıya gösterilecek kısa bir metne dönüştürür.
+  /// URL veya teknik detayların ekrana yansımasını engeller.
+  String _friendlyError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('socketexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network') ||
+        lower.contains('errno') ||
+        lower.contains('no address associated') ||
+        lower.contains('connection') ||
+        lower.contains('timeout')) {
+      return 'İnternet bağlantısı yok. Veriler önbellekten gösteriliyor.';
+    }
+    return 'Veri güncellenemedi. Lütfen daha sonra tekrar deneyin.';
   }
 
   String _formatDate(DateTime value) {
