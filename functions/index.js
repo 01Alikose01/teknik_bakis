@@ -820,30 +820,44 @@ function isRateLimited(ip) {
   return false;
 }
 
-/** NVIDIA NIM OpenAI-uyumlu API'ye istek atar. */
-async function callNvidiaAI(apiKey, prompt) {
+// ── YAPAY ZEKA MODELLERİ (NVIDIA NIM) ─────────────────────────────────────────
+// 1. Ana AI:    NVIDIA Nemotron 3 Super 120B (nvidia/nemotron-3-super-120b-a12b)
+// 2. Yedek AI:  OpenAI GPT-OSS 20B (openai/gpt-oss-20b)
+const MODEL_PRIMARY  = 'nvidia/nemotron-3-super-120b-a12b';
+const MODEL_FALLBACK = 'openai/gpt-oss-20b';
+
+/** NVIDIA NIM OpenAI-uyumlu API'ye tekil model isteği atar. */
+async function callNvidiaModel(apiKey, modelId, prompt, timeoutMs = 15000) {
   const body = JSON.stringify({
-    model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+    model: modelId,
     messages: [
       {
         role: 'system',
         content:
-          'Sen deneyimli bir Türk borsa analistinin sesini taklit eden teknik analiz asistanısın.\n' +
-          'KURALLAR:\n' +
-          '1. SADECE Türkçe yaz. İngilizce kelime, başlık veya cümle YASAKTIR.\n' +
-          '2. Düşünme sürecini, taslak adımları, kural listelerini, madde işaretlerini ASLA yazma.\n' +
-          '3. Doğrudan analize başla. "İşte analiz:", "Merhaba" gibi girişler yok.\n' +
-          '4. Maksimum 4-6 kısa, akıcı cümle. Düz paragraf yaz.\n' +
-          '5. Gerçek bir analist gibi konuş — doğal, sade, abartısız.\n' +
-          '6. Teknik terimler Türkçe olacak: EMA yerine "hareketli ortalama", RSI aşırı alım/satım bölgesi vb.\n' +
-          '7. Son cümle mutlaka: "Bu bir yatırım tavsiyesi değildir."\n' +
-          '8. Başka hiçbir şey yazma — sadece analiz paragrafı.',
+          'Sen deneyimli bir Turk borsa teknik analiz asistanisin.\n' +
+          'SADECE Turkce yaz.\n' +
+          'Ingilizce kelime, baslik veya aciklama kullanma.\n' +
+          'Dusunme surecini, reasoning, thinking process veya taslak adimlarini gosterme.\n' +
+          'Dogrudan analize basla.\n' +
+          'Gonderilen teknik verilerden yararlan.\n' +
+          'Her hisse icin ayni kalip analiz yazma.\n' +
+          'Analizin icerigi mutlaka gonderilen hissenin gercek teknik verilerine dayanmali.\n' +
+          'Mumkun oldugunda gercek sayisal degerleri kullan.\n' +
+          'RSI 32 ise bunu analizde degerlendir; RSI 58 ise 32 gibi davranma.\n' +
+          'Destek, direnc, fiyat degisimi, hacim, MACD, Supertrend ve formasyonlari yalnizca gonderilen verilere gore yorumla.\n' +
+          'Bir veri gonderilmemisse o veri hakkinda tahmin yapma.\n' +
+          'Olmayan bir sinyali varmis gibi gosterme.\n' +
+          'Ayni cumleleri farkli hisselerde tekrar etme.\n' +
+          '4-6 kisa ve dogal Turkce cumle yaz.\n' +
+          'Tek paragraf halinde yaz.\n' +
+          'Yatirim tavsiyesi verme.\n' +
+          'Son cumle: Bu bir yatirim tavsiyesi degildir.',
       },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.7,
-    top_p: 0.9,
-    max_tokens: 400,
+    temperature: 0.6,
+    top_p: 0.95,
+    max_tokens: 1024,
     stream: false,
   });
 
@@ -857,7 +871,7 @@ async function callNvidiaAI(apiKey, prompt) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
-      timeout: 25000,
+      timeout: timeoutMs,
     };
 
     const req = https.request(options, (res) => {
@@ -874,14 +888,51 @@ async function callNvidiaAI(apiKey, prompt) {
     });
 
     req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('NVIDIA API timeout')); });
+    req.on('timeout', () => { req.destroy(); reject(new Error(`NVIDIA API timeout (${modelId})`)); });
     req.write(body);
     req.end();
   });
 
-  const content = result?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('NVIDIA yanıtı boş');
-  return content.trim();
+  let content = result?.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`NVIDIA yanıtı boş (${modelId})`);
+  content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  if (!content) throw new Error(`NVIDIA yanıtı ayıklandıktan sonra boş kaldı (${modelId})`);
+  return content;
+}
+
+/**
+ * İki kademeli yapay zeka analizi:
+ * 1. Ana AI (NVIDIA Nemotron 3 Super 120B) denenir.
+ * 2. Başarısız olursa / zaman aşımına uğrarsa 2. AI (OpenAI GPT-OSS 20B) devreye girer.
+ * 3. Her iki model de başarısız olursa hata fırlatılır (Cloud Function 503 döner, Flutter lokal analize geçer).
+ */
+async function getDualAiAnalysis(apiKey, prompt) {
+  // 1. Kademe: Ana AI (Nemotron 3 Super 120B)
+  try {
+    console.log(`[AI] 1. Kademe (Ana AI) deneniyor: ${MODEL_PRIMARY}`);
+    const analysis = await callNvidiaModel(apiKey, MODEL_PRIMARY, prompt, 14000);
+    if (analysis && analysis.length >= 40) {
+      console.log(`[AI] Ana AI başarılı oldu (${MODEL_PRIMARY})`);
+      return { analysis, usedModel: MODEL_PRIMARY };
+    }
+    throw new Error('Ana AI yanıtı yetersiz veya boş');
+  } catch (errPrimary) {
+    console.warn(`[AI] Ana AI (${MODEL_PRIMARY}) başarısız oldu: ${errPrimary.message}. 2. Kademe (OpenAI GPT-OSS 20B) deneniyor...`);
+  }
+
+  // 2. Kademe: İkinci AI (OpenAI GPT-OSS 20B)
+  try {
+    console.log(`[AI] 2. Kademe (Yedek AI) deneniyor: ${MODEL_FALLBACK}`);
+    const analysis = await callNvidiaModel(apiKey, MODEL_FALLBACK, prompt, 18000);
+    if (analysis && analysis.length >= 40) {
+      console.log(`[AI] İkinci AI başarılı oldu (${MODEL_FALLBACK})`);
+      return { analysis, usedModel: MODEL_FALLBACK };
+    }
+    throw new Error('İkinci AI yanıtı yetersiz veya boş');
+  } catch (errSecondary) {
+    console.error(`[AI] İkinci AI (${MODEL_FALLBACK}) de başarısız oldu: ${errSecondary.message}`);
+    throw new Error(`Her iki AI modeli de başarısız oldu: ${errSecondary.message}`);
+  }
 }
 
 /** Hisse verilerinden AI prompt'u oluşturur. */
@@ -900,57 +951,60 @@ function buildAnalysisPrompt(data) {
     periodLabel, fk, pdDd,
   } = data;
 
-  const sinyaller = [];
-  if (isGoldenCross)      sinyaller.push('Altın Kesişim (kısa ortalama uzun ortalamanın üstüne çıktı)');
-  if (isDeathCross)       sinyaller.push('Ölüm Kesişimi (kısa ortalama uzun ortalamanın altına düştü)');
-  if (isMacdBullish)      sinyaller.push('MACD histogramı yükseliş yönüne döndü');
-  if (isMacdBearish)      sinyaller.push('MACD histogramı düşüş yönüne döndü');
-  if (isSupertrendBuy)    sinyaller.push('Süper Trend göstergesi alım sinyali verdi');
-  if (isSupertrendSell)   sinyaller.push('Süper Trend göstergesi satım sinyali verdi');
-  if (isBullishDivergence) sinyaller.push('Pozitif uyuşmazlık: fiyat düşerken momentum güçleniyor');
-  if (isBearishDivergence) sinyaller.push('Negatif uyuşmazlık: fiyat yükselirken momentum zayıflıyor');
-  if (isHammer)           sinyaller.push('Çekiç mumu oluştu — potansiyel dönüş sinyali');
-  if (isBullishEngulfing) sinyaller.push('Yutan boğa mumu oluştu');
-  if (isMorningStar)      sinyaller.push('Sabah yıldızı formasyonu oluştu');
-  if (isBearishEngulfing) sinyaller.push('Yutan ayı mumu oluştu');
-  if (isDoji)             sinyaller.push('Doji mumu var — kararsızlık sinyali');
+  // Boolean'ları Türkçe okunabilir formata çevir (AI modelin daha iyi anlaması için)
+  const e = (v) => v === true ? 'Evet' : 'Hayır';
 
   const ortalamaMetni =
-    emaAboveCount === 3 ? 'üç hareketli ortalamanın (20, 50, 200) hepsinin üzerinde' :
-    emaAboveCount === 2 ? '20 ve 50 günlük ortalamaların üzerinde, 200 günlük ortalama hâlâ baskı yapıyor' :
-    emaAboveCount === 1 ? 'yalnızca 20 günlük ortalamanın üzerinde' :
-    'üç hareketli ortalamanın hepsinin altında';
+    emaAboveCount === 3 ? 'Fiyat 20, 50 ve 200 günlük hareketli ortalamaların hepsinin üzerinde' :
+    emaAboveCount === 2 ? 'Fiyat 20 ve 50 günlük ortalamaların üzerinde; 200 günlük ortalama henüz aşılmadı' :
+    emaAboveCount === 1 ? 'Fiyat yalnızca 20 günlük ortalamanın üzerinde; 50 ve 200 günlük ortalamalar baskı yapıyor' :
+    'Fiyat 20, 50 ve 200 günlük hareketli ortalamaların hepsinin altında';
 
-  const momentumMetni =
-    rsi >= 70 ? `momentum göstergesi ${rsi.toFixed(0)} ile aşırı alım bölgesinde` :
-    rsi >= 60 ? `momentum göstergesi ${rsi.toFixed(0)} ile güçlü bölgede` :
-    rsi >= 45 ? `momentum göstergesi ${rsi.toFixed(0)} ile dengeli bölgede` :
-    rsi >= 30 ? `momentum göstergesi ${rsi.toFixed(0)} ile zayıf bölgede` :
-    `momentum göstergesi ${rsi.toFixed(0)} ile aşırı satım bölgesinde`;
-
-  const destekDirenc = supportLevel && resistanceLevel
-    ? `Yakın destek ${supportLevel.toFixed(2)} ₺, yakın direnç ${resistanceLevel.toFixed(2)} ₺.`
-    : supportLevel
-    ? `Yakın destek seviyesi ${supportLevel.toFixed(2)} ₺.`
-    : resistanceLevel
-    ? `Yakın direnç seviyesi ${resistanceLevel.toFixed(2)} ₺.`
-    : '';
-
-  const temelMetni = (fk > 0 || pdDd > 0)
-    ? `Fiyat/Kazanç oranı ${fk > 0 ? fk.toFixed(1) : '-'}, Piyasa Değeri/Defter Değeri ${pdDd > 0 ? pdDd.toFixed(2) : '-'}.`
-    : '';
+  const rsiStr = (typeof rsi === 'number' && !isNaN(rsi)) ? rsi.toFixed(1) : '?';
+  const priceStr = (typeof price === 'number') ? price.toFixed(2) : '?';
+  const changeStr = (changePercent >= 0 ? '+' : '') + (changePercent || 0).toFixed(2);
+  const periodChangeStr = (periodChange >= 0 ? '+' : '') + (periodChange || 0).toFixed(1);
 
   return (
-    `${name} (${symbol}) hissesinin ${periodLabel} teknik görünümünü değerlendir.\n\n` +
-    `Güncel fiyat ${price.toFixed(2)} ₺, dönemsel değişim ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%.\n` +
-    `Fiyat ${ortalamaMetni}.\n` +
-    `${momentumMetni.charAt(0).toUpperCase() + momentumMetni.slice(1)}.\n` +
-    (destekDirenc ? `${destekDirenc}\n` : '') +
-    `İşlem hacmi ${volumeIncreasing ? 'artıyor' : 'azalıyor'}.\n` +
-    `Görüntülenen dönemde toplam değişim ${periodChange >= 0 ? '+' : ''}${periodChange.toFixed(1)}%.\n` +
-    (sinyaller.length > 0 ? `Öne çıkan sinyaller: ${sinyaller.join('; ')}.\n` : '') +
-    (temelMetni ? `${temelMetni}\n` : '') +
-    `\nSadece düz paragraf hâlinde, Türkçe, doğal ve kısa bir teknik görünüm yaz.`
+    `HİSSE:\n` +
+    `Sembol: ${symbol}\n` +
+    `Şirket: ${name}\n\n` +
+    `FİYAT:\n` +
+    `Güncel fiyat: ${priceStr} TL\n` +
+    `Günlük değişim: ${changeStr}%\n\n` +
+    `TEKNİK VERİLER:\n` +
+    `RSI (momentum göstergesi): ${rsiStr}\n` +
+    `Hareketli ortalama durumu: ${ortalamaMetni}\n` +
+    (supportLevel  ? `Yakın destek: ${supportLevel.toFixed(2)} TL\n`  : '') +
+    (resistanceLevel ? `Yakın direnç: ${resistanceLevel.toFixed(2)} TL\n` : '') +
+    `Hacim artıyor mu: ${e(volumeIncreasing)}\n` +
+    `Dönem değişimi (${periodLabel || 'G'}): ${periodChangeStr}%\n\n` +
+    `SİNYALLER:\n` +
+    `Pozitif uyumsuzluk (Bullish Divergence): ${e(isBullishDivergence)}\n` +
+    `Negatif uyumsuzluk (Bearish Divergence): ${e(isBearishDivergence)}\n` +
+    `Golden Cross (Altın Kesişim): ${e(isGoldenCross)}\n` +
+    `Death Cross (Ölüm Kesişimi): ${e(isDeathCross)}\n` +
+    `MACD yükseliş sinyali: ${e(isMacdBullish)}\n` +
+    `MACD düşüş sinyali: ${e(isMacdBearish)}\n` +
+    `Supertrend AL sinyali: ${e(isSupertrendBuy)}\n` +
+    `Supertrend SAT sinyali: ${e(isSupertrendSell)}\n\n` +
+    `MUM FORMASYONLARI:\n` +
+    `Çekiç (Hammer): ${e(isHammer)}\n` +
+    `Yutan Boğa (Bullish Engulfing): ${e(isBullishEngulfing)}\n` +
+    `Sabah Yıldızı (Morning Star): ${e(isMorningStar)}\n` +
+    `Yutan Ayı (Bearish Engulfing): ${e(isBearishEngulfing)}\n` +
+    `Doji: ${e(isDoji)}\n\n` +
+    ((fk > 0 || pdDd > 0)
+      ? `DEĞERLEME (teknik analizden bağımsız değerlendir):\n` +
+        (fk   > 0 ? `F/K (Fiyat/Kazanç): ${fk.toFixed(1)}\n`   : '') +
+        (pdDd > 0 ? `PD/DD (Piyasa/Defter): ${pdDd.toFixed(2)}\n` : '') + '\n'
+      : '') +
+    `Yukarıdaki verileri analiz et.\n` +
+    `Analizde RSI ${rsiStr} ve fiyat ${priceStr} TL gerçek değerlerini kullan.\n` +
+    `Aynı kalıp cümleleri farklı hisseler için tekrar etme.\n` +
+    `Veri yoksa o konuda tahmin yapma.\n` +
+    `Sadece 4-6 kısa cümlelik tek paragraf Türkçe analiz döndür.\n` +
+    `Son cümle: Bu bir yatırım tavsiyesi değildir.`
   );
 }
 
@@ -976,11 +1030,33 @@ function getCacheTtl() {
   return (gun === 0 || gun === 6) ? CACHE_TTL_HAFTASONU_MS : CACHE_TTL_BORSAGUNU_MS;
 }
 
-function buildCacheKey(symbol, periodLabel) {
-  const bugun = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+function buildCacheKey(symbol, periodLabel, rsi, changePercent, data) {
+  const bugun = new Date().toISOString().slice(0, 10);
   const temiz = symbol.replace(/[^A-Z0-9]/gi, '').toUpperCase();
   const periyot = (periodLabel || 'G').replace(/\s/g, '_');
-  return `${temiz}_${periyot}_${bugun}`;
+
+  // RSI'yi 5'in katlarına yuvarla — her hisse benzersiz cache anahtarı alır
+  // Örnek: THYAO RSI=32→30, ASELS RSI=57→55, TUPRS RSI=71→70 → tamamı farklı
+  const rsiRound = Math.round((rsi || 50) / 5) * 5;
+
+  // Fiyat değişim yönü (geniş bant)
+  const yon = changePercent > 2 ? 'up2' : changePercent > 0.5 ? 'up1'
+            : changePercent < -2 ? 'dn2' : changePercent < -0.5 ? 'dn1' : 'flat';
+
+  // Aktif sinyal özeti — farklı sinyal kombinasyonları farklı cache anahtarı üretir
+  const sd = data || {};
+  const sinyalBits = [
+    sd.isGoldenCross       ? 'gc'  : '',
+    sd.isDeathCross        ? 'dc'  : '',
+    sd.isMacdBullish       ? 'mb'  : '',
+    sd.isMacdBearish       ? 'ms'  : '',
+    sd.isSupertrendBuy     ? 'sb'  : '',
+    sd.isSupertrendSell    ? 'ss'  : '',
+    sd.isBullishDivergence ? 'bd'  : '',
+    sd.isBearishDivergence ? 'bdn' : '',
+  ].filter(Boolean).join('') || 'none';
+
+  return `v5_${temiz}_${periyot}_${bugun}_rsi${rsiRound}_${yon}_${sinyalBits}`;
 }
 
 async function getCachedAnalysis(cacheKey) {
@@ -1017,7 +1093,7 @@ async function setCachedAnalysis(cacheKey, analysis, symbol, periodLabel) {
 exports.getTeknikAnaliz = onRequest({
   region: 'europe-west1',
   memory: '256MiB',
-  timeoutSeconds: 35,
+  timeoutSeconds: 50,
   secrets: [NVIDIA_API_KEY],
 }, async (req, res) => {
   // CORS
@@ -1045,7 +1121,7 @@ exports.getTeknikAnaliz = onRequest({
     return;
   }
 
-  const cacheKey = buildCacheKey(data.symbol, data.periodLabel);
+  const cacheKey = buildCacheKey(data.symbol, data.periodLabel, data.rsi || 50, data.changePercent || 0, data);
 
   // ── 1. Önbellek kontrolü ──────────────────────────────────────────────────
   const cachedAnalysis = await getCachedAnalysis(cacheKey);
@@ -1055,17 +1131,17 @@ exports.getTeknikAnaliz = onRequest({
     return;
   }
 
-  // ── 2. NVIDIA'ya yeni istek ───────────────────────────────────────────────
+  // ── 2. NVIDIA'ya yeni istek (İki Kademeli Dual AI) ───────────────────────
   try {
     const apiKey  = NVIDIA_API_KEY.value();
     const prompt  = buildAnalysisPrompt(data);
-    const analysis = await callNvidiaAI(apiKey, prompt);
+    const { analysis, usedModel } = await getDualAiAnalysis(apiKey, prompt);
 
     // Önbelleğe yaz (hata olursa sessizce geç)
     await setCachedAnalysis(cacheKey, analysis, data.symbol, data.periodLabel);
 
-    console.log(`NVIDIA'dan yeni yanıt alındı, önbelleğe yazıldı: ${cacheKey}`);
-    res.json({ success: true, analysis, fromCache: false });
+    console.log(`AI'dan yeni yanıt alındı (${usedModel}), önbelleğe yazıldı: ${cacheKey}`);
+    res.json({ success: true, analysis, usedModel, fromCache: false });
   } catch (err) {
     console.error('getTeknikAnaliz hatası:', err.message);
     // 503 → Flutter lokal analize geçer

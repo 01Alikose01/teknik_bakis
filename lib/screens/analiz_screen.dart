@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
@@ -623,8 +623,7 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                             onTap: () => setState(() => _selectedInfoTab = 0),
                           ),
                           const SizedBox(width: 8),
-                          _InfoTabButton(
-                            label: 'Teknik Analiz',
+                          _TeknikAnalizButton(
                             selected: _selectedInfoTab == 1,
                             onTap: () => setState(() => _selectedInfoTab = 1),
                           ),
@@ -680,6 +679,7 @@ class _AnalizScreenState extends State<AnalizScreen> with SingleTickerProviderSt
                       ] else ...[
                         if (a != null)
                           _TeknikAnalizPanel(
+                            key: ValueKey('$_selectedSymbol${_periods[_selectedPeriod]}'),
                             asset: a,
                             periodLabel: _periods[_selectedPeriod],
                           )
@@ -718,33 +718,274 @@ class _InfoTabButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final surface = theme.colorScheme.surface;
     final onSurface = theme.colorScheme.onSurface;
-    final color = selected ? const Color(0xFF34C759) : onSurface.withOpacity(0.72);
 
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          height: 48,
+          margin: const EdgeInsets.all(2.0),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF34C759).withOpacity(0.12) : surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: selected ? const Color(0xFF34C759) : theme.dividerColor),
+            color: selected
+                ? (isDark ? const Color(0xFF20232B) : Colors.white)
+                : (isDark ? surface.withOpacity(0.5) : const Color(0xFFF1F3F6)),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: selected
+                  ? (isDark ? const Color(0xFF3F4452) : const Color(0xFFCBD5E1))
+                  : (isDark ? theme.dividerColor.withOpacity(0.3) : const Color(0xFFE2E8F0)),
+              width: 1.2,
+            ),
+            boxShadow: selected && !isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
+                color: selected
+                    ? (isDark ? Colors.white : const Color(0xFF1E293B))
+                    : onSurface.withOpacity(0.65),
+                fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 14,
+                letterSpacing: 0.2,
               ),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _TeknikAnalizButton extends StatefulWidget {
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TeknikAnalizButton({
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  State<_TeknikAnalizButton> createState() => _TeknikAnalizButtonState();
+}
+
+class _TeknikAnalizButtonState extends State<_TeknikAnalizButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: _TeknikAnalizNeonGlowPainter(
+                progress: _controller.value,
+                isDark: isDark,
+                isSelected: widget.selected,
+              ),
+              child: child,
+            );
+          },
+          child: Container(
+            height: 48,
+            margin: const EdgeInsets.all(2.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDark
+                    ? [
+                        const Color(0xFF1B1D24),
+                        const Color(0xFF111216),
+                      ]
+                    : [
+                        Colors.white,
+                        const Color(0xFFF5F7FA),
+                      ],
+              ),
+              boxShadow: !isDark
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: Center(
+              child: Text(
+                'Teknik Analiz',
+                style: TextStyle(
+                  color: isDark
+                      ? Colors.white
+                      : const Color(0xFF283344),
+                  fontWeight: widget.selected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 14,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeknikAnalizNeonGlowPainter extends CustomPainter {
+  final double progress;
+  final bool isDark;
+  final bool isSelected;
+
+  _TeknikAnalizNeonGlowPainter({
+    required this.progress,
+    required this.isDark,
+    required this.isSelected,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(1.5),
+      Radius.circular((size.height - 3.0) / 2),
+    );
+
+    final angle = progress * 2 * math.pi;
+
+    final coreColors = [
+      const Color(0xFF00E5FF), // Cyan
+      const Color(0xFF0080FF), // Electric Blue
+      const Color(0xFF00E5FF), // Cyan
+      const Color(0xFFFFEB3B), // Yellow transition
+      const Color(0xFFFF9100), // Neon Orange
+      const Color(0xFFFF3D00), // Red Orange
+      const Color(0xFFFF9100), // Neon Orange
+      const Color(0xFFFFD54F), // Gold
+      const Color(0xFF00E5FF), // Back to Cyan
+    ];
+
+    final stops = [
+      0.0,
+      0.15,
+      0.35,
+      0.50,
+      0.65,
+      0.80,
+      0.90,
+      0.96,
+      1.0,
+    ];
+
+    final double intensity = isSelected ? 1.0 : 0.72;
+
+    final bloomColors = coreColors
+        .map((c) => c.withOpacity((isDark ? 0.75 : 0.50) * intensity))
+        .toList();
+
+    final midColors = coreColors
+        .map((c) => c.withOpacity((isDark ? 0.90 : 0.70) * intensity))
+        .toList();
+
+    final rimColors = coreColors
+        .map((c) => c.withOpacity(intensity))
+        .toList();
+
+    final bloomGradient = SweepGradient(
+      center: Alignment.center,
+      colors: bloomColors,
+      stops: stops,
+      transform: GradientRotation(angle),
+    );
+
+    final midGradient = SweepGradient(
+      center: Alignment.center,
+      colors: midColors,
+      stops: stops,
+      transform: GradientRotation(angle),
+    );
+
+    final rimGradient = SweepGradient(
+      center: Alignment.center,
+      colors: rimColors,
+      stops: stops,
+      transform: GradientRotation(angle),
+    );
+
+    // 1. Soft Outer Bloom Aura
+    final bloomPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = isDark ? 8.0 : 6.0
+      ..shader = bloomGradient.createShader(rect)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, isDark ? 9.0 : 6.5);
+
+    // 2. Mid Glow Layer
+    final midPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = isDark ? 4.0 : 3.0
+      ..shader = midGradient.createShader(rect)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3.5);
+
+    // 3. Crisp Rim Stroke
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..shader = rimGradient.createShader(rect);
+
+    canvas.drawRRect(rrect, bloomPaint);
+    canvas.drawRRect(rrect, midPaint);
+    canvas.drawRRect(rrect, rimPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TeknikAnalizNeonGlowPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.isSelected != isSelected;
   }
 }
 
@@ -811,7 +1052,7 @@ class _SummaryTile extends StatelessWidget {
 class _TeknikAnalizPanel extends StatefulWidget {
   final AssetModel asset;
   final String periodLabel;
-  const _TeknikAnalizPanel({required this.asset, this.periodLabel = 'Günlük'});
+  const _TeknikAnalizPanel({super.key, required this.asset, this.periodLabel = 'Günlük'});
 
   @override
   State<_TeknikAnalizPanel> createState() => _TeknikAnalizPanelState();
@@ -865,6 +1106,9 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
         if (result != null && result.isNotEmpty) {
           _aiText = result;
           _aiUsed = true;
+        } else {
+          _aiText = null;
+          _aiUsed = false;
         }
       });
     }
@@ -949,12 +1193,25 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
 
   // ── Hacim yorumu ────────────────────────────────────────────────────────────
   bool get _volumeIncreasing {
-    if (asset.volumes.length < 5) return false;
-    final recent = asset.volumes.sublist(asset.volumes.length - 3);
-    final prev = asset.volumes.sublist(asset.volumes.length - 6, asset.volumes.length - 3);
-    final avgRecent = recent.reduce((a, b) => a + b) / 3;
-    final avgPrev = prev.reduce((a, b) => a + b) / 3;
-    return avgRecent > avgPrev;
+    final volumes = asset.volumes;
+    if (volumes.length < 6) return false;
+
+    final recentStart = volumes.length > 3 ? volumes.length - 3 : 0;
+    final previousEnd = recentStart;
+    final previousStart =
+        previousEnd > 3 ? previousEnd - 3 : 0;
+
+    if (previousEnd <= previousStart) return false;
+
+    final recent = volumes.sublist(recentStart);
+    final previous = volumes.sublist(previousStart, previousEnd);
+
+    final avgRecent =
+        recent.reduce((a, b) => a + b) / recent.length;
+    final avgPrevious =
+        previous.reduce((a, b) => a + b) / previous.length;
+
+    return avgRecent > avgPrevious;
   }
 
   // ── Dönem değişimi ──────────────────────────────────────────────────────────
@@ -975,226 +1232,431 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
   }
 
   // ── Genel görünüm metni üretici — zengin varyantlar ────────────────────────
+  // ── LOCAL TEKNİK ANALİZ MOTORU ─────────────────────────────────────────────
+  //
+  // Cloud AI cevap veremezse kullanılan yerel motor.
+  // Önce teknik ilişkileri hesaplar, sonra bu ilişkileri doğal Türkçe
+  // cümlelere dönüştürür. Rastgele cümle seçimi yoktur; aynı veri aynı
+  // sonucu üretir ve çelişkili yorumların önüne geçilir.
   String _buildGenel() {
+    final price = asset.price;
     final rsi = _rsiValue;
-    final ema = _emaAboveCount;
-    final rnd = math.Random(asset.symbol.hashCode ^ DateTime.now().day);
+    final change = _periodChange;
 
-    /// Verilen listeden rastgele bir eleman seçer (seed: sembol + gün)
-    String pick(List<String> options) => options[rnd.nextInt(options.length)];
+    final ema20List = asset.ema(20);
+    final ema50List = asset.ema(50);
+    final ema200List = asset.ema(200);
+
+    final ema20 = ema20List.isNotEmpty ? ema20List.last : null;
+    final ema50 = ema50List.isNotEmpty ? ema50List.last : null;
+    final ema200 = ema200List.isNotEmpty ? ema200List.last : null;
+
+    final support = _supportLevels();
+    final resistance = _resistanceLevels();
 
     final parts = <String>[];
 
-    // ── 1. Hareketli ortalama & fiyat konumu ────────────────────────────────
-    if (ema == 3) {
-      parts.add(pick([
-        '${asset.name} tüm önemli hareketli ortalamaların (20/50/200 günlük) üzerinde; büyük resim güçlü görünüyor.',
-        '${asset.name} hem kısa hem orta hem de uzun vadeli ortalamaların üzerinde seyrediyor.',
-        '20, 50 ve 200 günlük ortalamaların hepsinin üstünde olan ${asset.name} trend açısından sağlam bir konumda.',
-        '${asset.name} üç önemli ortalamanın üzerinde; hareketin devam edip etmeyeceğini hacim belirleyecek.',
-        '${asset.name} tüm hareketli ortalamaları geçmiş durumda — teknik tablo net şekilde olumlu.',
-      ]));
-    } else if (ema == 2) {
-      parts.add(pick([
-        '${asset.name} kısa ve orta vadeli ortalamaların üzerinde; uzun vade henüz direniyor.',
-        '${asset.name} 20 ve 50 günlük ortalamaların üzerinde seyrediyor, 200 günlük ortalama bir sonraki engel.',
-        'Kısa ve orta vadeli tablo olumlu, ${asset.name} 200 günlük ortalamasını test etme aşamasında.',
-        '${asset.name} iki ortalamanın üzerinde; uzun vadeli trendin üstüne çıkabilirse tablo daha da açılır.',
-        '${asset.name} 20 ve 50 günlük ortalamaların üstünde durdu — şimdi sıra uzun vadeyi kırmakta.',
-      ]));
-    } else if (ema == 1) {
-      parts.add(pick([
-        '${asset.name} yalnızca kısa vadeli (20 günlük) ortalamanın üzerinde; orta ve uzun vadeli baskı sürüyor.',
-        '${asset.name} 20 günlük ortalamanın üstünde tutunuyor ama 50 ve 200 günlük ortalamalar hâlâ baskı kuruyor.',
-        'Sadece 20 günlük ortalama geçilmiş — ${asset.name} için asıl sınav 50 ve 200 günlük seviyeler.',
-        '${asset.name} kısa vadede tutunmaya çalışıyor, ama orta ve uzun vade henüz dirençte.',
-        'Kısa vadeli ortalama geçildi; ${asset.name} için bir adım atıldı, iki adım daha var.',
-      ]));
+    // ── 1. Trend: fiyatın EMA'lara göre gerçek konumu ───────────────────────
+    if (ema20 != null && ema50 != null && ema200 != null) {
+      if (price > ema20 && price > ema50 && price > ema200) {
+        parts.add(
+          '${asset.name} fiyatı 20, 50 ve 200 günlük üssel hareketli '
+          'ortalamaların üzerinde. Kısa, orta ve uzun vadeli trend yapısı '
+          'aynı yönde güçlü.',
+        );
+      } else if (price < ema20 && price < ema50 && price < ema200) {
+        parts.add(
+          '${asset.name} fiyatı 20, 50 ve 200 günlük üssel hareketli '
+          'ortalamaların altında. Ana trend baskı altında ve fiyat henüz '
+          'önemli ortalamaların üzerine çıkabilmiş değil.',
+        );
+      } else if (price > ema20 && price > ema50 && price <= ema200) {
+        parts.add(
+          '${asset.name} kısa ve orta vadeli ortalamalarının üzerinde, '
+          'ancak 200 günlük ortalamanın altında. Kısa vadeli toparlanma '
+          'var; uzun vadeli trend için henüz tam teyit yok.',
+        );
+      } else if (price > ema20 && price <= ema50 && price <= ema200) {
+        parts.add(
+          '${asset.name} 20 günlük ortalamanın üzerinde tutunuyor ancak '
+          '50 ve 200 günlük ortalamaların altında. Kısa vadeli toparlanma '
+          'denemesi var fakat ana trend henüz değişmiş değil.',
+        );
+      } else if (price <= ema20 && price > ema50 && price > ema200) {
+        parts.add(
+          '${asset.name} 50 ve 200 günlük ortalamaların üzerinde kalırken '
+          '20 günlük ortalamanın altında. Uzun vadeli yapı korunuyor ancak '
+          'kısa vadede bir miktar zayıflama var.',
+        );
+      } else {
+        parts.add(
+          '${asset.name} hareketli ortalamalara göre karma bir görünüm '
+          'sergiliyor. Kısa, orta ve uzun vadeli trendler aynı yönde değil.',
+        );
+      }
     } else {
-      parts.add(pick([
-        '${asset.name} tüm önemli hareketli ortalamaların altında; genel tablo baskılı görünüyor.',
-        '${asset.name} 20, 50 ve 200 günlük ortalamaların hepsinin altında — teknik baskı devam ediyor.',
-        'Tüm hareketli ortalamalar üstte; ${asset.name} için önce 20 günlük ortalama kırılabilirse daha cesaret verici.',
-        '${asset.name} ortalamaların altında seyrediyor. Kısa vadeli toparlanma için 20 günlük ortalama takip edilmeli.',
-        'Üç kritik ortalamanın altında olan ${asset.name} şu an teknik açıdan zayıf konumda.',
-      ]));
+      final count = _emaAboveCount;
+      if (count >= 2) {
+        parts.add(
+          '${asset.name} hesaplanabilen hareketli ortalamaların çoğunun '
+          'üzerinde seyrediyor; trend görünümü destekleniyor.',
+        );
+      } else if (count == 0) {
+        parts.add(
+          '${asset.name} hesaplanabilen hareketli ortalamaların altında '
+          'seyrediyor; trend görünümü zayıf.',
+        );
+      } else {
+        parts.add(
+          '${asset.name} hareketli ortalamalara göre karma bir görünüm '
+          'sergiliyor.',
+        );
+      }
     }
 
-    // ── 2. Özel sinyaller (Altın/Ölüm Kesişimi, Momentum, Süper Trend, Uyuşmazlık) ─
-    if (asset.isGoldenCross) {
-      parts.add(pick([
-        '20 günlük ortalama 50 günlüğü yukarı kesti — yükseliş kesişimi oluştu. Güçlü bir dönüş sinyali.',
-        'Altın kesişim oluştu; kısa vadeli ortalama uzun vadeyi geçti. Tarihsel olarak güçlü bir sinyal.',
-        '20 × 50 günlük ortalama yukarı kesişimi görünüyor — fiyat hareketi değişiyor.',
-      ]));
-    } else if (asset.isDeathCross) {
-      parts.add(pick([
-        '20 günlük ortalama 50 günlüğü aşağı kesti — ölüm kesişimi oluştu. Temkinli olmak mantıklı.',
-        'Ölüm kesişimi oluşmuş; kısa vadeli ortalama uzun vadeyi aşağı geçti. Dikkat.',
-        '20 × 50 günlük ortalama aşağı kesişimi mevcut — baskı bir süre daha devam edebilir.',
-      ]));
+    // ── 2. EMA20 / EMA50 ilişkisi ──────────────────────────────────────────
+    if (ema20 != null && ema50 != null && ema50 != 0) {
+      final gap = ((ema20 - ema50) / ema50) * 100;
+
+      if (asset.isGoldenCross) {
+        parts.add(
+          '20 günlük EMA ile 50 günlük EMA arasında yukarı yönlü kesişim '
+          'sinyali bulunuyor. Bu, kısa ve orta vadeli momentum açısından '
+          'olumlu bir gelişme.',
+        );
+      } else if (asset.isDeathCross) {
+        parts.add(
+          '20 günlük EMA ile 50 günlük EMA arasında aşağı yönlü kesişim '
+          'sinyali bulunuyor. Bu, kısa ve orta vadeli momentum üzerindeki '
+          'baskının arttığını gösteriyor.',
+        );
+      } else if (gap > 1) {
+        parts.add(
+          '20 günlük EMA, 50 günlük EMA\'nın %${gap.toStringAsFixed(1)} '
+          'üzerinde. Kısa vadeli momentum orta vadeye göre daha güçlü.',
+        );
+      } else if (gap < -1) {
+        parts.add(
+          '20 günlük EMA, 50 günlük EMA\'nın %${gap.abs().toStringAsFixed(1)} '
+          'altında. Kısa vadeli momentum orta vadeye göre daha zayıf.',
+        );
+      }
     }
 
-    if (asset.isMacdBullish) {
-      parts.add(pick([
-        'Momentum göstergesi histogramı negatiften pozitife döndü — güç alıcılar lehine değişiyor.',
-        'Momentum göstergesi alım sinyali verdi; histogram sıfırı geçti. Dönüş takip edilmeli.',
-        'Momentum histogramı yukarı döndü, bu erken ama dikkat çekici bir güç değişimi sinyali.',
-      ]));
-    } else if (asset.isMacdBearish) {
-      parts.add(pick([
-        'Momentum göstergesi histogramı pozitiften negatife döndü — güç baskı altına girdi.',
-        'Momentum göstergesi satış yönünde sinyal veriyor; histogram sıfırın altına indi.',
-        'Momentum negatife döndü — alıcı gücü azalıyor, dikkatli olunmalı.',
-      ]));
-    }
-
-    if (asset.isSupertrendBuy) {
-      parts.add(pick([
-        'Süper Trend göstergesi yönünü değiştirerek alım sinyali verdi.',
-        'Süper Trend göstergesi yeni bir alım sinyali oluşturdu.',
-        'Süper Trend olumluya döndü — trendin devam edip etmeyeceğini hacim onaylamalı.',
-      ]));
-    } else if (asset.isSupertrendSell) {
-      parts.add(pick([
-        'Süper Trend göstergesi satım sinyali verdi; trend aşağı döndü.',
-        'Süper Trend olumsuz yöne döndü — aşağı yönlü baskı başlamış olabilir.',
-      ]));
-    }
-
-    if (asset.isBullishDivergence) {
-      parts.add(pick([
-        'Fiyat düşerken momentum göstergesi yükseldi — olumlu uyuşmazlık var. Dönüş potansiyeli güçlü.',
-        'Olumlu uyuşmazlık var; fiyat dip yaparken güç toparlanıyor.',
-        'Fiyat ve momentum ters yönde hareket ediyor — gücün fiyattan önce döndüğü bir yapı bu.',
-      ]));
-    } else if (asset.isBearishDivergence) {
-      parts.add(pick([
-        'Fiyat yükselirken momentum göstergesi daha düşük tepe yaptı — olumsuz uyuşmazlık. Dikkatli olunmalı.',
-        'Olumsuz uyuşmazlık var; fiyat zirve yaparken güç zayıflıyor.',
-        'Fiyat ve momentum ters yönde hareket ediyor — yükseliş gücünün azaldığına işaret ediyor.',
-      ]));
-    }
-
-    // ── 3. Mum formasyonları ────────────────────────────────────────────────
-    if (asset.isHammer) {
-      parts.add(pick([
-        'Son mumda Çekiç formasyonu oluştu — satış baskısı emilmiş olabilir.',
-        'Çekiç mumu görünüyor; uzun alt gölge alıcıların devreye girdiğine işaret ediyor.',
-      ]));
-    } else if (asset.isBullishEngulfing) {
-      parts.add(pick([
-        'Yutan boğa mumu oluştu — yükseliş mumu düşüş mumunu tamamen kapattı.',
-        'Yutan boğa formasyonu mevcut; bir önceki düşüş mumu tamamen sarıldı.',
-      ]));
-    } else if (asset.isMorningStar) {
-      parts.add(pick([
-        'Sabah yıldızı formasyonu görünüyor — güçlü bir dönüş sinyali.',
-        'Sabah yıldızı oluştu; üç mumlu bu formasyon dip bölgesinde güçlü dönüş sinyali.',
-      ]));
-    } else if (asset.isBearishEngulfing) {
-      parts.add(pick([
-        'Yutan ayı mumu var — düşüş mumu bir önceki yükseliş mumunu tamamen kapattı.',
-        'Yutan ayı formasyonu oluştu; satıcılar alıcıları tamamen bastırdı.',
-      ]));
-    } else if (asset.isDoji) {
-      parts.add(pick([
-        'Son mumda doji görünüyor — alıcı ve satıcı arasında denge, karar anı yakın.',
-        'Doji mumu var; piyasa kararsız, bir sonraki mum yönü belirleyecek.',
-      ]));
-    }
-
-    // ── 4. Destek / Direnç ──────────────────────────────────────────────────
-    final sup = _supportLevels();
-    final res = _resistanceLevels();
-    if (sup.isNotEmpty && res.isNotEmpty) {
-      parts.add(pick([
-        'En yakın destek ${sup.first.toStringAsFixed(2)}, direnç ${res.first.toStringAsFixed(2)} — bu iki seviye belirleyici.',
-        '${sup.first.toStringAsFixed(2)} destekte, ${res.first.toStringAsFixed(2)} dirençte sıkışık tablo.',
-        'Fiyat ${sup.first.toStringAsFixed(2)}–${res.first.toStringAsFixed(2)} aralığında; hangisi kırılırsa o yön belirleyici.',
-        'Destek ${sup.first.toStringAsFixed(2)}, direnç ${res.first.toStringAsFixed(2)} — aradaki mesafe oldukça dar.',
-      ]));
-    } else if (res.isNotEmpty) {
-      parts.add(pick([
-        'Önündeki ilk direnç ${res.first.toStringAsFixed(2)}; bu seviyeyi geçmek yükseliş için kritik.',
-        '${res.first.toStringAsFixed(2)} direnci bekliyor — burası aşılırsa tablo değişir.',
-        'Yakın direnç ${res.first.toStringAsFixed(2)}; geçilirse ivme kazanabilir.',
-      ]));
-    } else if (sup.isNotEmpty) {
-      parts.add(pick([
-        'En yakın destek ${sup.first.toStringAsFixed(2)}; bu seviyeyi koruması önemli.',
-        '${sup.first.toStringAsFixed(2)} destek seviyesi şu an belirleyici rol oynuyor.',
-        'Destek ${sup.first.toStringAsFixed(2)}; burası kırılırsa baskı artabilir.',
-      ]));
-    }
-
-    // ── 5. Momentum yorumu — çok varyantlı ─────────────────────────────────
+    // ── 3. RSI ─────────────────────────────────────────────────────────────
     if (rsi >= 70) {
-      parts.add(pick([
-        'Momentum göstergesi ${rsi.toStringAsFixed(0)} — aşırı alım bölgesinde, kâr realizasyonu gelebilir.',
-        'Momentum ${rsi.toStringAsFixed(0)} ile aşırı alımda; soğuma yaşanmadan zorlamak riskli.',
-        'Momentum ${rsi.toStringAsFixed(0)}: aşırı alım. Bu seviyelerde her yükseliş bir önceki kadar kolay olmayabilir.',
-      ]));
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde ve aşırı alım bölgesinde. '
+        'Momentum güçlü olsa da kısa vadede soluklanma veya düzeltme ihtimali '
+        'artmış durumda.',
+      );
     } else if (rsi >= 60) {
-      parts.add(pick([
-        'Momentum göstergesi ${rsi.toStringAsFixed(0)} — güçlü bölge, hareket sağlıklı.',
-        'Momentum ${rsi.toStringAsFixed(0)}: güçlü ama aşırı alım değil — denge iyi.',
-        'Momentum ${rsi.toStringAsFixed(0)} ile olumlu bölgede seyrediyor.',
-      ]));
-    } else if (rsi >= 45) {
-      parts.add(pick([
-        'Momentum göstergesi ${rsi.toStringAsFixed(0)} — dengeli bölge, ne aşırı coşku ne aşırı korku.',
-        'Momentum ${rsi.toStringAsFixed(0)}: denge bölgesinde, bir yön için tetikleyici bekleniyor.',
-        'Momentum ${rsi.toStringAsFixed(0)} ile abartılı değil — sakin bir seyir.',
-      ]));
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde. Momentum pozitif ve '
+        'henüz klasik aşırı alım bölgesinde değil.',
+      );
+    } else if (rsi >= 50) {
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde. Momentum nötr-pozitif '
+        'bölgede ve belirgin bir aşırılık göstermiyor.',
+      );
+    } else if (rsi >= 40) {
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde. Momentum zayıf-nötr '
+        'bölgede; alıcılar henüz belirgin üstünlük kurmuş değil.',
+      );
     } else if (rsi >= 30) {
-      parts.add(pick([
-        'Momentum göstergesi ${rsi.toStringAsFixed(0)} — zayıf bölge, alıcılar henüz geri dönmedi.',
-        'Momentum ${rsi.toStringAsFixed(0)}: baskı altında ama aşırı satım seviyesine ulaşmadı.',
-        'Momentum ${rsi.toStringAsFixed(0)} ile zayıf — toparlanma için sinyal bekleniyor.',
-      ]));
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde. Momentum zayıf ve '
+        '30 seviyesine yakın; ancak klasik aşırı satım bölgesine henüz girmedi.',
+      );
     } else {
-      parts.add(pick([
-        'Momentum göstergesi ${rsi.toStringAsFixed(0)} — aşırı satım bölgesinde; teknik toparlanma potansiyeli var.',
-        'Momentum ${rsi.toStringAsFixed(0)}: aşırı satım. Kısa vadeli teknik sıçrama ihtimali göz ardı edilmemeli.',
-        'Momentum ${rsi.toStringAsFixed(0)} ile derin satım bölgesinde — alıcıların dönüşü için zemin oluşuyor olabilir.',
-      ]));
+      parts.add(
+        'RSI ${rsi.toStringAsFixed(0)} seviyesinde ve klasik aşırı satım '
+        'bölgesinde. Teknik tepki ihtimali artabilir ancak RSI tek başına '
+        'trend dönüşü teyidi değildir.',
+      );
     }
 
-    // ── 6. Hacim — çok varyantlı ───────────────────────────────────────────
-    if (_volumeIncreasing) {
-      parts.add(pick([
-        'Hacim artıyor; hareketi destekleyen katılım güçleniyor.',
-        'İşlem hacmindeki artış hareketin arkasında güç olduğunu gösteriyor.',
-        'Hacim yukarı gidiyor — bu, fiyat hareketinin teyit edilmesi açısından olumlu.',
-        'Artan hacim, mevcut trendin katılımcı tarafından desteklendiğine işaret ediyor.',
-      ]));
+    // ── 4. MACD: AssetModel'deki gerçek anlam histogram sıfır geçişi ────────
+    if (asset.isMacdBullish) {
+      parts.add(
+        'MACD histogramının negatiften pozitife dönmesi kısa vadeli '
+        'momentumda toparlanma sinyali veriyor. Ancak bunun kalıcı bir trend '
+        'dönüşümü sayılması için fiyat hareketinin de destek vermesi gerekiyor.',
+      );
+    } else if (asset.isMacdBearish) {
+      parts.add(
+        'MACD histogramının pozitiften negatife dönmesi kısa vadeli '
+        'momentumun zayıfladığına işaret ediyor.',
+      );
+    }
+
+    // ── 5. Supertrend ─────────────────────────────────────────────────────
+    if (asset.isSupertrendBuy) {
+      parts.add(
+        'Supertrend tarafında AL yönlü sinyal oluşmuş. Bu kısa vadeli '
+        'toparlanmayı destekliyor; ancak ana trendle birlikte okunmalı.',
+      );
+    } else if (asset.isSupertrendSell) {
+      parts.add(
+        'Supertrend tarafında SAT yönlü sinyal oluşmuş. Kısa vadeli '
+        'aşağı yönlü baskı artmış görünüyor.',
+      );
+    }
+
+    // ── 6. Uyuşmazlık ───────────────────────────────────────────────────────
+    if (asset.isBullishDivergence) {
+      parts.add(
+        'Pozitif uyuşmazlık görülüyor. Fiyat zayıflarken momentumun aynı '
+        'ölçüde zayıflamaması satış baskısının azalıyor olabileceğine işaret '
+        'ediyor; fiyat teyidi yine de gerekli.',
+      );
+    } else if (asset.isBearishDivergence) {
+      parts.add(
+        'Negatif uyuşmazlık görülüyor. Fiyat yükselirken momentumun '
+        'zayıflaması yükseliş gücünün azalabileceğine işaret ediyor.',
+      );
+    }
+
+    // ── 7. Mum formasyonları ───────────────────────────────────────────────
+    if (asset.isHammer) {
+      parts.add(
+        'Son mumda Çekiç formasyonu oluşmuş. Alt bölgede alıcıların '
+        'devreye girdiğine dair kısa vadeli bir işaret var.',
+      );
+    } else if (asset.isBullishEngulfing) {
+      parts.add(
+        'Yutan Boğa formasyonu oluşmuş. Son mumda alıcıların kısa vadeli '
+        'kontrolü artırdığı görülüyor.',
+      );
+    } else if (asset.isMorningStar) {
+      parts.add(
+        'Sabah Yıldızı formasyonu görülüyor. Dip bölgesinde toparlanmayı '
+        'destekleyen bir mum yapısı oluşmuş.',
+      );
+    } else if (asset.isBearishEngulfing) {
+      parts.add(
+        'Yutan Ayı formasyonu oluşmuş. Satıcıların kısa vadeli baskısı '
+        'artmış görünüyor.',
+      );
+    } else if (asset.isDoji) {
+      parts.add(
+        'Son mumda Doji oluşmuş. Alıcı ve satıcılar arasında kararsızlık '
+        'var; sonraki fiyat hareketi yön açısından önemli.',
+      );
+    }
+
+    // ── 8. Hacim: sadece artıyor/azalıyor demek yerine 20 günlük kıyas ────
+    final volumeRatio = _volume20Ratio;
+    if (volumeRatio != null) {
+      if (volumeRatio >= 1.50) {
+        parts.add(
+          'Son işlem hacmi 20 günlük ortalamanın yaklaşık '
+          '%${((volumeRatio - 1) * 100).toStringAsFixed(0)} üzerinde. '
+          'Piyasaya katılım belirgin şekilde artmış durumda; ancak hacim '
+          'tek başına yönün pozitif olduğunu göstermez.',
+        );
+      } else if (volumeRatio >= 1.30) {
+        parts.add(
+          'Son işlem hacmi 20 günlük ortalamanın yaklaşık '
+          '%${((volumeRatio - 1) * 100).toStringAsFixed(0)} üzerinde. '
+          'Hareketin arkasındaki katılım normalin üzerinde.',
+        );
+      } else if (volumeRatio >= 1.0) {
+        parts.add(
+          'Son işlem hacmi 20 günlük ortalamaya yakın veya üzerinde. '
+          'Fiyat hareketinin hacim tarafında belirgin bir zayıflama yok.',
+        );
+      } else if (volumeRatio >= 0.70) {
+        parts.add(
+          'Son işlem hacmi 20 günlük ortalamanın altında. '
+          'Fiyat hareketinin arkasındaki katılım sınırlı.',
+        );
+      } else {
+        parts.add(
+          'Son işlem hacmi 20 günlük ortalamanın belirgin şekilde altında. '
+          'Hareket düşük katılımla gerçekleşiyor.',
+        );
+      }
+    } else if (_volumeIncreasing) {
+      parts.add(
+        'İşlem hacmi son günlerde artıyor. Piyasaya katılım güçleniyor; '
+        'ancak hacim tek başına yön belirlemez.',
+      );
     } else {
-      parts.add(pick([
-        'Hacim azalıyor; hareket teyitsiz kalıyor, dikkatli olmak mantıklı.',
-        'İşlem hacmi düşüyor — fiyat hareketi katılım kaybediyor.',
-        'Azalan hacim, mevcut trendin gücünün sorgulanmasına neden olabilir.',
-        'Hacim desteklemiyor; bu tür hareketler bazen aldatıcı olabilir.',
-      ]));
+      parts.add(
+        'İşlem hacmi son günlerde zayıflıyor. Mevcut fiyat hareketinin '
+        'hacim tarafından teyidi sınırlı.',
+      );
     }
 
-    // ── 7. Dönem değişimi ──────────────────────────────────────────────────
-    final change = _periodChange;
-    if (change > 50) {
-      parts.add(pick([
-        'Görüntülenen dönemde %${change.toStringAsFixed(0)} yükseldi — geç kalma riski göz önünde bulundurulmalı.',
-        'Dönem içi %${change.toStringAsFixed(0)} artış güçlü, ama bu seviyelerde dikkatli olmak gerekiyor.',
-      ]));
-    } else if (change < -30) {
-      parts.add(pick([
-        'Dönem içinde %${change.abs().toStringAsFixed(0)} geriledi — değerleme cazip görünebilir.',
-        '%${change.abs().toStringAsFixed(0)} düşüş sonrası fiyatlanma değer yatırımcısının ilgisini çekebilir.',
-      ]));
+    // ── 9. Destek / direnç ─────────────────────────────────────────────────
+    if (support.isNotEmpty && resistance.isNotEmpty) {
+      final s = support.first;
+      final r = resistance.first;
+
+      if (price <= s * 1.01) {
+        parts.add(
+          'Fiyat ${s.toStringAsFixed(2)} seviyesindeki yakın desteğe '
+          'yakın. Bu seviyenin korunması kısa vadeli görünüm açısından önemli.',
+        );
+      } else if (price >= r * 0.99) {
+        parts.add(
+          'Fiyat ${r.toStringAsFixed(2)} seviyesindeki yakın dirence '
+          'yaklaşmış durumda. Bu bölgede oluşacak fiyat hareketi önemli.',
+        );
+      } else {
+        parts.add(
+          'Yakın destek ${s.toStringAsFixed(2)}, yakın direnç '
+          '${r.toStringAsFixed(2)} seviyesinde. Fiyat şu anda bu iki seviye '
+          'arasında bulunuyor.',
+        );
+      }
+    } else if (support.isNotEmpty) {
+      parts.add(
+        'Yakın destek ${support.first.toStringAsFixed(2)} seviyesinde. '
+        'Bu seviyenin korunması aşağı yönlü baskının artmaması açısından önemli.',
+      );
+    } else if (resistance.isNotEmpty) {
+      parts.add(
+        'Yakın direnç ${resistance.first.toStringAsFixed(2)} seviyesinde. '
+        'Bu bölgedeki fiyat davranışı kısa vadeli yön açısından önemli.',
+      );
     }
 
-    parts.add('Bu bir yatırım tavsiyesi değildir; teknik verileri birlikte okuduk.');
+    // ── 10. Dönem performansı ──────────────────────────────────────────────
+    if (change >= 20) {
+      parts.add(
+        'Seçili dönemde fiyat %${change.toStringAsFixed(1)} yükselmiş. '
+        'Bu performansın ardından mevcut teknik seviyelerin korunması önemli.',
+      );
+    } else if (change <= -20) {
+      parts.add(
+        'Seçili dönemde fiyat %${change.abs().toStringAsFixed(1)} gerilemiş. '
+        'Bu nedenle toparlanma sinyallerinin kalıcı olup olmadığı izlenmeli.',
+      );
+    } else if (change > 0) {
+      parts.add(
+        'Seçili dönemde fiyat %${change.toStringAsFixed(1)} yükselmiş; '
+        'hareket henüz belirgin bir trend performansı oluşturmuyor.',
+      );
+    } else if (change < 0) {
+      parts.add(
+        'Seçili dönemde fiyat %${change.abs().toStringAsFixed(1)} gerilemiş; '
+        'toparlanma sinyallerinin fiyat tarafından teyit edilmesi gerekiyor.',
+      );
+    }
+
+    // ── 11. Sinyalleri birlikte okuma ──────────────────────────────────────
+    final bullish = <String>[];
+    final bearish = <String>[];
+
+    if (_emaAboveCount >= 2) bullish.add('ortalamalar');
+    if (_emaAboveCount == 0) bearish.add('ortalamalar');
+
+    if (asset.isGoldenCross) bullish.add('Golden Cross');
+    if (asset.isDeathCross) bearish.add('Death Cross');
+
+    if (asset.isMacdBullish) bullish.add('MACD');
+    if (asset.isMacdBearish) bearish.add('MACD');
+
+    if (asset.isSupertrendBuy) bullish.add('Supertrend');
+    if (asset.isSupertrendSell) bearish.add('Supertrend');
+
+    if (asset.isBullishDivergence) bullish.add('pozitif uyuşmazlık');
+    if (asset.isBearishDivergence) bearish.add('negatif uyuşmazlık');
+
+    if (asset.isHammer ||
+        asset.isBullishEngulfing ||
+        asset.isMorningStar) {
+      bullish.add('mum formasyonu');
+    }
+
+    if (asset.isBearishEngulfing) bearish.add('mum formasyonu');
+    if (rsi < 40) bearish.add('zayıf RSI');
+
+    // Ana trend zayıf + kısa vadeli toparlanma sinyalleri:
+    if (_emaAboveCount <= 1 &&
+        (asset.isMacdBullish ||
+            asset.isBullishDivergence ||
+            asset.isSupertrendBuy)) {
+      parts.add(
+        'Sinyaller birlikte değerlendirildiğinde ana trend henüz güçlü '
+        'bir yükseliş yapısına dönüşmüş değil; buna karşılık kısa vadeli '
+        'toparlanmayı destekleyen göstergeler bulunuyor. Mevcut tablo '
+        'zayıf trend içinde toparlanma denemesi şeklinde okunabilir.',
+      );
+    } else if (_emaAboveCount >= 2 &&
+        bullish.length >= bearish.length + 2) {
+      parts.add(
+        'Teknik göstergelerin önemli bölümü aynı yönde. Trend ve momentum '
+        'tarafında olumlu sinyaller birbirini destekliyor.',
+      );
+    } else if (bearish.length >= bullish.length + 2) {
+      parts.add(
+        'Teknik göstergelerin önemli bölümü aşağı yönlü baskıya işaret ediyor. '
+        'Kısa vadeli tepki oluşsa bile bunun kalıcı trend dönüşümü olduğunu '
+        'söylemek için ek teyit gerekiyor.',
+      );
+    } else {
+      parts.add(
+        'Teknik göstergeler tamamen aynı yönde değil. Bu nedenle trend, '
+        'momentum, hacim ve kritik fiyat seviyeleri birlikte izlenmeli.',
+      );
+    }
+
+    // ── 12. Sonuç ──────────────────────────────────────────────────────────
+    if (_emaAboveCount == 3 &&
+        bullish.length >= bearish.length + 2) {
+      parts.add(
+        'Genel görünüm: Trend ve momentum tarafında güçlü bir yapı var; '
+        'kritik desteklerin korunması takip edilmeli.',
+      );
+    } else if (_emaAboveCount == 0 &&
+        bearish.length >= bullish.length) {
+      parts.add(
+        'Genel görünüm: Ana trend zayıf ve aşağı yönlü baskı devam ediyor. '
+        'Olumlu sinyaller oluşsa bile trend teyidi ayrıca takip edilmeli.',
+      );
+    } else if (rsi < 40 &&
+        (asset.isMacdBullish || asset.isBullishDivergence)) {
+      parts.add(
+        'Genel görünüm: Momentum zayıf olmasına rağmen kısa vadeli '
+        'toparlanma sinyalleri oluşuyor. Tepkinin kalıcı olup olmadığı '
+        'fiyat ve hacim tarafından teyit edilmeli.',
+      );
+    } else {
+      parts.add(
+        'Genel görünüm: Teknik tablo karışık. Tek bir gösterge yerine '
+        'trend, momentum, hacim ve kritik fiyat seviyeleri birlikte okunmalı.',
+      );
+    }
+
+    parts.add(
+      'Bu analiz yalnızca mevcut teknik verilere dayanır ve yatırım tavsiyesi değildir.',
+    );
+
     return parts.join(' ');
   }
+
+  // Son hacmin 20 günlük ortalamaya oranı.
+  double? get _volume20Ratio {
+    final volumes = asset.volumes;
+    if (volumes.length < 2) return null;
+
+    final end = volumes.length;
+    final start = end > 21 ? end - 21 : 0;
+    final previous = volumes.sublist(start, end - 1);
+
+    if (previous.isEmpty) return null;
+
+    final avg = previous.reduce((a, b) => a + b) / previous.length;
+    if (avg <= 0) return null;
+
+    return volumes.last / avg;
+  }
+
 
   // ── Artılar / Eksiler ────────────────────────────────────────────────────────
   List<String> _pros() {
@@ -1293,7 +1755,7 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
         _TeknikKart(
           shadow: shadowColor,
           header: '[ Genel görünüm ]',
-          isAi: _aiUsed,
+          isAi: true,
           child: _aiLoading
               ? const _AiLoadingRow()
               : Column(
@@ -1303,15 +1765,14 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
                       _aiText ?? _buildGenel(),
                       style: TextStyle(color: onSurface, fontSize: 13, height: 1.68),
                     ),
-                    if (_aiUsed) ...[
-                      const SizedBox(height: 12),
-                      _AiBadgeRow(
-                        onRefresh: () {
-                          setState(() { _aiText = null; _aiUsed = false; });
-                          _fetchAiAnalysis();
-                        },
-                      ),
-                    ],
+                    const SizedBox(height: 12),
+                    _AnalizBadgeRow(
+                      isAi: _aiUsed,
+                      onRefresh: () {
+                        setState(() { _aiText = null; _aiUsed = false; });
+                        _fetchAiAnalysis();
+                      },
+                    ),
                   ],
                 ),
         ),
@@ -1699,19 +2160,22 @@ class _AiLoadingRow extends StatelessWidget {
   }
 }
 
-// ── AI Badge Row ─────────────────────────────────────────────────────────────
+// ── Analiz Rozeti Satırı (✦ AI Analiz / ✦ Teknik Analiz) ──────────────────────
 
-class _AiBadgeRow extends StatelessWidget {
+class _AnalizBadgeRow extends StatelessWidget {
+  final bool isAi;
   final VoidCallback onRefresh;
-  const _AiBadgeRow({required this.onRefresh});
+  const _AnalizBadgeRow({required this.isAi, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final label = isAi ? 'AI Analiz' : 'Teknik Analiz';
+
     return Row(
       children: [
-        // ✦ AI badge — 2026 gradient style
+        // ✦ AI Analiz veya Teknik Analiz rozeti — aynı degrade ve tasarım
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
@@ -1729,14 +2193,14 @@ class _AiBadgeRow extends StatelessWidget {
               ),
             ],
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('✦', style: TextStyle(color: Colors.white, fontSize: 10)),
-              SizedBox(width: 5),
+              const Text('✦', style: TextStyle(color: Colors.white, fontSize: 10)),
+              const SizedBox(width: 5),
               Text(
-                'AI Analiz',
-                style: TextStyle(
+                label,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -1813,7 +2277,7 @@ class _TeknikKart extends StatelessWidget {
     final onSurface = theme.colorScheme.onSurface;
     final onSurfaceSecondary = onSurface.withOpacity(0.5);
 
-    // AI kartı için hafif mor glow border
+    // AI / Genel görünüm kartı için hafif mor glow border
     final border = isAi
         ? Border.all(
             color: const Color(0xFF7C3AED).withOpacity(isDark ? 0.35 : 0.18),
