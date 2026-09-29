@@ -7,6 +7,7 @@ import '../widgets/stock_chart.dart';
 import '../widgets/indicator_chip.dart';
 import '../widgets/stock_quote_panel.dart';
 import '../widgets/tutorial_tooltip.dart';
+import '../widgets/formatted_analysis_text.dart';
 import '../services/portfolio_service.dart';
 import '../services/kap_news_service.dart';
 import '../services/settings_service.dart';
@@ -1637,7 +1638,7 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
       'Bu analiz yalnızca mevcut teknik verilere dayanır ve yatırım tavsiyesi değildir.',
     );
 
-    return parts.join(' ');
+    return parts.join('\n\n');
   }
 
   // Son hacmin 20 günlük ortalamaya oranı.
@@ -1761,8 +1762,8 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _aiText ?? _buildGenel(),
+                    FormattedAnalysisText(
+                      text: _aiText ?? _buildGenel(),
                       style: TextStyle(color: onSurface, fontSize: 13, height: 1.68),
                     ),
                     const SizedBox(height: 12),
@@ -2623,4 +2624,3 @@ class _CatBtn extends StatelessWidget {
     );
   }
 }
-

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../kap_ai/models/kap_analysis.dart';
 import '../kap_ai/data/keyword_database.dart';
+import '../widgets/formatted_analysis_text.dart';
 import 'kap_ai_list_screen.dart';
 
 // ─────────────────────────────────────────────
@@ -108,11 +109,13 @@ class KapAiDetailScreen extends StatelessWidget {
           _SectionCard(
             emoji: '📢',
             title: 'AI Özeti',
-            child: Text(analysis.summary,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
-                    height: 1.5)),
+            child: FormattedAnalysisText(
+              text: analysis.summary,
+              style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface,
+                  height: 1.5),
+            ),
           ),
 
           // ── AI Güveni ──

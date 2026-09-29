@@ -848,10 +848,14 @@ async function callNvidiaModel(apiKey, modelId, prompt, timeoutMs = 15000) {
           'Bir veri gonderilmemisse o veri hakkinda tahmin yapma.\n' +
           'Olmayan bir sinyali varmis gibi gosterme.\n' +
           'Ayni cumleleri farkli hisselerde tekrar etme.\n' +
-          '4-6 kisa ve dogal Turkce cumle yaz.\n' +
-          'Tek paragraf halinde yaz.\n' +
+          'Analizi TAM OLARAK 3 paragrafa ayir.\n' +
+          'Paragraflar arasina mutlaka BIR BOS SATIR birak.\n' +
+          '1. Paragraf: Fiyat ve trend durumu.\n' +
+          '2. Paragraf: Momentum (RSI), destek/direnc ve hacim.\n' +
+          '3. Paragraf: Genel degerlendirme ve varsa temel carpanlar.\n' +
+          'Her paragraf 2-3 kisa cumleden olusmali.\n' +
           'Yatirim tavsiyesi verme.\n' +
-          'Son cumle: Bu bir yatirim tavsiyesi degildir.',
+          'Son satir (ayri 4. paragraf olarak): Bu bir yatirim tavsiyesi degildir.',
       },
       { role: 'user', content: prompt },
     ],
@@ -1003,8 +1007,8 @@ function buildAnalysisPrompt(data) {
     `Analizde RSI ${rsiStr} ve fiyat ${priceStr} TL gerçek değerlerini kullan.\n` +
     `Aynı kalıp cümleleri farklı hisseler için tekrar etme.\n` +
     `Veri yoksa o konuda tahmin yapma.\n` +
-    `Sadece 4-6 kısa cümlelik tek paragraf Türkçe analiz döndür.\n` +
-    `Son cümle: Bu bir yatırım tavsiyesi değildir.`
+    `Analizi 3 paragrafa ayirarak yaz. Paragraflar arasina bos satir birak.\n` +
+    `Son satir (bos satirdan sonra ayri paragraf): Bu bir yatirim tavsiyesi degildir.`
   );
 }
 
