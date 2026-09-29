@@ -24,11 +24,11 @@ class StockChart extends StatelessWidget {
       );
     }
 
-    final showEma20 = activeIndicators.contains('EMA 20');
-    final showEma50 = activeIndicators.contains('EMA 50');
-    final showSupertrend = activeIndicators.contains('Supertrend');
-    final showRsi = activeIndicators.contains('RSI 30');
-    final showMacd = activeIndicators.contains('MACD');
+    final showEma20 = activeIndicators.contains('Ort. 20');
+    final showEma50 = activeIndicators.contains('Ort. 50');
+    final showSupertrend = activeIndicators.contains('Süper Trend');
+    final showRsi = activeIndicators.contains('Momentum (14)');
+    final showMacd = activeIndicators.contains('Güç Göstergesi');
 
     final ema20 = showEma20 ? asset.ema(20) : <double>[];
     final ema50 = showEma50 ? asset.ema(50) : <double>[];
@@ -79,7 +79,7 @@ class StockChart extends StatelessWidget {
       ));
     }
 
-    // Supertrend çizgisi
+    // Süper Trend çizgisi
     List<FlSpot> stBullSpots = [];
     List<FlSpot> stBearSpots = [];
     if (showSupertrend && stData['trend'] != null && stData['trend']!.isNotEmpty) {
@@ -120,11 +120,11 @@ class StockChart extends StatelessWidget {
 
     final legendItems = <_Legend>[
       const _Legend(color: Color(0xFF00C853), label: 'Fiyat'),
-      if (showEma20) const _Legend(color: Color(0xFF1E88E5), label: 'EMA20'),
-      if (showEma50) const _Legend(color: Color(0xFFFF6F00), label: 'EMA50'),
+      if (showEma20) const _Legend(color: Color(0xFF1E88E5), label: 'Ort.20'),
+      if (showEma50) const _Legend(color: Color(0xFFFF6F00), label: 'Ort.50'),
       if (showSupertrend) ...[
-        const _Legend(color: Color(0xFF00C853), label: 'ST Al'),
-        const _Legend(color: Color(0xFFE53935), label: 'ST Sat'),
+        const _Legend(color: Color(0xFF00C853), label: 'S.T. Al'),
+        const _Legend(color: Color(0xFFE53935), label: 'S.T. Sat'),
       ],
     ];
 
@@ -182,13 +182,13 @@ class StockChart extends StatelessWidget {
         ],
         if (rsiValues.isNotEmpty) ...[
           const SizedBox(height: 12),
-          _SectionLabel(label: 'RSI (14)', color: const Color(0xFFAB47BC)),
+          _SectionLabel(label: 'Momentum (14)', color: const Color(0xFFAB47BC)),
           const SizedBox(height: 4),
           _RsiChart(rsiValues: rsiValues),
         ],
         if (macdData.isNotEmpty && (macdData['macd']?.isNotEmpty ?? false)) ...[
           const SizedBox(height: 12),
-          _SectionLabel(label: 'MACD (12,26,9)', color: const Color(0xFFFFB300)),
+          _SectionLabel(label: 'Güç Göstergesi (12,26,9)', color: const Color(0xFFFFB300)),
           const SizedBox(height: 4),
           _MacdChart(macdData: macdData),
         ],

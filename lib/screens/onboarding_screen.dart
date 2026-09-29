@@ -144,7 +144,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           color: const Color(0xFFFFB800),
                           title: 'Teknik Sinyal Bildirimleri',
                           subtitle:
-                              'MACD kesişimi, Supertrend dönüşü gibi sinyaller oluştuğunda otomatik bildirim al.',
+                              'Güç Göstergesi kesişimi, Süper Trend dönüşü gibi sinyaller oluştuğunda otomatik bildirim al.',
                         ),
                         _FeatureCard(
                           emoji: '🧩',

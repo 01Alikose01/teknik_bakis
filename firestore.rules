@@ -53,5 +53,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Yapay Zeka Analiz Önbelleği — Cloud Function yazar, uygulama okur ─
+    // Tüm kullanıcılar okuyabilir (önbellekten hızlı cevap).
+    // Yazma sadece Cloud Function'dan (sunucu taraflı) yapılır.
+    match /ai_cache/{cacheKey} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
   }
 }

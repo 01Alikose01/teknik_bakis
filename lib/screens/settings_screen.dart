@@ -324,11 +324,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _FaqSection(title: '🔍 Radar & Tarama'),
                   _FaqItem(
                     q: 'Tarama (Radar) nasıl çalışır?',
-                    a: 'Tarama ekranı BIST hisselerini seçtiğiniz teknik gösterge kriterine göre filtreler. Örneğin "RSI Aşırı Satım" filtresi RSI değeri 30\'un altına düşmüş hisseleri listeler. Sonuçlar anlık değil, en son kapanış verisine göre hesaplanır.',
+                    a: 'Tarama ekranı BIST hisselerini seçtiğiniz teknik gösterge kriterine göre filtreler. Örneğin "Momentum Aşırı Satım" filtresi momentum değeri 30\'un altına düşmüş hisseleri listeler. Sonuçlar anlık değil, en son kapanış verisine göre hesaplanır.',
                   ),
                   _FaqItem(
                     q: 'Ücretsiz planda kaç tarama filtresi kullanabilirim?',
-                    a: 'Ücretsiz planda temel filtreler açıktır. RSI, hacim ve EMA gibi gelişmiş filtreler Premium\'a özeldir. Planlar ekranından hangi filtrelerin Premium olduğunu görebilirsiniz.',
+                    a: 'Ücretsiz planda temel filtreler açıktır. Momentum, hacim ve hareketli ortalama gibi gelişmiş filtreler Premium\'a özeldir. Planlar ekranından hangi filtrelerin Premium olduğunu görebilirsiniz.',
                   ),
                   _FaqItem(
                     q: 'Tarama sonuçları otomatik güncelleniyor mu?',
@@ -338,20 +338,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // ── Analiz & Grafikler ──────────────────────────────
                   _FaqSection(title: '📈 Analiz & Grafikler'),
                   _FaqItem(
-                    q: 'RSI nasıl hesaplanır?',
-                    a: 'Wilder\'ın Smoothed RSI yöntemi kullanılır (14 periyot). RSI 30\'un altı aşırı satım, 70\'in üstü aşırı alım bölgesi olarak kabul edilir.',
+                    q: 'Momentum göstergesi nasıl hesaplanır?',
+                    a: 'Wilder\'ın düzeltilmiş momentum yöntemi kullanılır (14 periyot). 30\'un altı aşırı satım, 70\'in üstü aşırı alım bölgesi olarak kabul edilir.',
                   ),
                   _FaqItem(
-                    q: 'EMA 20 ve EMA 50 ne anlama gelir?',
-                    a: 'EMA (Üssel Hareketli Ortalama), son fiyatlara daha fazla ağırlık veren bir ortalamadır. EMA 20 kısa vadeli, EMA 50 orta vadeli trendi gösterir. Fiyatın bu ortalamaların üzerinde olması yükseliş eğilimine işaret eder.',
+                    q: '20 ve 50 günlük hareketli ortalamalar ne anlama gelir?',
+                    a: 'Üssel Hareketli Ortalama (ÜHO), son fiyatlara daha fazla ağırlık veren bir ortalamadır. 20 günlük kısa vadeli, 50 günlük orta vadeli trendi gösterir. Fiyatın bu ortalamaların üzerinde olması yükseliş eğilimine işaret eder.',
                   ),
                   _FaqItem(
-                    q: 'Supertrend göstergesi nedir?',
-                    a: 'Supertrend, ATR tabanlı bir trend takip göstergesidir. Yeşil çizgi al sinyali (yükseliş trendi), kırmızı çizgi sat sinyali (düşüş trendi) anlamına gelir. Trend dönüşlerini işaret eder.',
+                    q: 'Süper Trend göstergesi nedir?',
+                    a: 'Süper Trend, gerçek aralık tabanlı bir trend takip göstergesidir. Yeşil çizgi alım sinyali (yükseliş trendi), kırmızı çizgi satım sinyali (düşüş trendi) anlamına gelir. Trend dönüşlerini işaret eder.',
                   ),
                   _FaqItem(
-                    q: 'MACD ne işe yarar?',
-                    a: 'MACD (12, 26, 9 parametreli) momentum ve trend değişimlerini ölçer. MACD çizgisi sinyal çizgisini yukarı keserse alım, aşağı keserse satım sinyali olarak yorumlanabilir.',
+                    q: 'Güç Göstergesi (MACD) ne işe yarar?',
+                    a: 'Güç Göstergesi (12, 26, 9 parametreli) ivme ve trend değişimlerini ölçer. Çizgisi sinyal çizgisini yukarı keserse alım, aşağı keserse satım sinyali olarak yorumlanabilir.',
                   ),
                   _FaqItem(
                     q: 'TradingView grafiğini nasıl açabilirim?',

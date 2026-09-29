@@ -50,50 +50,50 @@ class _ScannerScreenState extends State<ScannerScreen>
   static const List<_FilterDef> _trendFilters = [
     _FilterDef(
       id: 'MACD Bullish',
-      label: '📊 MACD AL',
-      subtitle: 'Koşul: MACD çizgisi sinyal çizgisini yukarı keser → Alım sinyali, pozitif momentum oluşturur.',
+      label: '📊 Güç Göst. AL',
+      subtitle: 'Koşul: Güç göstergesi (MACD) sinyal çizgisini yukarı keser → alım sinyali, olumlu ivme oluşturur.',
       color: Color(0xFF34C759),
       icon: Icons.show_chart,
     ),
     _FilterDef(
       id: 'Golden Cross',
-      label: '✨ Golden Cross AL',
-      subtitle: 'Koşul: EMA20, EMA50\'yi yukarı yönde kesti — güçlü yükseliş sinyali oluştu.',
+      label: '✨ Altın Kesişim AL',
+      subtitle: 'Koşul: 20 günlük ortalama, 50 günlüğü yukarı kesti — güçlü yükseliş sinyali oluştu.',
       color: Color(0xFF86C232),
       icon: Icons.trending_up,
     ),
     _FilterDef(
       id: 'RSI 40',
-      label: '📊 RSI Dip AL',
-      subtitle: 'Koşul: RSI değeri 40 ve altına düştüğünde aşırı satım bölgesine yaklaşılıyor. Potansiyel dönüş noktası.',
+      label: '📊 Momentum Dip AL',
+      subtitle: 'Koşul: Momentum değeri 40 ve altına düştüğünde aşırı satım bölgesine yaklaşılıyor. Potansiyel dönüş noktası.',
       color: Color(0xFFAB47BC),
       icon: Icons.show_chart,
     ),
     _FilterDef(
       id: 'Supertrend AL',
-      label: '⚡ Supertrend AL',
-      subtitle: 'Koşul: Supertrend göstergesi yön değiştirerek AL sinyali üretir. Trendin başlangıcını yakalar.',
+      label: '⚡ Süper Trend AL',
+      subtitle: 'Koşul: Süper Trend göstergesi yön değiştirerek alım sinyali üretir. Trendin başlangıcını yakalar.',
       color: Color(0xFF4CAF50),
       icon: Icons.bolt,
     ),
     _FilterDef(
       id: 'HACIMLENEN DİP',
       label: '🔥 Hacimli Dip AL',
-      subtitle: 'Koşul: RSI düşük, hacim yükselmiş ve fiyat dip bölgesinde. Premium sinyali.',
+      subtitle: 'Koşul: Momentum düşük, hacim yükselmiş ve fiyat dip bölgesinde. Premium sinyali.',
       color: Color(0xFFEF6C00),
       icon: Icons.local_fire_department,
     ),
     _FilterDef(
       id: 'POZITIF_UYUMSUZLUK',
-      label: '📊 Pozitif Uyuşmazlık AL',
-      subtitle: 'Fiyat daha düşük dip yaparken RSI daha yüksek dip yapar. Momentum tersine dönüyor — güçlü yükseliş sinyali.',
+      label: '📊 Olumlu Uyuşmazlık AL',
+      subtitle: 'Fiyat daha düşük dip yaparken momentum daha yüksek dip yapar. Güç tersine dönüyor — yükseliş sinyali.',
       color: Color(0xFF7B61FF),
       icon: Icons.show_chart,
     ),
     _FilterDef(
       id: 'TOBO_AL',
-      label: '🔵 TOBO AL',
-      subtitle: 'Düşüş sonrası pivot diplerden sol omuz → baş → sağ omuz yapısı oluşur; boyun çizgisi kırılınca sinyali üretilir.',
+      label: '🔵 Omuz-Baş-Omuz (Ters) AL',
+      subtitle: 'Düşüş sonrası pivot diplerden sol omuz → baş → sağ omuz yapısı oluşur; boyun çizgisi kırılınca sinyal üretilir.',
       color: Color(0xFF26C6DA),
       icon: Icons.trending_up,
     ),
@@ -106,15 +106,15 @@ class _ScannerScreenState extends State<ScannerScreen>
     ),
     _FilterDef(
       id: 'BB SIKIŞMA',
-      label: '📦 BB Sıkışma',
-      subtitle: 'Bollinger Bandı Squeeze — patlama öncesi oluşum.',
+      label: '📦 Bant Sıkışma',
+      subtitle: 'Bollinger Bandı Sıkışması — patlama öncesi oluşum.',
       color: Color(0xFF7C4DFF),
       icon: Icons.compress,
     ),
     _FilterDef(
       id: 'EMA20 > EMA50',
-      label: '📊 EMA20 Üstü AL',
-      subtitle: 'Koşul: EMA20 çizgisi EMA50\'nin en az %0.20 üzerinde — yükseliş momentumu devam ediyor.',
+      label: '📊 Ort.20 Üstü AL',
+      subtitle: 'Koşul: 20 günlük ortalama, 50 günlüğünün en az %0.20 üzerinde — yükseliş ivmesi devam ediyor.',
       color: Color(0xFF2196F3),
       icon: Icons.trending_up,
     ),
@@ -141,15 +141,15 @@ class _ScannerScreenState extends State<ScannerScreen>
     ),
     _FilterDef(
       id: 'KISA VADE TRADE',
-      label: '⚡ KISA VADE TRADE',
-      subtitle: 'Kısa vade AL/SAT sinyali.',
+      label: '⚡ Kısa Vade',
+      subtitle: 'Kısa vade alım/satım sinyali.',
       color: Color(0xFF29B6F6),
       icon: Icons.flash_on,
     ),
     _FilterDef(
       id: 'MA50 = MA200',
-      label: '📊 MA50 = MA200',
-      subtitle: 'Koşul: Fiyat MA50 ve MA200 üzerinde kapanış yapmış — güçlü yükseliş teyidi.',
+      label: '📊 Ort.50 = Ort.200',
+      subtitle: 'Koşul: Fiyat 50 ve 200 günlük ortalamaların üzerinde kapanış yapmış — güçlü yükseliş teyidi.',
       color: Color(0xFFE91E63),
       icon: Icons.trending_up,
     ),
@@ -159,36 +159,36 @@ class _ScannerScreenState extends State<ScannerScreen>
   static const List<_FilterDef> _momentumFilters = [
     _FilterDef(
       id: 'MACD Bear',
-      label: '📉 MACD SAT',
-      subtitle: 'MACD çizgisi Signal çizgisini yukarıdan aşağı kesti — aşağı yönlü momentum başladı. Kesişim son 3 mum içinde.',
+      label: '📉 Güç Göst. SAT',
+      subtitle: 'Güç göstergesi (MACD) sinyal çizgisini yukarıdan aşağı kesti — aşağı yönlü ivme başladı. Kesişim son 3 mum içinde.',
       color: Color(0xFFFF3B30),
       icon: Icons.show_chart,
     ),
     _FilterDef(
       id: 'Death Cross',
-      label: '💀 Death Cross SAT',
-      subtitle: 'Koşul: EMA20, EMA50\'yi aşağı yönde kestiğinde güçlü bir düşüş sinyali oluşur.',
+      label: '💀 Ölüm Kesişimi SAT',
+      subtitle: 'Koşul: 20 günlük ortalama, 50 günlüğü aşağı kesti — güçlü düşüş sinyali oluşur.',
       color: Color(0xFFFF6B6B),
       icon: Icons.trending_down,
     ),
     _FilterDef(
       id: 'RSI_TEPE',
-      label: '📊 RSI Tepe SAT',
-      subtitle: 'RSI 70 üzerinde aşırı alım bölgesine girilmiş, fiyat tepe yapıyor. Momentum zayıflayabilir — satış baskısı yaklaşıyor.',
+      label: '📊 Momentum Tepe SAT',
+      subtitle: 'Momentum 70 üzerinde aşırı alım bölgesine girilmiş, fiyat tepe yapıyor. Güç zayıflayabilir — satış baskısı yaklaşıyor.',
       color: Color(0xFFFF9800),
       icon: Icons.show_chart,
     ),
     _FilterDef(
       id: 'Supertrend SAT',
-      label: '⚡ Supertrend SAT',
-      subtitle: 'Koşul: Supertrend göstergesi SAT sinyali üretir. Düşüş trendinin başlangıcını işaret eder.',
+      label: '⚡ Süper Trend SAT',
+      subtitle: 'Koşul: Süper Trend göstergesi satım sinyali üretir. Düşüş trendinin başlangıcını işaret eder.',
       color: Color(0xFFEF5350),
       icon: Icons.bolt_outlined,
     ),
     _FilterDef(
       id: 'BEARISH_DIV',
-      label: '📉 Negatif Uyumsuzluk SAT',
-      subtitle: 'Fiyat daha yüksek tepe yaparken RSI daha düşük tepe yapıyor. Momentum zayıflıyor — düşüş riski sinyali.',
+      label: '📉 Olumsuz Uyuşmazlık SAT',
+      subtitle: 'Fiyat daha yüksek tepe yaparken momentum daha düşük tepe yapıyor. Güç zayıflıyor — düşüş riski sinyali.',
       color: Color(0xFFE53935),
       icon: Icons.trending_down,
     ),
@@ -205,36 +205,36 @@ class _ScannerScreenState extends State<ScannerScreen>
   static const List<_FilterDef> _formationFilters = [
     _FilterDef(
       id: 'Hammer',
-      label: '🔨 Hammer Formasyonu',
+      label: '🔨 Çekiç Formasyonu',
       subtitle: 'Potansiyel trend dönüşlerinin habercisi. Alt gölgesi uzun, gövdesi küçük mum.',
       color: Color(0xFFFF9800),
       icon: Icons.hardware,
     ),
     _FilterDef(
       id: 'Doji',
-      label: '➕ Doji Formasyonu',
+      label: '➕ Doji Mumu',
       subtitle: 'Açılış ve kapanış neredeyse eşit — kararsızlık ve olası dönüş sinyali.',
       color: Color(0xFF9C27B0),
       icon: Icons.add_circle_outline,
     ),
     _FilterDef(
       id: 'Morning Star',
-      label: '🌟 MorningStar Formasyonu',
-      subtitle: 'Düşüş trendinin sonunda görülen 3 mumlu dönüş formasyonu. (Sabah Yıldızı)',
+      label: '🌟 Sabah Yıldızı',
+      subtitle: 'Düşüş trendinin sonunda görülen 3 mumlu dönüş formasyonu.',
       color: Color(0xFFFFD700),
       icon: Icons.star_outline,
     ),
     _FilterDef(
       id: 'Bearish Engulfing',
-      label: '🐻 AyıYutan Formasyonu',
-      subtitle: 'Yükseliş trendi ardından kırmızı mumun yeşil mumu yutması — satış baskısı sinyali.',
+      label: '🐻 Yutan Ayı Mumu',
+      subtitle: 'Yükseliş trendi ardından düşüş mumunun yükseliş mumunu yutması — satış baskısı sinyali.',
       color: Color(0xFFD32F2F),
       icon: Icons.arrow_circle_down,
     ),
     _FilterDef(
       id: 'Bullish Engulfing',
-      label: '🐂 BoğaYutan Formasyonu',
-      subtitle: 'Düşüş trendi sonrası yeşil mumun kırmızı mumu yutması — alım baskısı sinyali.',
+      label: '🐂 Yutan Boğa Mumu',
+      subtitle: 'Düşüş trendi sonrası yükseliş mumunun düşüş mumunu yutması — alım baskısı sinyali.',
       color: Color(0xFF00C853),
       icon: Icons.arrow_circle_up,
     ),
@@ -1354,7 +1354,7 @@ class _ResultCard extends StatelessWidget {
     final badges = <_Badge>[];
     for (final filterId in activeFilters) {
       if (filterId == 'RSI 40' && asset.isRsiBelow40 && currentRsi != null)
-        badges.add(_Badge(label: 'RSI ${currentRsi.toStringAsFixed(1)}', color: const Color(0xFFAB47BC)));
+        badges.add(_Badge(label: 'Mom. ${currentRsi.toStringAsFixed(1)}', color: const Color(0xFFAB47BC)));
       if (filterId == 'HACIMLENEN DİP' && asset.isVolumeDip)
         badges.add(const _Badge(label: '🔥 HACİMLENEN DİP', color: Color(0xFFEF6C00)));
       if (filterId == 'DEGER_FILTRESI' && asset.isValueStock)
@@ -1366,29 +1366,29 @@ class _ResultCard extends StatelessWidget {
       if (filterId == 'BB SIKIŞMA' && asset.isBollingerSqueeze)
         badges.add(_Badge(label: asset.bollingerSqueezeStatus, color: const Color(0xFF7C4DFF)));
       if (filterId == 'EMA20 > EMA50' && asset.isEma20AboveEma50WithMargin)
-        badges.add(const _Badge(label: 'EMA20 > EMA50', color: Color(0xFF2196F3)));
+        badges.add(const _Badge(label: 'Ort.20 > Ort.50', color: Color(0xFF2196F3)));
       if (filterId == 'MA50 = MA200' && asset.isPriceAboveMa50AndMa200)
-        badges.add(const _Badge(label: 'MA50 > MA200', color: Color(0xFFE91E63)));
+        badges.add(const _Badge(label: 'Ort.50 > Ort.200', color: Color(0xFFE91E63)));
       if (filterId == 'Golden Cross' && asset.isGoldenCross)
-        badges.add(const _Badge(label: 'Golden Cross', color: Color(0xFF34C759)));
+        badges.add(const _Badge(label: 'Altın Kesişim', color: Color(0xFF34C759)));
       if (filterId == 'Death Cross' && asset.isDeathCross)
-        badges.add(const _Badge(label: 'Death Cross', color: Color(0xFFFF3B30)));
+        badges.add(const _Badge(label: 'Ölüm Kesişimi', color: Color(0xFFFF3B30)));
       if (filterId == 'Supertrend AL' && asset.isSupertrendBuy)
-        badges.add(const _Badge(label: 'ST AL', color: Color(0xFF34C759)));
+        badges.add(const _Badge(label: 'S.T. AL', color: Color(0xFF34C759)));
       if (filterId == 'Supertrend SAT' && asset.isSupertrendSell)
-        badges.add(const _Badge(label: 'ST SAT', color: Color(0xFFFF3B30)));
+        badges.add(const _Badge(label: 'S.T. SAT', color: Color(0xFFFF3B30)));
       if (filterId == 'MACD Bullish' && asset.isMacdBullish)
-        badges.add(const _Badge(label: 'MACD ↑', color: Color(0xFFFFB300)));
+        badges.add(const _Badge(label: 'Güç Göst. ↑', color: Color(0xFFFFB300)));
       if (filterId == 'MACD Bear' && asset.isMacdBearish)
-        badges.add(const _Badge(label: 'MACD ↓', color: Color(0xFFFF3B30)));
+        badges.add(const _Badge(label: 'Güç Göst. ↓', color: Color(0xFFFF3B30)));
       if (filterId == 'RSI_TEPE' && asset.isRsiAbove70)
-        badges.add(const _Badge(label: 'RSI Tepe', color: Color(0xFFFF9800)));
+        badges.add(const _Badge(label: 'Mom. Tepe', color: Color(0xFFFF9800)));
       if (filterId == 'BEARISH_DIV' && asset.isBearishDivergence)
-        badges.add(const _Badge(label: 'Neg. Uyumsuzluk', color: Color(0xFFE53935)));
+        badges.add(const _Badge(label: 'Olums. Uyuşmazlık', color: Color(0xFFE53935)));
       if (filterId == 'ASC_TRIANGLE' && asset.isAscendingTriangleSell)
         badges.add(const _Badge(label: 'Yüks. Üçgen SAT', color: Color(0xFFD32F2F)));
       if (filterId == 'POZITIF_UYUMSUZLUK' && asset.isBullishDivergence)
-        badges.add(const _Badge(label: 'Poz. Uyuşmazlık', color: Color(0xFF7B61FF)));
+        badges.add(const _Badge(label: 'Olumlu Uyuşmazlık', color: Color(0xFF7B61FF)));
       if (filterId == 'TOBO_AL' && asset.isToboPattern)
         badges.add(const _Badge(label: 'TOBO AL', color: Color(0xFF26C6DA)));
       if (filterId == 'ALCALAN_UCGEN' && asset.isAscendingTriangleBuy)
@@ -1398,15 +1398,15 @@ class _ResultCard extends StatelessWidget {
       if (filterId == 'DONCHIAN_20' && asset.isDonchian20Breakout)
         badges.add(const _Badge(label: 'Donchian 20', color: Color(0xFF7B61FF)));
       if (filterId == 'Hammer' && asset.isHammer)
-        badges.add(const _Badge(label: '🔨 Hammer', color: Color(0xFFFF9800)));
+        badges.add(const _Badge(label: '🔨 Çekiç', color: Color(0xFFFF9800)));
       if (filterId == 'Doji' && asset.isDoji)
         badges.add(const _Badge(label: '➕ Doji', color: Color(0xFF9C27B0)));
       if (filterId == 'Morning Star' && asset.isMorningStar)
-        badges.add(const _Badge(label: '🌟 Morning Star', color: Color(0xFFFFD700)));
+        badges.add(const _Badge(label: '🌟 Sabah Yıldızı', color: Color(0xFFFFD700)));
       if (filterId == 'Bullish Engulfing' && asset.isBullishEngulfing)
-        badges.add(const _Badge(label: '🐂 Boğa Yutan', color: Color(0xFF00C853)));
+        badges.add(const _Badge(label: '🐂 Yutan Boğa', color: Color(0xFF00C853)));
       if (filterId == 'Bearish Engulfing' && asset.isBearishEngulfing)
-        badges.add(const _Badge(label: '🐻 Ayı Yutan', color: Color(0xFFD32F2F)));
+        badges.add(const _Badge(label: '🐻 Yutan Ayı', color: Color(0xFFD32F2F)));
     }
 
     return GestureDetector(
@@ -1443,11 +1443,11 @@ class _ResultCard extends StatelessWidget {
               _InfoRow(icon: Icons.arrow_downward, iconColor: const Color(0xFFFF3B30), label: '52H Düşük', value: '${asset.low52w.toStringAsFixed(2)} ₺'),
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('EMA Durumu', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65))),
+              Text('Ort. Durumu', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65))),
               const SizedBox(height: 4),
-              if (ema5val.isNotEmpty)   _EmaRow(label: 'EMA5',   emaVal: ema5val.last,   price: asset.price),
-              if (ema20val.isNotEmpty)  _EmaRow(label: 'EMA20',  emaVal: ema20val.last,  price: asset.price),
-              if (ema100val.isNotEmpty) _EmaRow(label: 'EMA100', emaVal: ema100val.last, price: asset.price),
+              if (ema5val.isNotEmpty)   _EmaRow(label: 'Ort.5',   emaVal: ema5val.last,   price: asset.price),
+              if (ema20val.isNotEmpty)  _EmaRow(label: 'Ort.20',  emaVal: ema20val.last,  price: asset.price),
+              if (ema100val.isNotEmpty) _EmaRow(label: 'Ort.100', emaVal: ema100val.last, price: asset.price),
             ]),
           ]),
           if (badges.isNotEmpty || signalId != null) ...[

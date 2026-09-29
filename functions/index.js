@@ -48,9 +48,10 @@ initializeApp();
 const db = getFirestore();
 
 // ── KAP API Secrets (Firebase Secret Manager) ────────────────────────────────
-const KAP_API_KEY = defineSecret('KAP_API_KEY');
-const KAP_TOKEN   = defineSecret('KAP_TOKEN');
+const KAP_API_KEY  = defineSecret('KAP_API_KEY');
+const KAP_TOKEN    = defineSecret('KAP_TOKEN');
 const ADMIN_SECRET = defineSecret('ADMIN_SECRET'); // Manuel sync koruması
+const NVIDIA_API_KEY = defineSecret('NVIDIA_API_KEY'); // NVIDIA NIM AI API
 
 // ── KAP API base ─────────────────────────────────────────────────────────────
 const KAP_BASE = 'https://apigwdev.mkk.com.tr/api/vyk';
@@ -785,5 +786,339 @@ exports.syncIpoManual = onRequest({
     res.json({ success: true, count });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEKNİK ANALİZ AI PROXY — NVIDIA NIM (Nemotron-3.5-Lightning-30B)
+//
+// Flutter uygulaması bu endpoint'e hisse verilerini gönderir.
+// NVIDIA_API_KEY sadece burada yaşar — uygulama bundle'ına girmez.
+//
+// Güvenlik:
+//   - CORS: sadece Firebase Hosting domain'ine izin verilir
+//   - Rate limit: IP başına dakikada max 10 istek
+//   - Input validation: zorunlu alanlar kontrol edilir
+//   - Timeout: 25 saniye
+//
+// Fallback davranışı:
+//   - Herhangi bir hatada HTTP 503 döner → Flutter lokal fallback'e geçer
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Rate limiter (bellek içi, function instance başına)
+const rateLimitMap = new Map(); // ip → { count, resetAt }
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  if (entry.count >= 10) return true;
+  entry.count++;
+  return false;
+}
+
+/** NVIDIA NIM OpenAI-uyumlu API'ye istek atar. */
+async function callNvidiaAI(apiKey, prompt) {
+  const body = JSON.stringify({
+    model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Sen deneyimli bir Türk borsa analistinin sesini taklit eden teknik analiz asistanısın.\n' +
+          'KURALLAR:\n' +
+          '1. SADECE Türkçe yaz. İngilizce kelime, başlık veya cümle YASAKTIR.\n' +
+          '2. Düşünme sürecini, taslak adımları, kural listelerini, madde işaretlerini ASLA yazma.\n' +
+          '3. Doğrudan analize başla. "İşte analiz:", "Merhaba" gibi girişler yok.\n' +
+          '4. Maksimum 4-6 kısa, akıcı cümle. Düz paragraf yaz.\n' +
+          '5. Gerçek bir analist gibi konuş — doğal, sade, abartısız.\n' +
+          '6. Teknik terimler Türkçe olacak: EMA yerine "hareketli ortalama", RSI aşırı alım/satım bölgesi vb.\n' +
+          '7. Son cümle mutlaka: "Bu bir yatırım tavsiyesi değildir."\n' +
+          '8. Başka hiçbir şey yazma — sadece analiz paragrafı.',
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.7,
+    top_p: 0.9,
+    max_tokens: 400,
+    stream: false,
+  });
+
+  const result = await new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'integrate.api.nvidia.com',
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+      timeout: 25000,
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try { resolve(JSON.parse(data)); }
+          catch (e) { reject(new Error('NVIDIA yanıt parse hatası: ' + e.message)); }
+        } else {
+          reject(new Error(`NVIDIA API HTTP ${res.statusCode}: ${data.substring(0, 200)}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('NVIDIA API timeout')); });
+    req.write(body);
+    req.end();
+  });
+
+  const content = result?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('NVIDIA yanıtı boş');
+  return content.trim();
+}
+
+/** Hisse verilerinden AI prompt'u oluşturur. */
+function buildAnalysisPrompt(data) {
+  const {
+    symbol, name, price, changePercent,
+    rsi, emaAboveCount,
+    supportLevel, resistanceLevel,
+    volumeIncreasing, periodChange,
+    isBullishDivergence, isBearishDivergence,
+    isGoldenCross, isDeathCross,
+    isMacdBullish, isMacdBearish,
+    isSupertrendBuy, isSupertrendSell,
+    isHammer, isBullishEngulfing, isMorningStar,
+    isBearishEngulfing, isDoji,
+    periodLabel, fk, pdDd,
+  } = data;
+
+  const sinyaller = [];
+  if (isGoldenCross)      sinyaller.push('Altın Kesişim (kısa ortalama uzun ortalamanın üstüne çıktı)');
+  if (isDeathCross)       sinyaller.push('Ölüm Kesişimi (kısa ortalama uzun ortalamanın altına düştü)');
+  if (isMacdBullish)      sinyaller.push('MACD histogramı yükseliş yönüne döndü');
+  if (isMacdBearish)      sinyaller.push('MACD histogramı düşüş yönüne döndü');
+  if (isSupertrendBuy)    sinyaller.push('Süper Trend göstergesi alım sinyali verdi');
+  if (isSupertrendSell)   sinyaller.push('Süper Trend göstergesi satım sinyali verdi');
+  if (isBullishDivergence) sinyaller.push('Pozitif uyuşmazlık: fiyat düşerken momentum güçleniyor');
+  if (isBearishDivergence) sinyaller.push('Negatif uyuşmazlık: fiyat yükselirken momentum zayıflıyor');
+  if (isHammer)           sinyaller.push('Çekiç mumu oluştu — potansiyel dönüş sinyali');
+  if (isBullishEngulfing) sinyaller.push('Yutan boğa mumu oluştu');
+  if (isMorningStar)      sinyaller.push('Sabah yıldızı formasyonu oluştu');
+  if (isBearishEngulfing) sinyaller.push('Yutan ayı mumu oluştu');
+  if (isDoji)             sinyaller.push('Doji mumu var — kararsızlık sinyali');
+
+  const ortalamaMetni =
+    emaAboveCount === 3 ? 'üç hareketli ortalamanın (20, 50, 200) hepsinin üzerinde' :
+    emaAboveCount === 2 ? '20 ve 50 günlük ortalamaların üzerinde, 200 günlük ortalama hâlâ baskı yapıyor' :
+    emaAboveCount === 1 ? 'yalnızca 20 günlük ortalamanın üzerinde' :
+    'üç hareketli ortalamanın hepsinin altında';
+
+  const momentumMetni =
+    rsi >= 70 ? `momentum göstergesi ${rsi.toFixed(0)} ile aşırı alım bölgesinde` :
+    rsi >= 60 ? `momentum göstergesi ${rsi.toFixed(0)} ile güçlü bölgede` :
+    rsi >= 45 ? `momentum göstergesi ${rsi.toFixed(0)} ile dengeli bölgede` :
+    rsi >= 30 ? `momentum göstergesi ${rsi.toFixed(0)} ile zayıf bölgede` :
+    `momentum göstergesi ${rsi.toFixed(0)} ile aşırı satım bölgesinde`;
+
+  const destekDirenc = supportLevel && resistanceLevel
+    ? `Yakın destek ${supportLevel.toFixed(2)} ₺, yakın direnç ${resistanceLevel.toFixed(2)} ₺.`
+    : supportLevel
+    ? `Yakın destek seviyesi ${supportLevel.toFixed(2)} ₺.`
+    : resistanceLevel
+    ? `Yakın direnç seviyesi ${resistanceLevel.toFixed(2)} ₺.`
+    : '';
+
+  const temelMetni = (fk > 0 || pdDd > 0)
+    ? `Fiyat/Kazanç oranı ${fk > 0 ? fk.toFixed(1) : '-'}, Piyasa Değeri/Defter Değeri ${pdDd > 0 ? pdDd.toFixed(2) : '-'}.`
+    : '';
+
+  return (
+    `${name} (${symbol}) hissesinin ${periodLabel} teknik görünümünü değerlendir.\n\n` +
+    `Güncel fiyat ${price.toFixed(2)} ₺, dönemsel değişim ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%.\n` +
+    `Fiyat ${ortalamaMetni}.\n` +
+    `${momentumMetni.charAt(0).toUpperCase() + momentumMetni.slice(1)}.\n` +
+    (destekDirenc ? `${destekDirenc}\n` : '') +
+    `İşlem hacmi ${volumeIncreasing ? 'artıyor' : 'azalıyor'}.\n` +
+    `Görüntülenen dönemde toplam değişim ${periodChange >= 0 ? '+' : ''}${periodChange.toFixed(1)}%.\n` +
+    (sinyaller.length > 0 ? `Öne çıkan sinyaller: ${sinyaller.join('; ')}.\n` : '') +
+    (temelMetni ? `${temelMetni}\n` : '') +
+    `\nSadece düz paragraf hâlinde, Türkçe, doğal ve kısa bir teknik görünüm yaz.`
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEKNİK ANALİZ ÖNBELLEK — Firestore
+//
+// Aynı hisse + periyot + gün kombinasyonu için günde 1 kez NVIDIA'ya istek atılır.
+// Kalan tüm kullanıcılar önbellekten anında cevap alır.
+//
+// Firestore yapısı:
+//   ai_cache/{symbol}_{period}_{YYYY-MM-DD}  → { analysis, createdAt, hitCount }
+//
+// Önbellek geçerlilik süresi:
+//   - Borsa günlerinde 4 saat (piyasa bilgisi değişir)
+//   - Hafta sonu 24 saat (piyasa kapalı, fiyat değişmez)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CACHE_TTL_BORSAGUNU_MS = 4 * 60 * 60 * 1000;   // 4 saat
+const CACHE_TTL_HAFTASONU_MS = 24 * 60 * 60 * 1000;  // 24 saat
+
+function getCacheTtl() {
+  const gun = new Date().getUTCDay(); // 0=Pazar, 6=Cumartesi
+  return (gun === 0 || gun === 6) ? CACHE_TTL_HAFTASONU_MS : CACHE_TTL_BORSAGUNU_MS;
+}
+
+function buildCacheKey(symbol, periodLabel) {
+  const bugun = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const temiz = symbol.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const periyot = (periodLabel || 'G').replace(/\s/g, '_');
+  return `${temiz}_${periyot}_${bugun}`;
+}
+
+async function getCachedAnalysis(cacheKey) {
+  try {
+    const doc = await db.collection('ai_cache').doc(cacheKey).get();
+    if (!doc.exists) return null;
+    const data = doc.data();
+    const now = Date.now();
+    const olusturmaTarihi = data.createdAt?.toMillis?.() || 0;
+    if (now - olusturmaTarihi > getCacheTtl()) return null; // süresi dolmuş
+    // Erişim sayacını arttır (analytics için)
+    doc.ref.update({ hitCount: FieldValue.increment(1) }).catch(() => {});
+    return data.analysis || null;
+  } catch (err) {
+    console.warn('Önbellek okuma hatası:', err.message);
+    return null;
+  }
+}
+
+async function setCachedAnalysis(cacheKey, analysis, symbol, periodLabel) {
+  try {
+    await db.collection('ai_cache').doc(cacheKey).set({
+      analysis,
+      symbol:      symbol.toUpperCase(),
+      periodLabel: periodLabel || '',
+      createdAt:   FieldValue.serverTimestamp(),
+      hitCount:    0,
+    });
+  } catch (err) {
+    console.warn('Önbellek yazma hatası:', err.message);
+  }
+}
+
+exports.getTeknikAnaliz = onRequest({
+  region: 'europe-west1',
+  memory: '256MiB',
+  timeoutSeconds: 35,
+  secrets: [NVIDIA_API_KEY],
+}, async (req, res) => {
+  // CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Yalnızca POST desteklenmektedir' });
+    return;
+  }
+
+  // Rate limit
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+  if (isRateLimited(clientIp)) {
+    res.status(429).json({ error: 'İstek limiti aşıldı, lütfen bekleyin' });
+    return;
+  }
+
+  // Girdi doğrulama
+  const data = req.body;
+  if (!data || !data.symbol || !data.name || typeof data.rsi !== 'number') {
+    res.status(400).json({ error: 'Eksik veya geçersiz parametre' });
+    return;
+  }
+
+  const cacheKey = buildCacheKey(data.symbol, data.periodLabel);
+
+  // ── 1. Önbellek kontrolü ──────────────────────────────────────────────────
+  const cachedAnalysis = await getCachedAnalysis(cacheKey);
+  if (cachedAnalysis) {
+    console.log(`Önbellekten döndü: ${cacheKey}`);
+    res.json({ success: true, analysis: cachedAnalysis, fromCache: true });
+    return;
+  }
+
+  // ── 2. NVIDIA'ya yeni istek ───────────────────────────────────────────────
+  try {
+    const apiKey  = NVIDIA_API_KEY.value();
+    const prompt  = buildAnalysisPrompt(data);
+    const analysis = await callNvidiaAI(apiKey, prompt);
+
+    // Önbelleğe yaz (hata olursa sessizce geç)
+    await setCachedAnalysis(cacheKey, analysis, data.symbol, data.periodLabel);
+
+    console.log(`NVIDIA'dan yeni yanıt alındı, önbelleğe yazıldı: ${cacheKey}`);
+    res.json({ success: true, analysis, fromCache: false });
+  } catch (err) {
+    console.error('getTeknikAnaliz hatası:', err.message);
+    // 503 → Flutter lokal analize geçer
+    res.status(503).json({ error: 'Yapay zeka servisi şu an kullanılamıyor' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ÖNBELLEK TEMİZLEYİCİ — Her gece 02:00 UTC çalışır
+//
+// 48 saatten eski ai_cache kayıtlarını siler.
+// Firestore'un şişmesini önler, maliyeti düşük tutar.
+// Günde max ~500 BIST hissesi × 6 periyot = 3000 kayıt — temizlik yönetilebilir.
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.cleanAiCache = onSchedule({
+  schedule:       '0 2 * * *',   // Her gece saat 02:00 UTC
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '256MiB',
+  timeoutSeconds: 120,
+}, async () => {
+  const ESKIME_SURESI_MS = 48 * 60 * 60 * 1000; // 48 saat
+  const sinirZamani = new Date(Date.now() - ESKIME_SURESI_MS);
+
+  console.log(`Önbellek temizliği başladı. ${sinirZamani.toISOString()} öncesi kayıtlar silinecek.`);
+
+  try {
+    // Batch halinde sil (Firestore limit: 500/batch)
+    let silinen = 0;
+    let devam = true;
+
+    while (devam) {
+      const snapshot = await db.collection('ai_cache')
+        .where('createdAt', '<', sinirZamani)
+        .limit(400)
+        .get();
+
+      if (snapshot.empty) { devam = false; break; }
+
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      silinen += snapshot.size;
+      console.log(`${silinen} kayıt silindi...`);
+
+      // 400'den az geldiyse bitti
+      if (snapshot.size < 400) devam = false;
+    }
+
+    console.log(`Önbellek temizliği tamamlandı: toplam ${silinen} kayıt silindi.`);
+  } catch (err) {
+    console.error('Önbellek temizliği hatası:', err.message);
   }
 });

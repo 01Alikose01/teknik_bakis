@@ -409,12 +409,12 @@ class _IncludedFeaturesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final features = [
-      ('🎯', 'Gelişmiş Filtreler & Taramalar', 'MACD, RSI, Bollinger, Supertrend ve daha fazlası'),
+      ('🎯', 'Gelişmiş Filtreler & Taramalar', 'Güç Göstergesi, Momentum, Bollinger Bandı, Süper Trend ve daha fazlası'),
       ('📊', 'SAT SİNYAL ve AL SİNYAL Özelliği', 'Hisseleri otomatik olarak bulur ve listeler'),
       ('🤖', 'AI KAP ve Haberleri', 'Yapay zeka destekli KAP analizi ve haberler'),
       ('🔔', 'Gerçek Zamanlı Alarmlar', 'Fiyat alarmları, anında push bildirimi'),
       ('💼', 'Portföy Kâr/Zarar Takibi', 'Hedef kâra ulaşınca otomatik bildirim'),
-      ('⚡', 'Teknik Sinyal Bildirimleri', 'MACD, Supertrend dönüşlerinde anlık uyarı'),
+      ('⚡', 'Teknik Sinyal Bildirimleri', 'Güç Göstergesi, Süper Trend dönüşlerinde anlık uyarı'),
       ('🧩', 'Özel Portföy Analizi', 'Risk dağılımı, sektör ağırlıkları, performans'),
       ('🚀', 'Halka Arz Alarmları', 'Başvuru süreleri dolmadan hatırlatma'),
       ('📈', 'Backtesting Test Et', 'Stratejileri geçmiş verilerle test et ve analiz et'),
