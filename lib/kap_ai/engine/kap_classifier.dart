@@ -37,6 +37,8 @@ class KapClassifier {
 
   KapClassificationResult classify(String text) {
     final normalized = _normalize(text);
+    final title = text.split('\n').take(3).join(' ');
+    final normalizedTitle = _normalize(title);
     final allMatches = <CategoryMatch>[];
 
     for (final entry in KeywordDatabase.categoryKeywords.entries) {
@@ -44,13 +46,30 @@ class KapClassifier {
       final matched = <String>[];
 
       for (final keyword in entry.value) {
-        if (normalized.contains(_normalize(keyword))) {
+        final normKw = _normalize(keyword);
+        if (normalized.contains(normKw)) {
           matched.add(keyword);
           score += keyword.split(' ').length * 10;
+          // Başlık veya ilk 3 satırda eşleşiyorsa ek öncelik
+          if (normalizedTitle.contains(normKw)) {
+            score += 25;
+          }
         }
       }
 
+      // Temettü, sermaye artırımı, geri alım gibi maddi kurumsal eylemler
+      // genel kurul gibi usuli süreçlerin önünde yer almalıdır.
       if (score > 0) {
+        if (entry.key == KapCategory.dividend ||
+            entry.key == KapCategory.bonusIssue ||
+            entry.key == KapCategory.rightsIssue ||
+            entry.key == KapCategory.shareBuyback ||
+            entry.key == KapCategory.newBusiness ||
+            entry.key == KapCategory.tender ||
+            entry.key == KapCategory.solarEnergyGES) {
+          score += 15;
+        }
+
         allMatches.add(CategoryMatch(
           category: entry.key,
           score: score,
@@ -121,6 +140,8 @@ class KapClassifier {
 
   String _normalize(String text) {
     return text
+        .replaceAll('İ', 'i')
+        .replaceAll('I', 'ı')
         .toLowerCase()
         .replaceAll(RegExp(r'[^\wçğıöşü\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')

@@ -853,15 +853,15 @@ async function callNvidiaModel(apiKey, modelId, prompt, timeoutMs = 15000) {
           '1. Paragraf: Fiyat ve trend durumu.\n' +
           '2. Paragraf: Momentum (RSI), destek/direnc ve hacim.\n' +
           '3. Paragraf: Genel degerlendirme ve varsa temel carpanlar.\n' +
-          'Her paragraf 2-3 kisa cumleden olusmali.\n' +
+          'Her paragraf 2-3 kisa cumleden olusmali. Uzun cumle yazma.\n' +
           'Yatirim tavsiyesi verme.\n' +
-          'Son satir (ayri 4. paragraf olarak): Bu bir yatirim tavsiyesi degildir.',
+          'Son cumle (son paragrafin sonuna ekle): Bu bir yatirim tavsiyesi degildir.',
       },
       { role: 'user', content: prompt },
     ],
     temperature: 0.6,
     top_p: 0.95,
-    max_tokens: 1024,
+    max_tokens: 800,  // 3 kısa paragraf için yeterli; token bitince kesilmesini önler
     stream: false,
   });
 
@@ -897,6 +897,12 @@ async function callNvidiaModel(apiKey, modelId, prompt, timeoutMs = 15000) {
     req.end();
   });
 
+  // finish_reason kontrolü: "length" ise yanıt token limitinde kesildi → hata fırlat
+  const finishReason = result?.choices?.[0]?.finish_reason;
+  if (finishReason === 'length') {
+    throw new Error(`NVIDIA yanıtı token limitinde kesildi (${modelId}) — yarım analiz önlendi`);
+  }
+
   let content = result?.choices?.[0]?.message?.content;
   if (!content) throw new Error(`NVIDIA yanıtı boş (${modelId})`);
   content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -908,18 +914,22 @@ async function callNvidiaModel(apiKey, modelId, prompt, timeoutMs = 15000) {
  * İki kademeli yapay zeka analizi:
  * 1. Ana AI (NVIDIA Nemotron 3 Super 120B) denenir.
  * 2. Başarısız olursa / zaman aşımına uğrarsa 2. AI (OpenAI GPT-OSS 20B) devreye girer.
+
  * 3. Her iki model de başarısız olursa hata fırlatılır (Cloud Function 503 döner, Flutter lokal analize geçer).
  */
 async function getDualAiAnalysis(apiKey, prompt) {
+  // Minimum anlamlı analiz uzunluğu: 3 paragraf × 2 cümle = en az ~200 karakter
+  const MIN_ANALYSIS_LENGTH = 200;
+
   // 1. Kademe: Ana AI (Nemotron 3 Super 120B)
   try {
     console.log(`[AI] 1. Kademe (Ana AI) deneniyor: ${MODEL_PRIMARY}`);
     const analysis = await callNvidiaModel(apiKey, MODEL_PRIMARY, prompt, 14000);
-    if (analysis && analysis.length >= 40) {
-      console.log(`[AI] Ana AI başarılı oldu (${MODEL_PRIMARY})`);
+    if (analysis && analysis.length >= MIN_ANALYSIS_LENGTH) {
+      console.log(`[AI] Ana AI başarılı oldu (${MODEL_PRIMARY}), uzunluk: ${analysis.length}`);
       return { analysis, usedModel: MODEL_PRIMARY };
     }
-    throw new Error('Ana AI yanıtı yetersiz veya boş');
+    throw new Error(`Ana AI yanıtı yetersiz (${analysis?.length ?? 0} karakter, min ${MIN_ANALYSIS_LENGTH})`);
   } catch (errPrimary) {
     console.warn(`[AI] Ana AI (${MODEL_PRIMARY}) başarısız oldu: ${errPrimary.message}. 2. Kademe (OpenAI GPT-OSS 20B) deneniyor...`);
   }
@@ -928,11 +938,11 @@ async function getDualAiAnalysis(apiKey, prompt) {
   try {
     console.log(`[AI] 2. Kademe (Yedek AI) deneniyor: ${MODEL_FALLBACK}`);
     const analysis = await callNvidiaModel(apiKey, MODEL_FALLBACK, prompt, 18000);
-    if (analysis && analysis.length >= 40) {
-      console.log(`[AI] İkinci AI başarılı oldu (${MODEL_FALLBACK})`);
+    if (analysis && analysis.length >= MIN_ANALYSIS_LENGTH) {
+      console.log(`[AI] İkinci AI başarılı oldu (${MODEL_FALLBACK}), uzunluk: ${analysis.length}`);
       return { analysis, usedModel: MODEL_FALLBACK };
     }
-    throw new Error('İkinci AI yanıtı yetersiz veya boş');
+    throw new Error(`İkinci AI yanıtı yetersiz (${analysis?.length ?? 0} karakter, min ${MIN_ANALYSIS_LENGTH})`);
   } catch (errSecondary) {
     console.error(`[AI] İkinci AI (${MODEL_FALLBACK}) de başarısız oldu: ${errSecondary.message}`);
     throw new Error(`Her iki AI modeli de başarısız oldu: ${errSecondary.message}`);

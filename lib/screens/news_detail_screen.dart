@@ -270,13 +270,32 @@ class _KapDetailBody extends StatelessWidget {
         // AI Analizi
         _InfoCard(
           icon: '🤖',
-          title: 'AI Analizi',
+          title: 'AI Analizi & Yönetici Özeti',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(analysis.summary,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.6)),
+              Text(
+                analysis.executiveSummary.isNotEmpty
+                    ? analysis.executiveSummary
+                    : analysis.summary,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.9), height: 1.6),
+              ),
+              if (analysis.financialImpact.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text('Finansal & Bilanço Etkisi:',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: theme.colorScheme.primary)),
+                const SizedBox(height: 6),
+                Text(analysis.financialImpact,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.85),
+                        height: 1.5)),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
@@ -340,17 +359,52 @@ class _KapDetailBody extends StatelessWidget {
         // Yatırımcı Yorumu
         _InfoCard(
           icon: '👤',
-          title: 'Yatırımcı Yorumu',
-          child: Text(_investorComment(analysis.effect, analysis.categoryName),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
+          title: 'Küçük Yatırımcı Rehberi',
+          child: Text(
+            analysis.retailInvestorGuidance.isNotEmpty
+                ? analysis.retailInvestorGuidance
+                : _investorComment(analysis.effect, analysis.categoryName),
+            style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6),
+          ),
         ),
+
+        // Takip Edilecek Noktalar
+        if (analysis.watchItems.isNotEmpty)
+          _InfoCard(
+            icon: '🎯',
+            title: 'Takip Edilecek Katalizörler',
+            child: Column(
+              children: analysis.watchItems
+                  .map((w) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('→  ',
+                                style: TextStyle(
+                                    color: Color(0xFF34C759),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold)),
+                            Expanded(
+                              child: Text(w,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.9),
+                                      height: 1.4)),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
 
         // Riskler
         if (analysis.risks.isNotEmpty)
           _InfoCard(
             icon: '⚠️',
-            title: 'Dikkat Edilmesi Gerekenler',
+            title: 'Dikkat Edilmesi Gerekenler & Riskler',
             child: Column(
               children: analysis.risks
                   .map((r) => Padding(
@@ -376,10 +430,14 @@ class _KapDetailBody extends StatelessWidget {
         // Piyasa Etkisi
         _InfoCard(
           icon: '📌',
-          title: 'Piyasa Etkisi',
-          child: Text(_marketImpact(analysis.effect),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6)),
+          title: 'Piyasa & Fiyatlama Dinamikleri',
+          child: Text(
+            analysis.marketOutlook.isNotEmpty
+                ? analysis.marketOutlook
+                : _marketImpact(analysis.effect),
+            style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.9), height: 1.6),
+          ),
         ),
 
         const SizedBox(height: 24),

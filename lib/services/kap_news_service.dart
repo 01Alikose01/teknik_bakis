@@ -29,10 +29,11 @@ class KapNewsService {
     final normalizedSymbol = symbol.trim().toUpperCase();
     final fallbackName = (name ?? _findStockName(symbol) ?? symbol).trim();
     final slugCandidates = <String>[
-      normalizedSymbol.toLowerCase(),
+      if (_hasTickerAlias(normalizedSymbol)) _slugify(_fallbackTickerName(normalizedSymbol)),
+      _slugify(fallbackName.replaceAll(RegExp(r'\bA\.?Ş\b|\bAS\b|\bINC\b|\bLTD\b|\bPLC\b', caseSensitive: false), '')),
       _slugify(fallbackName),
       _slugify(_fallbackTickerName(normalizedSymbol)),
-      _slugify(fallbackName.replaceAll(RegExp(r'\bA\.?Ş\b|\bAS\b|\bINC\b|\bLTD\b|\bPLC\b'), '')),
+      normalizedSymbol.toLowerCase(),
     ];
 
     for (final candidate in slugCandidates) {
@@ -204,6 +205,11 @@ class KapNewsService {
       orElse: () => <String, String>{},
     );
     return entry['name'];
+  }
+
+  static bool _hasTickerAlias(String symbol) {
+    const aliases = {'TUPRS', 'AKBNK', 'SISE', 'THYAO'};
+    return aliases.contains(symbol.trim().toUpperCase());
   }
 
   static String _fallbackTickerName(String symbol) {

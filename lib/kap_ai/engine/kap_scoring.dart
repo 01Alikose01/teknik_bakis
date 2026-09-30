@@ -1,11 +1,10 @@
 import '../data/keyword_database.dart';
+import '../models/kap_entities.dart';
 import 'kap_classifier.dart';
 
 class KapScoreResult {
   final int score; // 0-100
-
   final int stars; // 1-5
-
   final String effectScore;
 
   const KapScoreResult({
@@ -20,10 +19,10 @@ class KapScoring {
 
   KapScoreResult calculate(
     String text,
-    KapClassificationResult classification,
-  ) {
+    KapClassificationResult classification, {
+    KapEntities? entities,
+  }) {
     final normalized = text.toLowerCase();
-
     int score = 0;
 
     //-------------------------------------------------
@@ -32,43 +31,51 @@ class KapScoring {
 
     switch (classification.category) {
       case KapCategory.newBusiness:
-        score += 60;
-        break;
-
-      case KapCategory.tender:
         score += 65;
         break;
 
+      case KapCategory.tender:
+        score += 70;
+        break;
+
       case KapCategory.export:
-        score += 55;
-        break;
-
-      case KapCategory.shareBuyback:
-        score += 55;
-        break;
-
-      case KapCategory.dividend:
-        score += 50;
-        break;
-
-      case KapCategory.capacityIncrease:
-        score += 55;
-        break;
-
-      case KapCategory.investment:
-        score += 50;
-        break;
-
-      case KapCategory.incentive:
-        score += 45;
-        break;
-
-      case KapCategory.partnership:
         score += 60;
         break;
 
+      case KapCategory.shareBuyback:
+        score += 65;
+        break;
+
+      case KapCategory.dividend:
+        score += 60;
+        break;
+
+      case KapCategory.bonusIssue:
+        score += 70;
+        break;
+
+      case KapCategory.solarEnergyGES:
+        score += 65;
+        break;
+
+      case KapCategory.capacityIncrease:
+        score += 60;
+        break;
+
+      case KapCategory.investment:
+        score += 55;
+        break;
+
+      case KapCategory.incentive:
+        score += 50;
+        break;
+
+      case KapCategory.partnership:
+        score += 65;
+        break;
+
       case KapCategory.debtReduction:
-        score += 45;
+        score += 55;
         break;
 
       case KapCategory.rightsIssue:
@@ -92,7 +99,7 @@ class KapScoring {
         break;
 
       case KapCategory.contractTermination:
-        score += 70;
+        score += 75;
         break;
 
       case KapCategory.executiveResignation:
@@ -100,44 +107,60 @@ class KapScoring {
         break;
 
       case KapCategory.lawsuit:
+        score += 50;
+        break;
+
+      case KapCategory.debtIssuance:
+        score += 40;
+        break;
+
+      case KapCategory.shareTransaction:
+        score += 45;
+        break;
+
+      case KapCategory.capitalIncrease:
+        score += 45;
+        break;
+
+      case KapCategory.financialReport:
+        score += 50;
+        break;
+
+      case KapCategory.ratingUpdate:
         score += 45;
         break;
 
       default:
-        score += 25;
+        score += 30;
     }
 
     //-------------------------------------------------
-    // 2- Parasal Büyüklük
+    // 2- Parasal Büyüklük Puanı
     //-------------------------------------------------
 
-    score += _moneyScore(normalized);
+    if (entities?.amountTl != null && entities!.amountTl! > 0) {
+      score += _amountScore(entities.amountTl!);
+    } else {
+      score += _moneyScoreFallback(normalized);
+    }
 
     //-------------------------------------------------
     // 3- Güçlü Pozitif Kelimeler
     //-------------------------------------------------
 
     const positives = [
-
-      "imzalandı",
-
-      "kazanıldı",
-
-      "tamamlandı",
-
-      "onaylandı",
-
-      "yatırım",
-
-      "teşvik",
-
-      "yeni",
-
-      "büyüme",
-
-      "kapasite",
-
-      "sipariş",
+      'imzalandı',
+      'kazanıldı',
+      'tamamlandı',
+      'onaylandı',
+      'yatırım',
+      'teşvik',
+      'yeni',
+      'büyüme',
+      'kapasite',
+      'sipariş',
+      'rekor',
+      'kâr',
     ];
 
     for (final word in positives) {
@@ -151,24 +174,16 @@ class KapScoring {
     //-------------------------------------------------
 
     const negatives = [
-
-      "iptal",
-
-      "fesih",
-
-      "zarar",
-
-      "durduruldu",
-
-      "iflas",
-
-      "konkordato",
-
-      "ceza",
-
-      "mahkeme",
-
-      "kayıp",
+      'iptal',
+      'fesih',
+      'zarar',
+      'durduruldu',
+      'iflas',
+      'konkordato',
+      'ceza',
+      'mahkeme',
+      'kayıp',
+      'düşüş',
     ];
 
     for (final word in negatives) {
@@ -184,29 +199,28 @@ class KapScoring {
     score = score.clamp(1, 100);
 
     //-------------------------------------------------
-    // 6- Yıldız
+    // 6- Yıldız (1-5)
     //-------------------------------------------------
 
-    int stars = switch (score) {
-      >= 90 => 5,
-      >= 75 => 4,
-      >= 55 => 3,
-      >= 35 => 2,
+    final stars = switch (score) {
+      >= 85 => 5,
+      >= 70 => 4,
+      >= 50 => 3,
+      >= 30 => 2,
       _ => 1,
     };
 
     //-------------------------------------------------
-    // 7- +94 / -81 gösterimi
+    // 7- +94 / -81 / 50 gösterimi
     //-------------------------------------------------
 
     String effectScore;
-
     if (classification.effect == KapEffect.positive) {
-      effectScore = "+$score";
+      effectScore = '+$score';
     } else if (classification.effect == KapEffect.negative) {
-      effectScore = "-$score";
+      effectScore = '-$score';
     } else {
-      effectScore = "$score";
+      effectScore = '$score';
     }
 
     return KapScoreResult(
@@ -216,45 +230,29 @@ class KapScoring {
     );
   }
 
-  //-------------------------------------------------
-  // Para büyüklüğü analizi
-  //-------------------------------------------------
+  int _amountScore(double amountTl) {
+    if (amountTl >= 5000000000) return 25; // 5 Milyar TL+
+    if (amountTl >= 1000000000) return 20; // 1 Milyar TL+
+    if (amountTl >= 500000000) return 15;  // 500 Milyon TL+
+    if (amountTl >= 100000000) return 12;  // 100 Milyon TL+
+    if (amountTl >= 25000000) return 8;   // 25 Milyon TL+
+    if (amountTl >= 5000000) return 5;    // 5 Milyon TL+
+    return 2;
+  }
 
-  int _moneyScore(String text) {
+  int _moneyScoreFallback(String text) {
     final regex = RegExp(
       r'([\d.,]+)\s*(milyar|milyon|bin)?\s*(tl|₺|usd|eur|dolar|euro)',
       caseSensitive: false,
     );
 
     final match = regex.firstMatch(text);
+    if (match == null) return 0;
 
-    if (match == null) {
-      return 0;
-    }
-
-    final value =
-        double.tryParse(match.group(1)!.replaceAll(",", ".")) ?? 0;
-
-    final unit = match.group(2)?.toLowerCase() ?? "";
-
-    double amount = value;
-
-    if (unit == "bin") amount *= 1000;
-    if (unit == "milyon") amount *= 1000000;
-    if (unit == "milyar") amount *= 1000000000;
-
-    if (amount >= 5000000000) return 30;
-
-    if (amount >= 1000000000) return 25;
-
-    if (amount >= 500000000) return 20;
-
-    if (amount >= 100000000) return 15;
-
-    if (amount >= 10000000) return 10;
-
-    if (amount >= 1000000) return 6;
-
+    final unit = match.group(2)?.toLowerCase() ?? '';
+    if (unit == 'milyar') return 20;
+    if (unit == 'milyon') return 12;
+    if (unit == 'bin') return 4;
     return 2;
   }
 }

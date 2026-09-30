@@ -304,8 +304,8 @@ class _KapAiCard extends StatelessWidget {
                       Expanded(
                         child: Text(item.analysis.summary,
                             style: TextStyle(
-                                color: mutedTextColor, fontSize: 12),
-                            maxLines: 2,
+                                color: mutedTextColor, fontSize: 12, height: 1.4),
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis),
                       ),
                     ],

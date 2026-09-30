@@ -195,15 +195,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ]),
 
                   const SizedBox(height: 20),
-                  _SectionLabel('Teknik Bakış Partneri'),
-                  _SettingsGroup(items: [
-                    _SettingsItem(
-                      title: 'Partnerlik Programı',
-                      onTap: () {},
-                    ),
-                  ]),
-
-                  const SizedBox(height: 20),
                   _SectionLabel('Abonelik'),
                   _SettingsGroup(items: [
                     _SettingsItem(

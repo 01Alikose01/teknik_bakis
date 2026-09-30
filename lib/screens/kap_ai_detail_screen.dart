@@ -5,7 +5,7 @@ import '../widgets/formatted_analysis_text.dart';
 import 'kap_ai_list_screen.dart';
 
 // ─────────────────────────────────────────────
-// KAP AI Detay Ekranı
+// KAP AI Detay Ekranı — Profesyonel Finansal Analiz
 // ─────────────────────────────────────────────
 
 class KapAiDetailScreen extends StatelessWidget {
@@ -37,22 +37,28 @@ class KapAiDetailScreen extends StatelessWidget {
             ? 'Negatif'
             : 'Nötr';
 
+    final displayCompany = analysis.companyName.isNotEmpty
+        ? analysis.companyName
+        : item.source;
+
     return Scaffold(
-      backgroundColor: isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
+      backgroundColor:
+          isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
       appBar: AppBar(
-        backgroundColor: isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
+        backgroundColor:
+            isDark ? theme.colorScheme.surface : const Color(0xFFF2F2F7),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new,
-              color: isDark ? theme.colorScheme.onSurface : Colors.black87, size: 18),
+              color: isDark ? theme.colorScheme.onSurface : Colors.black87,
+              size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF1C3A5E),
                 borderRadius: BorderRadius.circular(8),
@@ -65,10 +71,10 @@ class KapAiDetailScreen extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('KAP AI Analizi',
+              child: Text('KAP AI Araştırma Raporu',
                   style: TextStyle(
                       color: theme.colorScheme.onSurface,
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis),
             ),
@@ -78,25 +84,85 @@ class KapAiDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          // ── Başlık kartı ──
+          // ── 1. Başlık & Şirket Kartı ──
           _Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.title,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: theme.colorScheme.onSurface)),
-                const SizedBox(height: 4),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.access_time,
-                        size: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.65)),
-                    const SizedBox(width: 4),
-                    Text(item.time,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(displayCompany,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: theme.colorScheme.onSurface)),
+                          const SizedBox(height: 4),
+                          Text(item.title,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.85),
+                                  height: 1.4)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: effectColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: effectColor.withOpacity(0.3)),
+                      ),
+                      child: Text(analysis.categoryName,
+                          style: TextStyle(
+                              color: effectColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: effectColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$effectEmoji $effectLabel (${analysis.effectScore})',
                         style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 12)),
+                            color: effectColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time,
+                            size: 12,
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.65)),
+                        const SizedBox(width: 4),
+                        Text(item.time,
+                            style: TextStyle(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.65),
+                                fontSize: 11)),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -105,126 +171,136 @@ class KapAiDetailScreen extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // ── AI Özeti ──
+          // ── 2. AI Yönetici Özeti ──
           _SectionCard(
             emoji: '📢',
-            title: 'AI Özeti',
+            title: 'AI Yönetici Özeti',
             child: FormattedAnalysisText(
-              text: analysis.summary,
+              text: analysis.executiveSummary.isNotEmpty
+                  ? analysis.executiveSummary
+                  : analysis.summary,
               style: TextStyle(
                   fontSize: 14,
                   color: theme.colorScheme.onSurface,
-                  height: 1.5),
+                  height: 1.6),
             ),
           ),
 
-          // ── AI Güveni ──
-          _SectionCard(
-            emoji: '🎯',
-            title: 'AI Güveni',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '%${analysis.confidence}',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: analysis.confidence >= 80
-                            ? const Color(0xFF34C759)
-                            : analysis.confidence >= 50
-                                ? const Color(0xFFFF9500)
-                                : const Color(0xFFFF3B30),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (analysis.confidence >= 80
-                                ? const Color(0xFF34C759)
-                                : analysis.confidence >= 50
-                                    ? const Color(0xFFFF9500)
-                                    : const Color(0xFFFF3B30))
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(analysis.confidenceLabel,
-                          style: TextStyle(
-                              color: analysis.confidence >= 80
-                                  ? const Color(0xFF34C759)
-                                  : analysis.confidence >= 50
-                                      ? const Color(0xFFFF9500)
-                                      : const Color(0xFFFF3B30),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: analysis.confidence / 100,
-                    backgroundColor: Colors.grey[200],
-                    valueColor: AlwaysStoppedAnimation(
-                      analysis.confidence >= 80
-                          ? const Color(0xFF34C759)
-                          : analysis.confidence >= 50
-                              ? const Color(0xFFFF9500)
-                              : const Color(0xFFFF3B30),
-                    ),
-                    minHeight: 6,
-                  ),
-                ),
-                if (analysis.confidence < 50) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Sınıflandırma belirsiz — orijinal KAP metnini kontrol edin.',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // ── Çelişki Uyarısı ──
-          if (analysis.hasContradiction)
+          // ── 3. Şirket & Finansal Etki Analizi ──
+          if (analysis.financialImpact.isNotEmpty)
             _SectionCard(
-              emoji: '⚡',
-              title: 'Çelişki Tespiti',
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9500).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: const Color(0xFFFF9500).withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  analysis.contradiction.message ?? 'Metin içinde çelişkili sinyaller var.',
-                  style: TextStyle(
-                      fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4),
-                ),
+              emoji: '🏢',
+              title: 'Finansal & Bilanço Etkisi',
+              child: FormattedAnalysisText(
+                text: analysis.financialImpact,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    color: theme.colorScheme.onSurface.withOpacity(0.92),
+                    height: 1.6),
               ),
             ),
 
-          // ── Çıkarılan Veriler ──
+          // ── 4. Piyasa & Fiyatlama Beklentisi ──
+          if (analysis.marketOutlook.isNotEmpty)
+            _SectionCard(
+              emoji: '📈',
+              title: 'Piyasa & Fiyatlama Dinamikleri',
+              child: FormattedAnalysisText(
+                text: analysis.marketOutlook,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    color: theme.colorScheme.onSurface.withOpacity(0.92),
+                    height: 1.6),
+              ),
+            ),
+
+          // ── 5. Küçük Yatırımcı İçin Stratejik Aksiyon Rehberi ──
+          _SectionCard(
+            emoji: '👤',
+            title: 'Küçük Yatırımcı İçin Aksiyon Rehberi',
+            child: FormattedAnalysisText(
+              text: analysis.retailInvestorGuidance.isNotEmpty
+                  ? analysis.retailInvestorGuidance
+                  : _retailInvestorNote(analysis),
+              style: TextStyle(
+                  fontSize: 13.5,
+                  color: theme.colorScheme.onSurface.withOpacity(0.92),
+                  height: 1.6),
+            ),
+          ),
+
+          // ── 6. Takip Edilecek Kritik Katalizörler ──
+          if (analysis.watchItems.isNotEmpty)
+            _SectionCard(
+              emoji: '🎯',
+              title: 'Takip Edilecek Kritik Katalizörler',
+              child: Column(
+                children: analysis.watchItems
+                    .map((w) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('→  ',
+                                  style: TextStyle(
+                                      color: Color(0xFF34C759),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold)),
+                              Expanded(
+                                child: Text(w,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.88),
+                                        height: 1.4)),
+                              ),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+
+          // ── 7. Çıkarılan Veriler ──
           if (analysis.entities.hasAny)
             _SectionCard(
               emoji: '🔍',
-              title: 'Çıkarılan Veriler',
+              title: 'Çıkarılan Kilit Veriler',
               child: Column(
                 children: [
                   if (analysis.entities.amount != null)
                     _InfoRow(
-                      label: 'Tutar',
+                      label: 'Tutar / Değer',
                       value: analysis.entities.amount!,
                     ),
+                  if (analysis.entities.shareCount != null) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Pay / Lot Adedi',
+                      value: analysis.entities.shareCount!,
+                    ),
+                  ],
+                  if (analysis.entities.dividendPerShare != null) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Hisse Başı Temettü',
+                      value: analysis.entities.dividendPerShare!,
+                    ),
+                  ],
+                  if (analysis.entities.capitalRatio != null) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Sermaye Oranı',
+                      value: analysis.entities.capitalRatio!,
+                    ),
+                  ],
+                  if (analysis.entities.projectScope != null) ...[
+                    const Divider(height: 12),
+                    _InfoRow(
+                      label: 'Proje / Konu',
+                      value: analysis.entities.projectScope!,
+                    ),
+                  ],
                   if (analysis.entities.dates.isNotEmpty) ...[
                     const Divider(height: 12),
                     _InfoRow(
@@ -232,24 +308,18 @@ class KapAiDetailScreen extends StatelessWidget {
                       value: analysis.entities.dates.join(', '),
                     ),
                   ],
-                  if (analysis.entities.percentages.isNotEmpty) ...[
+                  if (analysis.entities.percentages.isNotEmpty &&
+                      analysis.entities.capitalRatio == null) ...[
                     const Divider(height: 12),
                     _InfoRow(
                       label: 'Oran',
                       value: analysis.entities.percentages.join(', '),
                     ),
                   ],
-                  if (analysis.entities.symbols.isNotEmpty) ...[
-                    const Divider(height: 12),
-                    _InfoRow(
-                      label: 'Hisse',
-                      value: analysis.entities.symbols.join(', '),
-                    ),
-                  ],
                   if (analysis.entities.institution != null) ...[
                     const Divider(height: 12),
                     _InfoRow(
-                      label: 'Kurum',
+                      label: 'Karşı Kurum',
                       value: analysis.entities.institution!,
                     ),
                   ],
@@ -257,189 +327,12 @@ class KapAiDetailScreen extends StatelessWidget {
               ),
             ),
 
-          // ── Haber Türü ──
+          // ── 8. Riskler ve Belirsizlikler ──
           _SectionCard(
-            emoji: '🏷',
-            title: 'Haber Türü',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: effectColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: effectColor.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(analysis.categoryName,
-                          style: TextStyle(
-                              color: effectColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13)),
-                    ),
-                  ],
-                ),
-                if (analysis.secondaryCategories.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text('Ek kategoriler',
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.65),
-                          fontSize: 11)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: analysis.secondaryCategories
-                        .map((c) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? theme.colorScheme.surfaceContainerHighest
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: isDark
-                                      ? theme.colorScheme.outlineVariant
-                                      : Colors.grey[300]!,
-                                ),
-                              ),
-                              child: Text(c.categoryName,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: theme.colorScheme.onSurface.withOpacity(0.75))),
-                            ))
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // ── Etki Analizi ──
-          _SectionCard(
-            emoji: '📈',
-            title: 'Etki Analizi',
-            child: Column(
-              children: [
-                _InfoRow(
-                  label: 'Yön',
-                  value: '$effectEmoji $effectLabel',
-                  valueColor: effectColor,
-                ),
-                const Divider(height: 16),
-                _InfoRow(
-                  label: 'Eşleşen Anahtar Kelimeler',
-                  value: analysis.matchedKeywords.isEmpty
-                      ? 'Tespit edilemedi'
-                      : analysis.matchedKeywords.join(', '),
-                  valueColor: theme.colorScheme.onSurface.withOpacity(0.72),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Etki Skoru ──
-          _SectionCard(
-            emoji: '📊',
-            title: 'Etki Skoru',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      analysis.effectScore,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: effectColor,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: analysis.score / 100,
-                              backgroundColor: isDark
-                                  ? theme.colorScheme.surfaceContainerHighest
-                                  : Colors.grey[200],
-                              valueColor: AlwaysStoppedAnimation(effectColor),
-                              minHeight: 8,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text('${analysis.score} / 100',
-                              style: TextStyle(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.65),
-                                  fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // ── Önem Derecesi ──
-          _SectionCard(
-            emoji: '⭐',
-            title: 'Önem Derecesi',
-            child: Row(
-              children: [
-                ...List.generate(
-                  5,
-                  (i) => Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Icon(
-                      i < analysis.stars
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: i < analysis.stars
-                          ? const Color(0xFFFFCC00)
-                          : Colors.grey[300],
-                      size: 28,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text('${analysis.stars} / 5',
-                    style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.65),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-
-          // ── Küçük Yatırımcı İçin ──
-          _SectionCard(
-            emoji: '👤',
-            title: 'Küçük Yatırımcı İçin',
-            child: Text(
-              _retailInvestorNote(analysis),
-              style: TextStyle(
-                  fontSize: 14,
-                  color: theme.colorScheme.onSurface.withOpacity(0.9),
-                  height: 1.5),
-            ),
-          ),
-
-          // ── Riskler ──
-          _SectionCard(
-            emoji: '⚠',
-            title: 'Riskler',
+            emoji: '⚠️',
+            title: 'Riskler ve Belirsizlikler',
             child: analysis.risks.isEmpty
-                ? Text('Risk tespit edilmedi.',
+                ? Text('Belirgin bir risk unsuru tespit edilmedi.',
                     style: TextStyle(
                         color: theme.colorScheme.onSurface.withOpacity(0.65),
                         fontSize: 13))
@@ -458,7 +351,8 @@ class KapAiDetailScreen extends StatelessWidget {
                                     child: Text(r,
                                         style: TextStyle(
                                             fontSize: 13,
-                                            color: theme.colorScheme.onSurface.withOpacity(0.9),
+                                            color: theme.colorScheme.onSurface
+                                                .withOpacity(0.88),
                                             height: 1.4)),
                                   ),
                                 ],
@@ -468,42 +362,129 @@ class KapAiDetailScreen extends StatelessWidget {
                   ),
           ),
 
-          // ── Yön Rozeti ──
+          // ── 9. Çelişki Tespiti ──
+          if (analysis.hasContradiction)
+            _SectionCard(
+              emoji: '⚡',
+              title: 'Çelişki Sinyali',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9500).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: const Color(0xFFFF9500).withOpacity(0.3)),
+                ),
+                child: Text(
+                  analysis.contradiction.message ??
+                      'Metin içinde çelişkili sinyaller var.',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface,
+                      height: 1.4),
+                ),
+              ),
+            ),
+
+          // ── 10. AI Puanlama ve Güven Metrikleri ──
           _SectionCard(
-            emoji: effectEmoji,
-            title: 'Genel Değerlendirme',
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: effectColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: effectColor.withValues(alpha: 0.25)),
-              ),
-              child: Column(
-                children: [
-                  Text(effectEmoji, style: const TextStyle(fontSize: 36)),
-                  const SizedBox(height: 6),
-                  Text(effectLabel,
+            emoji: '📊',
+            title: 'AI Değerlendirme & Güven Metrikleri',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      analysis.effectScore,
                       style: TextStyle(
-                          color: effectColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18)),
-                  const SizedBox(height: 4),
-                  Text(
-                    _effectDescription(effect),
-                    style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.72),
-                        fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: effectColor,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Etki Skoru: ${analysis.score}/100',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: theme.colorScheme.onSurface)),
+                              Text('Güven: %${analysis.confidence}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.onSurface
+                                          .withOpacity(0.65))),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: analysis.score / 100,
+                              backgroundColor: isDark
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation(effectColor),
+                              minHeight: 8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text('Önem Seviyesi:',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.65))),
+                    const SizedBox(width: 8),
+                    ...List.generate(
+                      5,
+                      (i) => Icon(
+                        i < analysis.stars
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        color: i < analysis.stars
+                            ? const Color(0xFFFFCC00)
+                            : Colors.grey[300],
+                        size: 20,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: effectColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('${analysis.confidenceLabel} Güven',
+                          style: TextStyle(
+                              color: effectColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 
-          // ── Orijinal KAP Metni ──
+          // ── 11. Orijinal KAP Metni ──
           _SectionCard(
             emoji: '📄',
             title: 'Orijinal KAP Metni',
@@ -536,41 +517,20 @@ class KapAiDetailScreen extends StatelessWidget {
     );
   }
 
-  // Küçük yatırımcı notu üret
   String _retailInvestorNote(KapAnalysis analysis) {
     switch (analysis.effect) {
       case KapEffect.positive:
-        return 'Bu haber hisse için olumlu bir gelişmedir. '
-            'Kısa vadede yukarı yönlü hareket görülebilir. '
-            'Ancak mevcut piyasa koşullarını ve teknik seviyeleri '
-            'göz önünde bulundurarak karar vermeniz önerilir.';
+        return 'Bu bildirim hisse için olumlu bir katalizördür. Kısa vadeli fiyat sıçramalarında fomo ile alım yapmak yerine hacimli geri çekilmeleri izlemek ve iz süren stop kullanmak önerilir.';
       case KapEffect.negative:
-        return 'Bu haber hisse için olumsuz bir gelişmedir. '
-            'Kısa vadede satış baskısı oluşabilir. '
-            'Varsa stop-loss seviyelerinizi kontrol etmeniz '
-            've aceleci kararlardan kaçınmanız önerilir.';
+        return 'Bu bildirim hisse üzerinde kısa süreli satış baskısı oluşturabilir. Stop-loss seviyelerinizi gözden geçirmeniz ve haberin bilanço hasarını değerlendirmeniz önerilir.';
       case KapEffect.neutral:
-        return 'Bu haber hisse fiyatı üzerinde doğrudan '
-            'bir etki oluşturması beklenmiyor. '
-            'Uzun vadeli yatırımcılar için bilgilendirme '
-            'niteliğindedir.';
-    }
-  }
-
-  String _effectDescription(KapEffect effect) {
-    switch (effect) {
-      case KapEffect.positive:
-        return 'Haber hisse senedi için olumlu sinyaller içeriyor.';
-      case KapEffect.negative:
-        return 'Haber hisse senedi üzerinde olumsuz baskı yaratabilir.';
-      case KapEffect.neutral:
-        return 'Haberin hisse fiyatı üzerinde belirgin bir etkisi beklenmez.';
+        return 'Bu bildirim hisse fiyatı üzerinde doğrudan belirgin bir dalgalanma yaratması beklenmeyen rutin bir bilgilendirmedir.';
     }
   }
 }
 
 // ─────────────────────────────────────────────
-// Yardımcı widget'lar
+// Yardımcı Widget'lar
 // ─────────────────────────────────────────────
 
 class _Card extends StatelessWidget {
@@ -586,11 +546,14 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.04), blurRadius: 6)
+              color: Colors.black.withOpacity(isDark ? 0.16 : 0.04),
+              blurRadius: 6)
         ],
       ),
       child: child,
@@ -618,11 +581,14 @@ class _SectionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.04), blurRadius: 6)
+              color: Colors.black.withOpacity(isDark ? 0.16 : 0.04),
+              blurRadius: 6)
         ],
       ),
       child: Column(
@@ -631,12 +597,14 @@ class _SectionCard extends StatelessWidget {
           Row(
             children: [
               Text(emoji, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 6),
-              Text(title,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurface)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface)),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -667,15 +635,17 @@ class _InfoRow extends StatelessWidget {
           width: 130,
           child: Text(label,
               style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
                   fontSize: 12)),
         ),
         Expanded(
           child: Text(value,
               style: TextStyle(
                   fontSize: 12,
-                  color: valueColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
-                  fontWeight: FontWeight.w500)),
+                  color: valueColor ??
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
+                  fontWeight: FontWeight.w600)),
         ),
       ],
     );

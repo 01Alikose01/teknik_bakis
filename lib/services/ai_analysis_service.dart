@@ -174,7 +174,8 @@ class AiAnalysisService {
     }
 
     // 5. Asgari uzunluk kontrolü (yarım kalmış taslakları engellemek için)
-    if (text.length < 60) {
+    // 3 paragraf × 2 kısa cümle ≈ en az 200 karakter olmalı
+    if (text.length < 200) {
       return null;
     }
 

@@ -1063,6 +1063,7 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
   String? _aiText;
   bool _aiLoading = false;
   bool _aiUsed = false; // AI yanıtı başarıyla alındı mı?
+  int _fetchId = 0; // Her yeni fetch'te artar; eski fetch sonuçları görmezden gelinir.
 
   AssetModel get asset => widget.asset;
 
@@ -1079,12 +1080,14 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
         old.periodLabel != widget.periodLabel) {
       _aiText = null;
       _aiUsed = false;
+      // _aiLoading kontrolü olmadan her zaman yeni fetch başlat;
+      // eski fetch'in sonucu _fetchId ile reddedilir.
       _fetchAiAnalysis();
     }
   }
 
   Future<void> _fetchAiAnalysis() async {
-    if (_aiLoading) return;
+    final myId = ++_fetchId; // Bu fetch'e özgü ID
     setState(() => _aiLoading = true);
 
     final sup = _supportLevels();
@@ -1101,7 +1104,9 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
       periodLabel: widget.periodLabel,
     );
 
-    if (mounted) {
+    // Fetch tamamlandığında hâlâ bu fetch geçerliyse uygula.
+    // (Hisse değiştiyse _fetchId artmış olur → eski sonuç görmezden gelinir.)
+    if (mounted && myId == _fetchId) {
       setState(() {
         _aiLoading = false;
         if (result != null && result.isNotEmpty) {
