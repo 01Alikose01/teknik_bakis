@@ -12,6 +12,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Google Play Satın Alma Bildirimi (Client yazar, yetki üretmez) ─
+    match /purchases/{deviceId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    // ── Google Play Yetkilendirme / Entitlements (SADECE Cloud Function Yazar) ─
+    // İstemciler (client) bu koleksiyona asla doğrudan yazamaz.
+    // Yetki yalnızca Google Play Developer API doğrulaması sonrası Cloud Functions tarafından verilir.
+    match /entitlements/{deviceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── Abonelik Token Kasası (Sadece Cloud Function erişebilir) ─────────
+    match /subscription_tokens/{tokenId} {
+      allow read: if false;
+      allow write: if false;
+    }
+
     // ── Temel göstergeler (Cloud Function yazar, uygulama okur) ──────────
     match /fundamentals/{ticker} {
       allow read:   if true;

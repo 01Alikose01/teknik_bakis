@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
+import '../services/purchase_service.dart';
 import 'payment_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -200,6 +201,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _SettingsItem(
                       title: 'Planları Görüntüle',
                       onTap: () => _showPlansSheet(context),
+                    ),
+                    _SettingsItem(
+                      title: 'Abonelikleri Geri Yükle',
+                      subtitle: 'Google Play aboneliğinizi senkronize edin',
+                      onTap: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Google Play aboneliğiniz kontrol ediliyor...'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        await PurchaseService.restorePurchases();
+                        if (mounted) setState(() {});
+                      },
                     ),
                     _SettingsItem(
                       title: 'Yasal Uyarı',
@@ -532,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _PlanDetailCard(
                   emoji: '📅',
                   title: 'Aylık Plan',
-                  price: '₺299',
+                  price: PurchaseService.monthlyRawPriceText,
                   period: '/ay',
                   badge: SubscriptionService.plan == 'monthly' ? 'SEÇİLİ' : null,
                   badgeColor: SubscriptionService.plan == 'monthly' ? const Color(0xFF34C759) : null,
@@ -569,11 +586,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _PlanDetailCard(
                   emoji: '🏆',
                   title: 'Yıllık Plan',
-                  price: '₺2499',
+                  price: PurchaseService.yearlyRawPriceText,
                   period: '/yıl',
                   badge: SubscriptionService.plan == 'yearly' ? 'SEÇİLİ' : '%30 İNDİRİM',
                   badgeColor: SubscriptionService.plan == 'yearly' ? const Color(0xFF34C759) : const Color(0xFFFF9500),
-                  note: 'Ayda sadece ₺208 • En avantajlı',
+                  note: 'Ayda sadece ${PurchaseService.yearlyPerMonthText} • En avantajlı',
                   trialNote: '🎁 İlk 10 gün ücretsiz',
                   trialUsed: SubscriptionService.isExpiredGuest,
                   accent: const Color(0xFFFF9500),

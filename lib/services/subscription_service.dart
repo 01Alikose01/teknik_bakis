@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'device_id_service.dart';
 
 /// Abonelik durumunu ve deneme süresini yöneten servis.
 /// Hive box'ı kullanır — kalıcı depolama.
@@ -24,6 +26,45 @@ class SubscriptionService {
     }
 
     await _startTrialForNewUserIfNeeded();
+    // Google Play Developer API ile doğrulanmış hakları arka planda senkronize et
+    syncWithBackendEntitlements();
+  }
+
+  /// Cloud Firestore `entitlements/{deviceId}` kaydı ile cihazın yerel abonelik
+  /// durumunu senkronize eder. Google Play Developer API tarafından onaylanmış haklar
+  /// geçerli kabul edilir.
+  static Future<void> syncWithBackendEntitlements() async {
+    try {
+      final deviceId = await DeviceIdService.getDeviceId();
+      final doc = await FirebaseFirestore.instance
+          .collection('entitlements')
+          .doc(deviceId)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      if (doc.exists) {
+        final data = doc.data();
+        final isActive = data?['isActive'] == true;
+        final planKey = (data?['plan'] as String?) ?? 'monthly';
+        final expiryStr = data?['expiryTime'] as String?;
+
+        bool isStillValid = isActive;
+        if (expiryStr != null) {
+          final expiry = DateTime.tryParse(expiryStr);
+          if (expiry != null && DateTime.now().isAfter(expiry)) {
+            isStillValid = false;
+          }
+        }
+
+        if (isStillValid) {
+          await _box.put(_kPlan, planKey);
+        } else if (isPaidSubscriber) {
+          await cancelPaidSubscription();
+        }
+      }
+    } catch (_) {
+      // Offline durumlarda yerel Hive durumu korunur
+    }
   }
 
   // ─── Onboarding ───────────────────────────────────────────────────────────
@@ -36,11 +77,16 @@ class SubscriptionService {
 
   // ─── Plan başlatma ────────────────────────────────────────────────────────
 
-  /// Simüle edilmiş ödeme tamamlandığında ücretli planı etkinleştirir.
+  /// Ücretli planı etkinleştirir (Google Play doğrulaması sonrası).
   /// Trial başlangıcına dokunmaz; trial ve paid entitlement bağımsızdır.
   static Future<void> startPaidSubscription(String planKey) async {
     await _box.put(_kPlan, planKey);
     await markOnboarded();
+  }
+
+  /// Abonelik sona erdiğinde çağrılır.
+  static Future<void> cancelPaidSubscription() async {
+    await _box.put(_kPlan, 'none');
   }
 
   /// Ayarlar'dan aylık plan seçildi

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/subscription_service.dart';
+import '../services/purchase_service.dart';
 import 'payment_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -177,7 +178,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         selectedPlan: _selectedPlan,
         onStart: _proceed,
         onGuest: _continueAsGuest,
-        onRestore: () {},
+        onRestore: () async {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Google Play aboneliğiniz kontrol ediliyor...'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          await PurchaseService.restorePurchases();
+        },
       ),
     );
   }
@@ -289,7 +300,7 @@ class _PricingRow extends StatelessWidget {
         Expanded(
           child: _PlanCard(
             title: 'Aylık',
-            price: '₺299',
+            price: PurchaseService.monthlyRawPriceText,
             sub: '/ay',
             note: 'Taahhütsüz',
             badge: null,
@@ -302,9 +313,9 @@ class _PricingRow extends StatelessWidget {
         Expanded(
           child: _PlanCard(
             title: 'Yıllık',
-            price: '₺2499',
+            price: PurchaseService.yearlyRawPriceText,
             sub: '/yıl',
-            note: 'Ayda ₺208',
+            note: 'Ayda ${PurchaseService.yearlyPerMonthText}',
             badge: 'AVANTAJLI',
             discount: '%30 İNDİRİM',
             isSelected: selected == 1,
@@ -573,10 +584,10 @@ class _BottomActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final planLabel = selectedPlan == 0 ? '₺299/ay' : '₺2499/yıl';
-    final trialNote = selectedPlan == 0
-        ? 'İlk 10 gün ücretsiz. Sonra $planLabel'
-        : 'İlk 10 gün ücretsiz. Sonra $planLabel';
+    final planLabel = selectedPlan == 0
+        ? PurchaseService.monthlyPriceText
+        : PurchaseService.yearlyPriceText;
+    final trialNote = 'İlk 10 gün ücretsiz. Sonra $planLabel';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),

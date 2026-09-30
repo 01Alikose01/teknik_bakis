@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
 import '../services/subscription_service.dart';
+import '../services/purchase_service.dart';
 
 /// Ödeme ekranı — seçilen plana göre gösterilir.
-/// Gerçek ödeme entegrasyonu (RevenueCat, İyzico vb.) için
-/// [_processPurchase] metoduna entegre edilecek.
+/// Google Play Billing Library ile gerçek abonelik satın alma akışını yürütür.
 class PaymentScreen extends StatefulWidget {
   final String plan; // 'monthly' | 'yearly'
   final Widget nextScreen;
@@ -29,8 +29,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   String get _planLabel =>
       widget.plan == 'monthly' ? 'Aylık Plan' : 'Yıllık Plan';
-  String get _priceLabel =>
-      widget.plan == 'monthly' ? '₺299/ay' : '₺2499/yıl';
+  String get _priceLabel => widget.plan == 'monthly'
+      ? PurchaseService.monthlyPriceText
+      : PurchaseService.yearlyPriceText;
 
   /// Deneme daha önce kullanılmışsa trialNote farklı gösterilir
   bool get _trialUsed => _trialWasUsed;
@@ -39,6 +40,77 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _trialUsed ? 'İlk 10 gün ücretsiz (Kullanıldı)' : 'İlk 10 gün ücretsiz. Sonra $_priceLabel';
   Color get _accent => const Color(0xFF34C759);
 
+  @override
+  void initState() {
+    super.initState();
+    PurchaseService.flowStatus.addListener(_onPurchaseFlowChanged);
+  }
+
+  @override
+  void dispose() {
+    PurchaseService.flowStatus.removeListener(_onPurchaseFlowChanged);
+    super.dispose();
+  }
+
+  void _onPurchaseFlowChanged() {
+    if (!mounted) return;
+    final status = PurchaseService.flowStatus.value;
+    switch (status) {
+      case PurchaseFlowStatus.success:
+        setState(() => _processing = false);
+        _showSuccessSheet();
+        break;
+      case PurchaseFlowStatus.error:
+        setState(() => _processing = false);
+        final err = PurchaseService.lastErrorMessage.value ??
+            'Satın alma işlemi tamamlanamadı.';
+        _showErrorSnackBar(err);
+        break;
+      case PurchaseFlowStatus.canceled:
+        setState(() => _processing = false);
+        break;
+      case PurchaseFlowStatus.pending:
+        setState(() => _processing = false);
+        _showPendingDialog();
+        break;
+      case PurchaseFlowStatus.inProgress:
+        setState(() => _processing = true);
+        break;
+      case PurchaseFlowStatus.idle:
+        break;
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF3B30),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _showPendingDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Ödeme Beklemede'),
+        content: const Text(
+          'Ödeme işleminiz Google Play tarafından onay bekliyor. Onaylandığında Premium üyeliğiniz otomatik olarak başlayacaktır.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _processPurchase() async {
     if (_processing) return;
     // Ödeme başlamadan önce deneme durumunu yakala
@@ -46,21 +118,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _processing = true);
     HapticFeedback.mediumImpact();
 
-    // ── Gerçek ödeme burada yapılır ──────────────────────────────────────
-    // Örnek: RevenueCat, İyzico, Stripe entegrasyonu buraya eklenir.
-    // Şimdilik 1.5 sn simüle edip başarılı kabul ediyoruz.
-    await Future.delayed(const Duration(milliseconds: 1500));
-    // ─────────────────────────────────────────────────────────────────────
-
-    if (!mounted) return;
-
-    await SubscriptionService.startPaidSubscription(widget.plan);
-
-    if (!mounted) return;
-    setState(() => _processing = false);
-
-    // Başarı göster, sonra ana uygulamaya geç
-    await _showSuccessSheet();
+    // ── Google Play Satın Alma Akışı ──────────────────────────────────────
+    final initiated = await PurchaseService.buyPlan(widget.plan);
+    if (!initiated) {
+      if (mounted) {
+        setState(() => _processing = false);
+        final err = PurchaseService.lastErrorMessage.value ??
+            'Google Play satın alma ekranı açılamadı.';
+        _showErrorSnackBar(err);
+      }
+    }
+    // Satın alma akışı Google Play dialog penceresinde devam eder;
+    // _onPurchaseFlowChanged listener'ı sonucu yakalar.
   }
 
   Future<void> _showSuccessSheet() async {
@@ -268,7 +337,7 @@ class _PlanSummaryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                isYearly ? '₺2499' : '₺299',
+                isYearly ? PurchaseService.yearlyRawPriceText : PurchaseService.monthlyRawPriceText,
                 style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
@@ -292,7 +361,7 @@ class _PlanSummaryCard extends StatelessWidget {
                         style: TextStyle(
                             color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                             fontSize: 11)),
-                    Text('₺208',
+                    Text(PurchaseService.yearlyPerMonthText,
                         style: TextStyle(
                             color: accent,
                             fontWeight: FontWeight.bold,
@@ -645,8 +714,8 @@ class _SuccessSheet extends StatelessWidget {
           if (!trialUsed)
             Text(
               plan == 'monthly'
-                  ? '10 günlük ücretsiz denemeniz başladı.\nSonra aylık ₺299 üzerinden devam eder.'
-                  : '10 günlük ücretsiz denemeniz başladı.\nSonra yıllık ₺2499 üzerinden devam eder.',
+                  ? '10 günlük ücretsiz denemeniz başladı.\nSonra aylık ${PurchaseService.monthlyPriceText} üzerinden devam eder.'
+                  : '10 günlük ücretsiz denemeniz başladı.\nSonra yıllık ${PurchaseService.yearlyPriceText} üzerinden devam eder.',
               style: TextStyle(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                   fontSize: 14,

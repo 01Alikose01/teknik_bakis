@@ -106,25 +106,25 @@ class _TradingViewChartScreenState extends State<TradingViewChartScreen> {
 
   Future<AssetModel?> _fetchAsset(String category, String symbol, String period, String interval) async {
     if (category == 'gold') {
-      return StockService.fetchGold(period: period, interval: interval);
+      return StockService.fetchGold();
     }
     if (category == 'dollar') {
-      return StockService.fetchDollar(period: period, interval: interval);
+      return StockService.fetchDollar();
     }
     if (category == 'goldgram') {
-      return StockService.fetchGoldGram(period: period, interval: interval);
+      return StockService.fetchGoldGram();
     }
     if (category == 'silvertl') {
-      return StockService.fetchSilverTl(period: period, interval: interval);
+      return StockService.fetchSilverTl();
     }
     if (category == 'palladiumtl') {
-      return StockService.fetchPalladiumTl(period: period, interval: interval);
+      return StockService.fetchPalladiumTl();
     }
     if (category == 'platinumtl') {
-      return StockService.fetchPlatinumTl(period: period, interval: interval);
+      return StockService.fetchPlatinumTl();
     }
     if (category == 'euro') {
-      return StockService.fetchEuro(period: period, interval: interval);
+      return StockService.fetchEuro();
     }
     if (category == 'bist100') {
       return StockService.fetchIndex('XU100.IS', 'BIST 100', 'BIST 100', period: period, interval: interval);

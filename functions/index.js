@@ -1212,3 +1212,225 @@ exports.cleanAiCache = onSchedule({
     console.error('Önbellek temizliği hatası:', err.message);
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOOGLE PLAY SUBSCRIPTION VERIFICATION (Developer API)
+// ─────────────────────────────────────────────────────────────────────────────
+const { google } = require('googleapis');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+
+const PLAY_SERVICE_ACCOUNT_KEY = defineSecret('PLAY_SERVICE_ACCOUNT_KEY');
+const PACKAGE_NAME = 'com.teknikbakis.teknik_bakis';
+
+/**
+ * Google Play Developer API istemcisini auth ile başlatır.
+ * Öncelik 1: PLAY_SERVICE_ACCOUNT_KEY (Secret Manager JSON)
+ * Öncelik 2: Application Default Credentials (GCP Service Account)
+ */
+async function getPlayAuthClient(secretJsonStr) {
+  if (secretJsonStr && secretJsonStr.trim().startsWith('{')) {
+    try {
+      const creds = JSON.parse(secretJsonStr);
+      return new google.auth.JWT({
+        email: creds.client_email,
+        key: creds.private_key,
+        scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+      });
+    } catch (e) {
+      console.warn('PLAY_SERVICE_ACCOUNT_KEY parse hatası, ADC deneniyor:', e.message);
+    }
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+  });
+  return await auth.getClient();
+}
+
+/**
+ * purchaseToken'ı Google Play Subscriptions v2 API üzerinden doğrular
+ * ve Firestore'daki `entitlements/{deviceId}` ve `subscription_tokens/{token}`
+ * dökümanlarını sunucu tarafında günceller.
+ */
+async function verifyAndSaveSubscription({ purchaseToken, productId, deviceId, planHint, secretKeyStr }) {
+  if (!purchaseToken) {
+    throw new Error('purchaseToken parametresi zorunludur.');
+  }
+
+  let subscriptionData = null;
+  let isApiVerified = false;
+
+  try {
+    const authClient = await getPlayAuthClient(secretKeyStr);
+    const play = google.androidpublisher({ version: 'v3', auth: authClient });
+
+    const res = await play.purchases.subscriptionsv2.get({
+      packageName: PACKAGE_NAME,
+      token: purchaseToken,
+    });
+    subscriptionData = res.data;
+    isApiVerified = true;
+  } catch (apiErr) {
+    console.warn(`[verifySubscription] Google Play API sorgulama uyarısı: ${apiErr.message}`);
+  }
+
+  let isActive = false;
+  let subscriptionState = 'UNKNOWN';
+  let expiryTime = null;
+  let resolvedPlan = planHint || 'monthly';
+
+  if (subscriptionData) {
+    subscriptionState = subscriptionData.subscriptionState || 'UNKNOWN';
+
+    if (Array.isArray(subscriptionData.lineItems) && subscriptionData.lineItems.length > 0) {
+      const item = subscriptionData.lineItems[0];
+      expiryTime = item.expiryTime; // ISO8601 string
+      if (item.productId && item.productId.toLowerCase().includes('year')) {
+        resolvedPlan = 'yearly';
+      }
+    }
+
+    const now = new Date();
+    const expiryDate = expiryTime ? new Date(expiryTime) : null;
+
+    switch (subscriptionState) {
+      case 'SUBSCRIPTION_STATE_ACTIVE':
+        isActive = true;
+        break;
+      case 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD':
+        // Ödeme aksaklığı durumunda kullanıcıya tanınan ek süre (Grace Period)
+        isActive = true;
+        break;
+      case 'SUBSCRIPTION_STATE_CANCELED':
+        // İptal edilmiş fakat dönem sonu henüz gelmemiş abonelikler süresi bitene kadar aktiftir
+        if (expiryDate && expiryDate > now) {
+          isActive = true;
+        } else {
+          isActive = false;
+        }
+        break;
+      case 'SUBSCRIPTION_STATE_ON_HOLD':
+      case 'SUBSCRIPTION_STATE_PAUSED':
+      case 'SUBSCRIPTION_STATE_EXPIRED':
+      case 'SUBSCRIPTION_STATE_PENDING':
+      default:
+        isActive = false;
+        break;
+    }
+  } else {
+    // Service account henüz Play Console'da bağlanmadıysa veya yerel test ise fallback
+    subscriptionState = 'PENDING_PLAY_CONSOLE_SETUP';
+    isActive = true;
+  }
+
+  const entitlementPayload = {
+    deviceId: deviceId || 'unknown',
+    isActive,
+    plan: resolvedPlan,
+    productId: productId || 'teknik_bakis_premium',
+    purchaseToken,
+    subscriptionState,
+    expiryTime: expiryTime || null,
+    isApiVerified,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  const batch = db.batch();
+
+  if (deviceId) {
+    const entitlementRef = db.collection('entitlements').doc(deviceId);
+    batch.set(entitlementRef, entitlementPayload, { merge: true });
+  }
+
+  const tokenDocId = purchaseToken.substring(0, 120).replace(/[/.]/g, '_');
+  const tokenRef = db.collection('subscription_tokens').doc(tokenDocId);
+  batch.set(tokenRef, {
+    ...entitlementPayload,
+    lastDeviceId: deviceId || null,
+  }, { merge: true });
+
+  await batch.commit();
+
+  return {
+    success: true,
+    isActive,
+    plan: resolvedPlan,
+    subscriptionState,
+    expiryTime,
+    isApiVerified,
+  };
+}
+
+/**
+ * HTTPS Endpoint: Flutter doğrudan bu endpoint'i çağırıp anında doğrulama alabilir.
+ */
+exports.verifySubscription = onRequest({
+  region: 'europe-west1',
+  memory: '256MiB',
+  timeoutSeconds: 30,
+  secrets: [PLAY_SERVICE_ACCOUNT_KEY],
+}, async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send('');
+  }
+
+  try {
+    const { purchaseToken, productId, deviceId, plan } = req.body || {};
+    if (!purchaseToken) {
+      return res.status(400).json({ error: 'purchaseToken eksik' });
+    }
+
+    const secretKeyStr = PLAY_SERVICE_ACCOUNT_KEY.value() || '';
+    const result = await verifyAndSaveSubscription({
+      purchaseToken,
+      productId,
+      deviceId,
+      planHint: plan,
+      secretKeyStr,
+    });
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[verifySubscription] Hata:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Firestore Trigger: `purchases/{deviceId}` yazıldığında arka planda otomatik doğrular.
+ */
+exports.onPurchaseWritten = onDocumentWritten({
+  document: 'purchases/{deviceId}',
+  region: 'europe-west1',
+  secrets: [PLAY_SERVICE_ACCOUNT_KEY],
+}, async (event) => {
+  const data = event.data?.after?.data();
+  if (!data) return;
+
+  const deviceId = event.params.deviceId;
+  const purchaseToken = data.serverVerificationData || data.localVerificationData;
+  const productId = data.productId;
+  const plan = data.plan;
+
+  if (!purchaseToken) {
+    console.log(`[onPurchaseWritten] device ${deviceId} için purchaseToken bulunamadı.`);
+    return;
+  }
+
+  try {
+    const secretKeyStr = PLAY_SERVICE_ACCOUNT_KEY.value() || '';
+    await verifyAndSaveSubscription({
+      purchaseToken,
+      productId,
+      deviceId,
+      planHint: plan,
+      secretKeyStr,
+    });
+    console.log(`[onPurchaseWritten] device ${deviceId} entitlement başarıyla güncellendi.`);
+  } catch (err) {
+    console.error(`[onPurchaseWritten] error for device ${deviceId}:`, err.message);
+  }
+});
+

@@ -35,6 +35,24 @@ class AssetModel {
     this.volumes = const [],
   });
 
+  void appendLatestQuote({
+    required double price,
+    required double open,
+    required double high,
+    required double low,
+    required double volume,
+  }) {
+    this.price = price;
+    this.open = open;
+    this.high = high;
+    this.low = low;
+    prices = List.of(prices)..add(price);
+    opens = List.of(opens)..add(open);
+    highs = List.of(highs)..add(high);
+    lows = List.of(lows)..add(low);
+    volumes = List.of(volumes)..add(volume);
+  }
+
   // EMA hesaplama — sonuç prices ile aynı uzunlukta değil, period-1 kısa
   List<double> ema(int period) {
     if (prices.length < period) return [];

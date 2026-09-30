@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/app_navigation.dart';
 import '../services/subscription_service.dart';
+import '../services/purchase_service.dart';
 import 'payment_screen.dart';
 
 /// Premium özelliğe erişilmeye çalışıldığında gösterilen duvar ekranı.
@@ -251,7 +252,7 @@ class _PlanRow extends StatelessWidget {
         Expanded(
           child: _MiniPlanCard(
             title: 'Aylık',
-            price: '₺299',
+            price: PurchaseService.monthlyRawPriceText,
             sub: '/ay',
             note: 'Taahhütsüz',
             badge: null,
@@ -263,9 +264,9 @@ class _PlanRow extends StatelessWidget {
         Expanded(
           child: _MiniPlanCard(
             title: 'Yıllık',
-            price: '₺2499',
+            price: PurchaseService.yearlyRawPriceText,
             sub: '/yıl',
-            note: 'Ayda ₺208',
+            note: 'Ayda ${PurchaseService.yearlyPerMonthText}',
             badge: '%30 İNDİRİM',
             isSelected: selected == 1,
             onTap: () => onSelect(1),
@@ -458,8 +459,9 @@ class _GateBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceLabel =
-        selectedPlan == 0 ? '₺299/ay' : '₺2499/yıl';
+    final priceLabel = selectedPlan == 0
+        ? PurchaseService.monthlyPriceText
+        : PurchaseService.yearlyPriceText;
 
     final theme = Theme.of(context);
     return Container(

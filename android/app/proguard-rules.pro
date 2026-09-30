@@ -15,6 +15,10 @@
 -keepattributes Signature
 -keepattributes Exceptions
 
+# Google Play Billing
+-keep class com.android.billingclient.** { *; }
+-keep class com.android.vending.billing.** { *; }
+
 # Suppress missing Play Core classes (not used in this app)
 -dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
 -dontwarn com.google.android.play.core.splitinstall.SplitInstallException

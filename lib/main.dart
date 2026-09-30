@@ -16,6 +16,7 @@ import 'services/portfolio_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
 import 'services/subscription_service.dart';
+import 'services/purchase_service.dart';
 import 'services/bist100_service.dart';
 import 'services/home_price_cache.dart';
 import 'services/price_sync_service.dart';
@@ -26,6 +27,7 @@ void main() async {
   await PortfolioService.init();
   await SettingsService.init();
   await SubscriptionService.init();
+  PurchaseService.init(); // Google Play Billing'i arka planda başlat
   await HomePriceCache.init();
   await NotificationService.init();
   await NotificationService.requestPermission();

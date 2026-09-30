@@ -8,6 +8,15 @@ class StockService {
   static const String _baseUrl =
       'https://query1.finance.yahoo.com/v8/finance/chart';
 
+  static double sanitizeChangePercent(String symbol, double change) {
+    if (symbol == 'ALTIN' || symbol == 'DOLAR' || symbol == 'EURO' || symbol.contains('/')) {
+      return change;
+    }
+    if (change > 10.0) return 10.0;
+    if (change < -10.0) return -10.0;
+    return change;
+  }
+
   /// Günlük kotasyon: fiyat, OHLC ve değişim % tek kaynaktan.
   static _DailyQuote _extractDailyQuote(
     Map<String, dynamic> meta,
@@ -400,10 +409,12 @@ class StockService {
   static Future<AssetModel?> fetchIndex(
     String yahooSymbol,
     String displaySymbol,
-    String name,
-  ) async {
+    String name, {
+    String period = '5d',
+    String interval = '1d',
+  }) async {
     try {
-      final chart = await _fetchChartJson(yahooSymbol, '5d');
+      final chart = await _fetchChartJson(yahooSymbol, period, interval: interval);
       if (chart == null) return null;
       return _assetFromChart(chart, symbol: displaySymbol, name: name);
     } catch (_) {
