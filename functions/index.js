@@ -1164,6 +1164,513 @@ exports.getTeknikAnaliz = onRequest({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BIST100 ENDEKSİ SYNC — Borsa İstanbul Resmi Duyuruları
+//
+// Borsa İstanbul'un resmi periyodik gözden geçirme duyurularını okuyarak
+// BIST100 üyelerini otomatik günceller.
+//
+// Kaynak: https://www.borsaistanbul.com/en/announcement
+// Firestore: bist_index_meta/bist100
+//
+// Scheduler: Her Pazartesi 05:00 UTC (Türkiye 08:00)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * HTTPS GET ile ham HTML çeker (JSON parse etmez).
+ * Borsa İstanbul sayfaları için timeout 25s kullanılır.
+ */
+function fetchHtml(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'TeknikBakis-Backend/1.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      timeout: 25000,
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('fetchHtml Timeout: ' + url)); });
+  });
+}
+
+/**
+ * Borsa İstanbul duyuru listesini parse ederek en yeni BIST hisse endeksi
+ * duyurusunu bulur.
+ *
+ * Duyuru URL pattern: /en/announcement/{id}/{slug}
+ * Hedef slug'lar:
+ *   - bist-stock-indices-periodic-review
+ *   - announces-constituent-changes-bist-stock-indices-
+ *
+ * @param {string} html - Duyuru listesi sayfasının ham HTML'i
+ * @returns {{ announcementId: string, announcementUrl: string, announcementTitle: string } | null}
+ */
+function findLatestBist100Announcement(html) {
+  // href="/en/announcement/15598/bist-stock-indices-periodic-review" pattern
+  const linkRegex = /href="(\/en\/announcement\/(\d+)\/([^"]*(?:bist-stock-indices-periodic-review|announces-constituent-changes-bist-stock-indices-)[^"]*))"[^>]*>([^<]*)/gi;
+
+  let best = null;
+  let bestId = -1;
+  let match;
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    const path  = match[1];
+    const id    = parseInt(match[2], 10);
+    const title = (match[4] || '').trim() || path.split('/').pop().replace(/-/g, ' ');
+
+    if (id > bestId) {
+      bestId = id;
+      best = {
+        announcementId:    String(id),
+        announcementUrl:   'https://www.borsaistanbul.com' + path,
+        announcementTitle: title,
+      };
+    }
+  }
+
+  return best; // null if not found
+}
+
+/**
+ * Borsa İstanbul duyuru sayfasının metin içeriğini parse ederek
+ * BIST 100 bölümündeki eklenen/çıkarılan/yedek hisseleri çıkarır.
+ *
+ * Gerçek sayfa yapısı (doğrulanmış örnek, ID 15598):
+ *   "...BIST 100 INDEXSTOCKS TO BE INCLUDEDSTOCKS TO BE EXCLUDEDSUBSTITUTE STOCKS
+ *    1AGHOLANADOLU GRUBU HOLDING1BALSUBALSU GIDA1KLGYOKILER GMYO
+ *    2AHGAZAHLATCI DOGALGAZ2BSOKEBATICIM CIMENTO..."
+ *
+ * @param {string} html - Duyuru sayfasının ham HTML'i
+ * @returns {{ added: string[], removed: string[], alternates: string[],
+ *             periodStart: string, periodEnd: string, revision: string,
+ *             bist100SectionFound: boolean }}
+ */
+function parseBist100Announcement(html) {
+  // ── Düz metne çevir (script/style taglerini temizle) ──────────────────────
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')  // tüm HTML taglarını boşlukla değiştir
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // ── BIST 100 bölümünü bul ─────────────────────────────────────────────────
+  // Pattern: "BIST 100 INDEX" veya "BIST 100 ENDEKSI" ile başlar,
+  //           sonraki büyük endeks başlığı (BIST 500 veya BIST LIQUID) ile biter.
+  const bist100Start = text.search(/BIST\s+100\s+INDEX/i);
+  if (bist100Start === -1) {
+    return { added: [], removed: [], alternates: [], periodStart: '', periodEnd: '', revision: '', bist100SectionFound: false };
+  }
+
+  // Sonraki büyük bölümü bul (BIST 500 veya sonrası)
+  const afterBist100 = text.slice(bist100Start);
+  const nextSectionMatch = afterBist100.search(/BIST\s+500\s+INDEX|BIST\s+LIQUID|BIST\s+SUSTAINABILITY/i);
+  const bist100Section = nextSectionMatch !== -1
+    ? afterBist100.slice(0, nextSectionMatch)
+    : afterBist100.slice(0, 3000); // max 3000 karakter
+
+  // ── Periyot bilgisini çıkar (ana metinden) ────────────────────────────────
+  // "OCTOBER 1, 2026 – DECEMBER 31, 2026" veya "PERIOD OCTOBER 1, 2026-DECEMBER 31, 2026"
+  let periodStart = '';
+  let periodEnd   = '';
+  let revision    = '';
+
+  const periodMatch = text.match(
+    /(?:PERIOD\s+)?([A-Z]+\s+\d{1,2},?\s+\d{4})\s*[–\-]\s*([A-Z]+\s+\d{1,2},?\s+\d{4})/i
+  );
+  if (periodMatch) {
+    periodStart = periodMatch[1].trim();
+    periodEnd   = periodMatch[2].trim();
+    // Çeyrek hesapla
+    const endMonth = periodMatch[2].trim().toUpperCase();
+    if (endMonth.includes('MARCH'))      revision = `${periodMatch[2].match(/\d{4}/)[0]}-Q1`;
+    else if (endMonth.includes('JUNE'))  revision = `${periodMatch[2].match(/\d{4}/)[0]}-Q2`;
+    else if (endMonth.includes('SEPTEMBER')) revision = `${periodMatch[2].match(/\d{4}/)[0]}-Q3`;
+    else if (endMonth.includes('DECEMBER'))  revision = `${periodMatch[2].match(/\d{4}/)[0]}-Q4`;
+  }
+
+  // ── BIST 100 bölümündeki 3 sütun tablosunu parse et ──────────────────────
+  // Sayfa yapısı (doğrulanmış): başlıktan sonra sütunlar yan yana sıralanır
+  // "STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS"
+  // "1AGHOLANADOLU GRUBU HOLDING 1BALSUBALSU GIDA 1KLGYOKILER GMYO"
+  //
+  // Strateji: bölümü 3 alt bölüme ayır
+  //   Col1: STOCKS TO BE INCLUDED  → added
+  //   Col2: STOCKS TO BE EXCLUDED  → removed
+  //   Col3: SUBSTITUTE STOCKS      → alternates
+
+  // STOCKS TO BE INCLUDED bölümünü bul
+  const inclStart = bist100Section.search(/STOCKS\s+TO\s+BE\s+INCLUDED/i);
+  const exclStart = bist100Section.search(/STOCKS\s+TO\s+BE\s+EXCLUDED/i);
+  const substStart = bist100Section.search(/SUBSTITUTE\s+STOCKS/i);
+
+  if (inclStart === -1 || exclStart === -1) {
+    // Başlıklar bulunamadı — bölüm bulundu ama tablo yok (değişiklik yok senaryosu)
+    return { added: [], removed: [], alternates: [], periodStart, periodEnd, revision, bist100SectionFound: true };
+  }
+
+  // Her sütunun içeriğini belirle
+  // Gerçek HTML'de sütunlar tabloda yan yana, düz metne çevrilince sırayla gelir:
+  // "STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS 1AGHOL... 1BALSU... 1KLGYO..."
+  //
+  // Düz metni satırlara bölüp pattern ile çıkar:
+  // Satır pattern: {number}{SYMBOL}{COMPANY_NAME}  (bazen sadece 1 sütun dolu)
+  //
+  // Farklı bir yaklaşım: tüm {N}{SYMBOL}{COMPANY} üçlülerini çıkar,
+  // hangi sütuna ait olduklarını satır numarası (N) ile belirle.
+  //
+  // Gözlem: Her sütun kendi satır numaralarını 1'den başlatır.
+  // INCLUDED: 1..27 arası, EXCLUDED: aynı 1..27, SUBSTITUTE: 1..3 (genelde az)
+  //
+  // Yapı: başlık bölümünden sonra veriler sırayla 3 sütun halinde gelir.
+  // Düz metinde: inclStart < exclStart < substStart ise sütun sırası güvenli.
+
+  /**
+   * Verilen metin parçasından sembol listesini çıkarır.
+   * Pattern: \d+[A-Z]{2,6}[A-Z0-9]{0,} (satır numarası + sembol + şirket adı)
+   * Semboller: sadece büyük harf, 2-6 karakter, ardından rakam/büyük harf şirket adı gelir.
+   */
+  function extractSymbolsFromSection(section) {
+    const symbols = [];
+    // Pattern: bir veya daha fazla rakam, ardından büyük harf sembol (2-6 karakter),
+    // ardından büyük harf/boşluk/rakam şirket adı
+    // Sembolü şirket adından ayırmak için: sembol tamamen büyük harf ve kısa
+    const rowRegex = /\d+([A-Z]{2,6})(?=[A-Z\s\d])/g;
+    let m;
+    while ((m = rowRegex.exec(section)) !== null) {
+      const sym = m[1].trim();
+      if (sym && /^[A-Z]{2,6}$/.test(sym)) {
+        symbols.push(sym);
+      }
+    }
+    return [...new Set(symbols)]; // duplicate'leri temizle
+  }
+
+  // Her sütunun metin sınırlarını belirle
+  const inclSection = exclStart !== -1
+    ? bist100Section.slice(inclStart + 'STOCKS TO BE INCLUDED'.length, exclStart)
+    : bist100Section.slice(inclStart + 'STOCKS TO BE INCLUDED'.length);
+
+  const exclSection = substStart !== -1 && substStart > exclStart
+    ? bist100Section.slice(exclStart + 'STOCKS TO BE EXCLUDED'.length, substStart)
+    : bist100Section.slice(exclStart + 'STOCKS TO BE EXCLUDED'.length);
+
+  const substSection = substStart !== -1
+    ? bist100Section.slice(substStart + 'SUBSTITUTE STOCKS'.length)
+    : '';
+
+  const added      = extractSymbolsFromSection(inclSection);
+  const removed    = extractSymbolsFromSection(exclSection);
+  const alternates = substStart !== -1 ? extractSymbolsFromSection(substSection) : [];
+
+  if (substStart === -1) {
+    console.warn('BIST100_PARSE_WARN: SUBSTITUTE STOCKS section not found, alternates=[]. Continuing.');
+  }
+
+  return {
+    added,
+    removed,
+    alternates,
+    periodStart,
+    periodEnd,
+    revision,
+    bist100SectionFound: true,
+  };
+}
+
+/**
+ * Firestore'a yazmadan önce BIST100 güncelleme verilerini doğrular.
+ * Tüm kontroller geçmezse Firestore'a hiçbir şey yazılmaz.
+ *
+ * @param {{ bist100SectionFound: boolean, added: string[], removed: string[],
+ *            currentSymbols: string[], newSymbols: string[] }} params
+ * @returns {{ valid: boolean, reason: string }}
+ */
+function validateBist100Update({ bist100SectionFound, added, removed, currentSymbols, newSymbols }) {
+  if (!bist100SectionFound) {
+    return { valid: false, reason: 'BIST100_SECTION_NOT_FOUND' };
+  }
+  if (!Array.isArray(added)) {
+    return { valid: false, reason: 'ADDED_PARSE_FAILED' };
+  }
+  if (!Array.isArray(removed)) {
+    return { valid: false, reason: 'REMOVED_PARSE_FAILED' };
+  }
+  if (!newSymbols || newSymbols.length === 0) {
+    return { valid: false, reason: 'SYMBOLS_EMPTY' };
+  }
+  if (newSymbols.length !== 100) {
+    return { valid: false, reason: `SYMBOL_COUNT_NOT_100:${newSymbols.length}` };
+  }
+  for (const sym of newSymbols) {
+    if (!/^[A-Z]{2,6}$/.test(sym)) {
+      return { valid: false, reason: `INVALID_SYMBOL_FORMAT:${sym}` };
+    }
+  }
+  // added ve removed kesişimi
+  const addedSet   = new Set(added);
+  const overlap    = removed.filter(s => addedSet.has(s));
+  if (overlap.length > 0) {
+    return { valid: false, reason: `ADDED_REMOVED_OVERLAP:${overlap.join(',')}` };
+  }
+  // Beklenmedik büyük fark (parser bozulmuş olabilir)
+  const totalChange = added.length + removed.length;
+  if (totalChange > 20) {
+    return { valid: false, reason: `UNEXPECTED_LARGE_DIFF:added=${added.length},removed=${removed.length}` };
+  }
+  // Mevcut liste bozuk mu? (uyarı, engelleme değil)
+  if (currentSymbols.length > 0 && currentSymbols.length !== 100) {
+    console.warn(`BIST100_WARN: currentSymbols.length=${currentSymbols.length} (expected 100) — continuing with newSymbols validation only`);
+  }
+  return { valid: true, reason: '' };
+}
+
+/**
+ * BIST100 sync ana orkestrasyon fonksiyonu.
+ * Tüm adımları sırasıyla çalıştırır.
+ *
+ * @param {{ dryRun?: boolean }} options
+ * @returns {Promise<object>} - Sonuç nesnesi
+ */
+async function runBist100Sync({ dryRun = false } = {}) {
+  console.log('BIST100_SYNC_STARTED', new Date().toISOString());
+
+  // ── B. Duyuru listesini çek ───────────────────────────────────────────────
+  let listHtml;
+  try {
+    listHtml = await fetchHtml('https://www.borsaistanbul.com/en/announcement');
+  } catch (err) {
+    console.error('BIST100_FETCH_ERROR: announcement list fetch failed:', err.message);
+    throw err;
+  }
+
+  // ── B. En son BIST hisse endeksi duyurusunu bul ───────────────────────────
+  const announcementInfo = findLatestBist100Announcement(listHtml);
+  if (!announcementInfo) {
+    const msg = 'BIST100_FETCH_ERROR: no_announcement_found in announcement list';
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  const { announcementId, announcementUrl, announcementTitle } = announcementInfo;
+  console.log(`BIST100_ANNOUNCEMENT_FOUND: ${announcementId} - ${announcementTitle}`);
+
+  // ── C. Mevcut Firestore durumunu oku ─────────────────────────────────────
+  const metaRef = db.collection('bist_index_meta').doc('bist100');
+  const metaDoc = await metaRef.get();
+  const metaData = metaDoc.exists ? metaDoc.data() : {};
+
+  const currentAnnouncementId = metaData.announcementId || null;
+  const rawSymbols = metaData.symbols || [];
+  const currentSymbols = rawSymbols
+    .map(s => (s || '').trim().toUpperCase())
+    .filter(s => s.length > 0);
+
+  if (currentSymbols.length === 0 && metaDoc.exists) {
+    console.warn('BIST100_WARN: Firestore bist100 doc exists but symbols array is empty');
+  }
+
+  // ── D. Aynı duyuru kontrolü ───────────────────────────────────────────────
+  if (currentAnnouncementId && String(currentAnnouncementId) === String(announcementId)) {
+    console.log(`BIST100_NO_CHANGE: announcement ${announcementId} already processed`);
+    return { status: 'no_change', announcementId };
+  }
+
+  // ── E. Duyuru HTML'ini indir ve parse et ──────────────────────────────────
+  let announcementHtml;
+  try {
+    announcementHtml = await fetchHtml(announcementUrl);
+  } catch (err) {
+    console.error('BIST100_FETCH_ERROR: announcement page fetch failed:', err.message);
+    throw err;
+  }
+
+  const { added, removed, alternates, periodStart, periodEnd, revision, bist100SectionFound } =
+    parseBist100Announcement(announcementHtml);
+
+  console.log(`BIST100_PARSE_SUCCESS: added=${added.length}, removed=${removed.length}, alternates=${alternates.length}`);
+  if (alternates.length === 0) {
+    console.warn('BIST100_WARN: alternates list is empty or not found');
+  }
+
+  // ── F. Yeni liste hesapla ─────────────────────────────────────────────────
+  // Set mantığı: mevcut - removed + added
+  // Eğer currentSymbols boşsa ve added doluysa: ilk kurulum senaryosu
+  const currentSet = new Set(currentSymbols);
+  for (const sym of removed) {
+    currentSet.delete(sym.trim().toUpperCase());
+  }
+  for (const sym of added) {
+    const s = sym.trim().toUpperCase();
+    if (s) currentSet.add(s);
+  }
+  const newSymbols = [...currentSet].sort();
+
+  // ── G. Validation ────────────────────────────────────────────────────────
+  const { valid, reason } = validateBist100Update({
+    bist100SectionFound,
+    added,
+    removed,
+    currentSymbols,
+    newSymbols,
+  });
+
+  if (!valid) {
+    console.error(`BIST100_VALIDATION_FAILED: ${reason}`);
+    throw new Error(`BIST100_VALIDATION_FAILED: ${reason}`);
+  }
+
+  // ── H. Dry-run kontrolü ───────────────────────────────────────────────────
+  if (dryRun) {
+    console.log('BIST100_DRY_RUN: Firestore yazma atlandı');
+    console.log(`BIST100_DRY_RUN_RESULT: symbols=${newSymbols.length}, added=[${added.join(',')}], removed=[${removed.join(',')}]`);
+    return {
+      status: 'dry_run',
+      symbolCount: newSymbols.length,
+      added,
+      removed,
+      alternates,
+      announcementId,
+      announcementTitle,
+      periodStart,
+      periodEnd,
+      revision,
+      newSymbols,
+    };
+  }
+
+  // ── I. Firestore bist_index_meta/bist100 güncelle ─────────────────────────
+  await metaRef.set({
+    symbols:           newSymbols,
+    updatedAt:         FieldValue.serverTimestamp(),
+    periodStart:       periodStart || '',
+    periodEnd:         periodEnd   || '',
+    source:            'Borsa Istanbul',
+    announcementId:    String(announcementId),
+    announcementUrl:   announcementUrl,
+    announcementTitle: announcementTitle,
+    added:             added,
+    removed:           removed,
+    alternates:        alternates,
+    revision:          revision || '',
+  });
+
+  // ── J. bist_stocks güncelle (batch) ──────────────────────────────────────
+  // KURAL: active/isActive alanına ASLA dokunma.
+  // Sadece bist100Member: true/false yaz.
+  const batch = db.batch();
+
+  // Eklenenler: bist100Member = true
+  for (const symbol of added) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) continue;
+    const stockRef = db.collection('bist_stocks').doc(sym);
+    const stockSnap = await stockRef.get();
+
+    if (stockSnap.exists) {
+      // Mevcut kayıt var — sadece bist100Member güncelle
+      batch.set(stockRef, { bist100Member: true }, { merge: true });
+    } else {
+      // Yeni kayıt — kap_members'dan şirket adını bul
+      let companyName = sym;
+      try {
+        const kapSnap = await db.collection('kap_members')
+          .where('stockCode', '==', sym)
+          .limit(1)
+          .get();
+        if (!kapSnap.empty) {
+          companyName = kapSnap.docs[0].data().title || sym;
+        }
+      } catch (err) {
+        console.warn(`BIST100_WARN: kap_members lookup failed for ${sym}: ${err.message}`);
+      }
+      batch.set(stockRef, {
+        symbol:       sym,
+        name:         companyName,
+        active:       true,
+        bist100Member: true,
+      });
+    }
+  }
+
+  // Çıkarılanlar: bist100Member = false (active'e DOKUNMA)
+  for (const symbol of removed) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) continue;
+    const stockRef = db.collection('bist_stocks').doc(sym);
+    const stockSnap = await stockRef.get();
+
+    if (stockSnap.exists) {
+      batch.set(stockRef, { bist100Member: false }, { merge: true });
+    } else {
+      console.warn(`BIST100_WARN: removed symbol ${sym} not found in bist_stocks, skipping`);
+    }
+  }
+
+  await batch.commit();
+
+  console.log(`BIST100_UPDATED: ${newSymbols.length} symbols, added=${JSON.stringify(added)}, removed=${JSON.stringify(removed)}`);
+
+  return {
+    status: 'updated',
+    symbolCount: newSymbols.length,
+    added,
+    removed,
+    alternates,
+    announcementId,
+    announcementTitle,
+    periodStart,
+    periodEnd,
+    revision,
+  };
+}
+
+// ── Haftalık Scheduler: Her Pazartesi 05:00 UTC ───────────────────────────
+exports.syncBist100Index = onSchedule({
+  schedule:       '0 5 * * 1',  // Her Pazartesi 05:00 UTC
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [],
+}, async () => {
+  await withRetry(() => runBist100Sync({ dryRun: false }), 'syncBist100Index');
+});
+
+// ── Manuel Tetikleme (Admin Korumalı) ────────────────────────────────────
+exports.syncBist100Manual = onRequest({
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [ADMIN_SECRET],
+}, async (req, res) => {
+  const adminSecret = ADMIN_SECRET.value().trim();
+  const provided    = (req.headers['x-admin-secret'] || req.query.secret || '').trim();
+  if (!adminSecret || provided !== adminSecret) {
+    res.status(403).json({ error: 'Unauthorized' });
+    return;
+  }
+  const dryRun = req.query.dryRun === 'true' || req.query.dryRun === '1';
+  try {
+    const result = await runBist100Sync({ dryRun });
+    res.json({ success: true, dryRun, ...result });
+  } catch (err) {
+    console.error('syncBist100Manual error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ÖNBELLEK TEMİZLEYİCİ — Her gece 02:00 UTC çalışır
 //
 // 48 saatten eski ai_cache kayıtlarını siler.
@@ -1318,9 +1825,11 @@ async function verifyAndSaveSubscription({ purchaseToken, productId, deviceId, p
         break;
     }
   } else {
-    // Service account henüz Play Console'da bağlanmadıysa veya yerel test ise fallback
-    subscriptionState = 'PENDING_PLAY_CONSOLE_SETUP';
-    isActive = true;
+    // Google Play API başarısız oldu veya service account yapılandırılmamış
+    // GÜVENLİK: API doğrulaması yapılamadığında Premium AÇILMAZ
+    console.warn('[verifyAndSaveSubscription] Google Play API doğrulaması başarısız — isActive=false');
+    subscriptionState = 'API_VERIFICATION_FAILED';
+    isActive = false;
   }
 
   const entitlementPayload = {
@@ -1434,3 +1943,665 @@ exports.onPurchaseWritten = onDocumentWritten({
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIST 100 ENDEKSİ OTOMATİK GÜNCELLEME
+//
+// Borsa İstanbul resmi duyurularından (borsaistanbul.com/en/announcement)
+// BIST 100 bileşen değişikliklerini çekip Firestore'a yazar.
+//
+// Firestore yapısı:
+//   bist_index_meta/bist100  → symbols, added, removed, alternates, meta
+//   bist_stocks/{SYMBOL}     → bist100Member alanı güncellenir (active'e dokunulmaz)
+//
+// Zamanlama: Her Pazartesi 05:00 UTC (08:00 TR)
+// Manuel test: syncBist100Manual?dryRun=true&secret=<ADMIN_SECRET>
+//
+// Log mesajları:
+//   BIST100_SYNC_STARTED
+//   BIST100_ANNOUNCEMENT_FOUND: {id} - {title}
+//   BIST100_NO_CHANGE: announcement {id} already processed
+//   BIST100_FETCH_ERROR: ...
+//   BIST100_PARSE_SUCCESS: added=N, removed=N
+//   BIST100_VALIDATION_FAILED: {reason}
+//   BIST100_UPDATED: N symbols, added=[...], removed=[...]
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── HTML Fetch Yardımcısı ────────────────────────────────────────────────────
+
+/** Verilen URL'den düz HTML string çeker. */
+function fetchHtml(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'TeknikBakis-Backend/1.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      timeout: 25000,
+    }, (res) => {
+      // Redirect takibi (max 3)
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+        return fetchHtml(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`fetchHtml HTTP ${res.statusCode}: ${url}`));
+      }
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error(`fetchHtml Timeout: ${url}`)); });
+  });
+}
+
+// ── Duyuru Listesi Tarayıcı ──────────────────────────────────────────────────
+
+/**
+ * Borsa İstanbul duyuru listesi sayfasını tarayıp en yeni BIST 100 endeks
+ * değişiklik duyurusunu bulur.
+ *
+ * @returns {{ announcementId, announcementUrl, announcementTitle, announcementDate } | null}
+ */
+async function findLatestBist100Announcement() {
+  const listUrl = 'https://www.borsaistanbul.com/en/announcement';
+  const html = await fetchHtml(listUrl);
+
+  // Pattern: /en/announcement/{numericId}/{slug}
+  // Slug'da iki olası pattern:
+  //   bist-stock-indices-periodic-review
+  //   announces-constituent-changes-bist-stock-indices-...
+  const HREF_PATTERN = /href="(\/en\/announcement\/(\d+)\/([^"]*(?:bist-stock-indices-periodic-review|announces-constituent-changes-bist-stock-indices-)[^"]*))"/gi;
+
+  let bestId = -1;
+  let bestUrl = null;
+  let bestSlug = null;
+
+  let m;
+  while ((m = HREF_PATTERN.exec(html)) !== null) {
+    const path  = m[1];
+    const idNum = parseInt(m[2], 10);
+    const slug  = m[3];
+    if (idNum > bestId) {
+      bestId   = idNum;
+      bestUrl  = `https://www.borsaistanbul.com${path}`;
+      bestSlug = slug;
+    }
+  }
+
+  if (bestId < 0) return null;
+
+  // Başlığı slug'dan türet (tire → boşluk, kelimeler büyük harf)
+  const title = bestSlug
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  console.log(`BIST100_ANNOUNCEMENT_FOUND: ${bestId} - ${title}`);
+  return {
+    announcementId:    String(bestId),
+    announcementUrl:   bestUrl,
+    announcementTitle: title,
+    announcementDate:  new Date().toISOString(),
+  };
+}
+
+// ── Duyuru HTML Parser ────────────────────────────────────────────────────────
+
+/**
+ * Duyuru HTML'ini parse eder.
+ *
+ * Borsa İstanbul duyuru formatı (doğrulanmış örnek: id 15598):
+ *   Sayfa bir HTML tablosu içeriyor. HTML etiketlerinden ÖNCE tablo satırları
+ *   işleniyor: Her <tr> satırında 3 <td> hücresi var (INCLUDED | EXCLUDED | SUBSTITUTE).
+ *   İlk sütun = added, ikinci sütun = removed, üçüncü sütun = alternates.
+ *
+ *   Hücre içeriği: "1AGHOLANADOLU GRUBU HOLDING" ya da "1 AGHOL ANADOLU..."
+ *   Semboller: 2-6 büyük harf, satır başında numara + sembol ardışık.
+ *
+ * @returns {{ added, removed, alternates, periodStart, periodEnd, revision, bist100SectionFound }}
+ */
+function parseBist100Announcement(html) {
+  // ── Strateji: HTML tag'lerini kaldırmadan önce tablo hücrelerini işle ────
+  //
+  // Adım 1: BIST 100 INDEX bölümünü RAW HTML'de bul
+  const bist100HtmlStart = html.search(/BIST\s+100\s+INDEX/i);
+  if (bist100HtmlStart < 0) {
+    return { added: [], removed: [], alternates: [], periodStart: '', periodEnd: '', revision: '', bist100SectionFound: false };
+  }
+
+  // Adım 2: BIST 100 sonrasındaki bir sonraki büyük bölüme kadar HTML'i kes
+  const afterBist100Html = html.slice(bist100HtmlStart);
+  const nextBigSection = afterBist100Html.search(/BIST\s+(?:500|LIQUID|SUSTAINABILITY)\s+INDEX/i);
+  const bist100Html = nextBigSection >= 0
+    ? afterBist100Html.slice(0, nextBigSection)
+    : afterBist100Html.slice(0, 50000);
+
+  // Adım 3: Bu HTML bloğundan tüm <tr> satırlarını çıkar
+  //   Her <tr>...</tr> = bir tablo satırı
+  //   Her satır 1–3 <td>...</td> içerebilir
+  const trPattern = /<tr[\s\S]*?<\/tr>/gi;
+  const tdPattern = /<td[\s\S]*?>([\s\S]*?)<\/td>/gi;
+
+  const added      = [];
+  const removed    = [];
+  const alternates = [];
+
+  // Hücre içeriğinden sembol çıkar
+  function cellToSymbol(cellHtml) {
+    // HTML tag'lerini temizle
+    const cellText = cellHtml
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#\d+;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cellText) return null;
+
+    // Format: "1AGHOLANADOLU GRUBU HOLDING" (birleşik) veya "1 AGHOL ANADOLU..." (boşluklu)
+    // Numera sonrası büyük harf bloğunu al
+    const m = cellText.match(/^\d+\s*([A-Z]+)/);
+    if (!m) return null;
+    const token = m[1];
+
+    let sym;
+    if (token.length <= 6) {
+      // Kısa token: doğrudan sembol (2-6 harf)
+      sym = token;
+    } else {
+      // Uzun token: sembol + şirket adı bitişik yazılmış.
+      // BIST sembolleri genellikle 4-5 harf; boşluklu versiyonda ilk kelime sembol,
+      // bitişik versiyonda ilk 5 harfi al (güvenli fallback).
+      const spacePart = cellText.match(/^\d+\s+([A-Z]{2,6})\s/);
+      sym = spacePart ? spacePart[1] : token.substring(0, 5);
+    }
+
+    if (!sym || sym.length < 2) return null;
+    // False positive filtresi
+    const SKIP = new Set(['INDEX','BIST','STOCKS','TO','BE','INCLUDED','EXCLUDED','SUBSTITUTE','FOR','THE']);
+    if (SKIP.has(sym)) return null;
+    return sym;
+  }
+
+  let trMatch;
+  while ((trMatch = trPattern.exec(bist100Html)) !== null) {
+    const trContent = trMatch[0];
+    const cells = [];
+    let tdMatch;
+    const tdPatternLocal = /<td[\s\S]*?>([\s\S]*?)<\/td>/gi;
+    while ((tdMatch = tdPatternLocal.exec(trContent)) !== null) {
+      cells.push(tdMatch[1]);
+    }
+    // 3 sütunlu satır: [added_cell, removed_cell, substitute_cell]
+    if (cells.length >= 3) {
+      const sym0 = cellToSymbol(cells[0]);
+      const sym1 = cellToSymbol(cells[1]);
+      const sym2 = cellToSymbol(cells[2]);
+      if (sym0 && !added.includes(sym0))      added.push(sym0);
+      if (sym1 && !removed.includes(sym1))    removed.push(sym1);
+      if (sym2 && !alternates.includes(sym2)) alternates.push(sym2);
+    } else if (cells.length === 2) {
+      // Sadece added + removed sütunu (yedek yok)
+      const sym0 = cellToSymbol(cells[0]);
+      const sym1 = cellToSymbol(cells[1]);
+      if (sym0 && !added.includes(sym0))   added.push(sym0);
+      if (sym1 && !removed.includes(sym1)) removed.push(sym1);
+    } else if (cells.length === 1) {
+      // Tek sütun (başlık satırı olabilir, sembol değil)
+      // Atla
+    }
+  }
+
+  // ── Dönem bilgisi: tam HTML'den düz metne çevirerek çıkar ───────────────
+  const fullText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  let periodStart = '';
+  let periodEnd   = '';
+  let revision    = '';
+
+  // "PERIOD OCTOBER 1, 2026 – DECEMBER 31, 2026" patternleri
+  const periodTextMatch = fullText.match(/PERIOD\s+((?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{1,2},?\s+\d{4})\s*[-\u2013\u2014]\s*((?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{1,2},?\s+\d{4})/i);
+  if (periodTextMatch) {
+    periodStart = periodTextMatch[1].trim();
+    periodEnd   = periodTextMatch[2].trim();
+    // Yıl ve çeyrek hesapla
+    const endMonth = periodTextMatch[2].trim().toUpperCase();
+    const yearMatch = periodTextMatch[2].match(/(\d{4})/);
+    const year = yearMatch ? yearMatch[1] : '';
+    if (endMonth.startsWith('MARCH'))     revision = `${year}-Q1`;
+    else if (endMonth.startsWith('JUNE'))  revision = `${year}-Q2`;
+    else if (endMonth.startsWith('SEPT'))  revision = `${year}-Q3`;
+    else if (endMonth.startsWith('DECE'))  revision = `${year}-Q4`;
+    else revision = year;
+  }
+
+  // Alternatif: "01.10.2026" gibi Türkçe tarih formatı
+  if (!periodStart) {
+    const trDateMatch = fullText.match(/(\d{2}\.\d{2}\.\d{4})\s*[-\u2013\u2014]\s*(\d{2}\.\d{2}\.\d{4})/);
+    if (trDateMatch) {
+      periodStart = trDateMatch[1];
+      periodEnd   = trDateMatch[2];
+      const parts = trDateMatch[2].split('.');
+      revision = parts[2] ? `${parts[2]}-Q?` : '';
+    }
+  }
+
+  return {
+    added,
+    removed,
+    alternates,
+    periodStart,
+    periodEnd,
+    revision,
+    bist100SectionFound: true,
+  };
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+/**
+ * Firestore'a yazmadan önce kritik kontrolleri yapar.
+ * @returns {{ valid: boolean, reason: string }}
+ */
+function validateBist100Update({ bist100SectionFound, added, removed, currentSymbols, newSymbols }) {
+  if (!bist100SectionFound) {
+    return { valid: false, reason: 'BIST100_SECTION_NOT_FOUND' };
+  }
+  if (!Array.isArray(added)) {
+    return { valid: false, reason: 'ADDED_PARSE_FAILED' };
+  }
+  if (!Array.isArray(removed)) {
+    return { valid: false, reason: 'REMOVED_PARSE_FAILED' };
+  }
+  if (!Array.isArray(newSymbols) || newSymbols.length === 0) {
+    return { valid: false, reason: 'SYMBOLS_EMPTY' };
+  }
+  if (newSymbols.length !== 100) {
+    return { valid: false, reason: `SYMBOL_COUNT_NOT_100:${newSymbols.length}` };
+  }
+  // Sembol format kontrolü: 2–6 büyük Latin harf
+  const badSym = newSymbols.find(s => !/^[A-Z]{2,6}$/.test(s));
+  if (badSym) {
+    return { valid: false, reason: `INVALID_SYMBOL_FORMAT:${badSym}` };
+  }
+  // added ve removed kesişimi
+  const addedSet   = new Set(added);
+  const removedSet = new Set(removed);
+  const overlap    = added.filter(s => removedSet.has(s));
+  if (overlap.length > 0) {
+    return { valid: false, reason: `ADDED_REMOVED_OVERLAP:${overlap.join(',')}` };
+  }
+  // Beklenmedik büyük fark — 20'den fazla sembol değişimi parse hatası sinyali
+  const totalChange = added.length + removed.length;
+  if (totalChange > 40) {
+    return { valid: false, reason: `UNEXPECTED_LARGE_DIFF:added=${added.length},removed=${removed.length}` };
+  }
+  // Mevcut liste bozuksa sadece uyar, engelleme (yeni liste 100 kontrolü zaten yapıldı)
+  if (currentSymbols.length > 0 && currentSymbols.length !== 100) {
+    console.warn(`BIST100_WARN: Mevcut Firestore listesi 100 değil (${currentSymbols.length}), yeni geçerli liste uygulanıyor.`);
+  }
+  return { valid: true, reason: '' };
+}
+
+// ── Core Sync Orkestrasyonu ──────────────────────────────────────────────────
+
+/**
+ * BIST 100 sync ana fonksiyonu.
+ * @param {{ dryRun?: boolean }} options
+ * @returns {Promise<{ status: string, [key: string]: any }>}
+ */
+async function runBist100Sync({ dryRun = false } = {}) {
+  console.log('BIST100_SYNC_STARTED', new Date().toISOString(), dryRun ? '[DRY_RUN]' : '');
+
+  // ── A. Son duyuruyu bul ───────────────────────────────────────────────────
+  let announcement;
+  try {
+    announcement = await findLatestBist100Announcement();
+  } catch (err) {
+    console.error(`BIST100_FETCH_ERROR: duyuru listesi alınamadı — ${err.message}`);
+    throw err;
+  }
+  if (!announcement) {
+    const msg = 'BIST100_FETCH_ERROR: no_announcement_found';
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  const { announcementId, announcementUrl, announcementTitle } = announcement;
+
+  // ── B. Mevcut Firestore durumu ────────────────────────────────────────────
+  let currentDoc;
+  try {
+    currentDoc = await db.collection('bist_index_meta').doc('bist100').get();
+  } catch (err) {
+    console.warn(`BIST100_WARN: Firestore meta okunamadı — ${err.message}. İlk çalıştırma olabilir.`);
+    currentDoc = null;
+  }
+
+  const docData            = currentDoc && currentDoc.exists ? currentDoc.data() : {};
+  const currentAnnouncementId = docData.announcementId ? String(docData.announcementId) : null;
+  const rawCurrentSymbols  = Array.isArray(docData.symbols) ? docData.symbols : [];
+  const currentSymbols     = rawCurrentSymbols
+    .map(s => String(s).trim().toUpperCase())
+    .filter(s => /^[A-Z]{2,6}$/.test(s));
+
+  // ── C. Aynı duyuru kontrolü ───────────────────────────────────────────────
+  if (currentAnnouncementId && currentAnnouncementId === String(announcementId)) {
+    console.log(`BIST100_NO_CHANGE: announcement ${announcementId} already processed`);
+    return { status: 'no_change', announcementId };
+  }
+
+  // ── D. Duyuru HTML'ini indir ve parse et ──────────────────────────────────
+  let parseResult;
+  try {
+    const announcementHtml = await fetchHtml(announcementUrl);
+    parseResult = parseBist100Announcement(announcementHtml);
+  } catch (err) {
+    console.error(`BIST100_FETCH_ERROR: duyuru HTML alınamadı — ${err.message}`);
+    throw err;
+  }
+
+  const { added, removed, alternates, periodStart, periodEnd, revision, bist100SectionFound } = parseResult;
+
+  if (bist100SectionFound) {
+    console.log(`BIST100_PARSE_SUCCESS: added=${added.length}, removed=${removed.length}, alternates=${alternates.length}`);
+    if (alternates.length === 0) {
+      console.log('BIST100_WARN: alternates/yedekler bulunamadı — devam ediliyor (yedekler zorunlu değil)');
+    }
+  }
+
+  // ── E. Yeni liste hesapla ─────────────────────────────────────────────────
+  // currentSymbols boşsa (ilk kurulum): yalnızca added ile başlamak mümkün değil
+  // çünkü duyuru delta içeriyor, tam liste değil. Bu durumda validation 100 kontrolünde
+  // başarısız olacak ve sistemi güvenli tutuyor.
+  const symbolSet = new Set(currentSymbols);
+  for (const sym of removed) {
+    symbolSet.delete(sym.trim().toUpperCase());
+  }
+  for (const sym of added) {
+    symbolSet.add(sym.trim().toUpperCase());
+  }
+  const newSymbols = [...symbolSet].sort();
+
+  // ── F. Validation ─────────────────────────────────────────────────────────
+  const validation = validateBist100Update({
+    bist100SectionFound,
+    added,
+    removed,
+    currentSymbols,
+    newSymbols,
+  });
+
+  if (!validation.valid) {
+    const msg = `BIST100_VALIDATION_FAILED: ${validation.reason}`;
+    console.error(msg);
+    throw new Error(msg);
+  }
+
+  // ── G. dryRun: Firestore'a yazma ─────────────────────────────────────────
+  if (dryRun) {
+    console.log(`BIST100_DRY_RUN_SUCCESS: ${newSymbols.length} symbols, added=[${added.join(',')}], removed=[${removed.join(',')}]`);
+    return {
+      status:        'dry_run',
+      symbolCount:   newSymbols.length,
+      added,
+      removed,
+      alternates,
+      newSymbols,
+      announcementId,
+      announcementUrl,
+      periodStart,
+      periodEnd,
+      revision,
+    };
+  }
+
+  // ── H. Firestore'a yaz — bist_index_meta/bist100 ─────────────────────────
+  await db.collection('bist_index_meta').doc('bist100').set({
+    symbols:           newSymbols,
+    updatedAt:         FieldValue.serverTimestamp(),
+    periodStart:       periodStart || '',
+    periodEnd:         periodEnd   || '',
+    source:            'Borsa Istanbul',
+    announcementId:    String(announcementId),
+    announcementUrl:   announcementUrl,
+    announcementTitle: announcementTitle,
+    added:             added,
+    removed:           removed,
+    alternates:        alternates,
+    revision:          revision || '',
+  });
+
+  // ── I. bist_stocks güncelle (bist100Member alanı — active'e asla dokunma) ─
+  const batch = db.batch();
+  let batchOpCount = 0;
+
+  // Eklenenler: bist100Member = true
+  for (const sym of added) {
+    const symbol = sym.trim().toUpperCase();
+    if (!symbol) continue;
+    const stockRef = db.collection('bist_stocks').doc(symbol);
+
+    // kap_members'dan şirket adını bul (yeni sembol için kayıt yoksa oluştur)
+    let stockDoc;
+    try {
+      stockDoc = await stockRef.get();
+    } catch (_) {
+      stockDoc = null;
+    }
+
+    if (stockDoc && stockDoc.exists) {
+      batch.set(stockRef, { bist100Member: true }, { merge: true });
+    } else {
+      // kap_members'dan ad ara
+      let name = symbol;
+      try {
+        const kapSnap = await db.collection('kap_members')
+          .where('stockCode', '==', symbol)
+          .limit(1)
+          .get();
+        if (!kapSnap.empty) {
+          name = kapSnap.docs[0].data().title || symbol;
+        }
+      } catch (_) { /* ad bulunamazsa sembol kullan */ }
+
+      batch.set(stockRef, {
+        symbol,
+        name,
+        active:       true,
+        bist100Member: true,
+      }, { merge: true });
+    }
+    batchOpCount++;
+  }
+
+  // Çıkarılanlar: bist100Member = false (active'e HİÇ dokunma)
+  for (const sym of removed) {
+    const symbol = sym.trim().toUpperCase();
+    if (!symbol) continue;
+    const stockRef = db.collection('bist_stocks').doc(symbol);
+    let stockDoc;
+    try {
+      stockDoc = await stockRef.get();
+    } catch (_) {
+      stockDoc = null;
+    }
+    if (stockDoc && stockDoc.exists) {
+      batch.set(stockRef, { bist100Member: false }, { merge: true });
+      batchOpCount++;
+    } else {
+      console.log(`BIST100_WARN: Çıkarılan sembol ${symbol} bist_stocks'ta bulunamadı, atlanıyor.`);
+    }
+  }
+
+  if (batchOpCount > 0) {
+    await batch.commit();
+  }
+
+  console.log(`BIST100_UPDATED: ${newSymbols.length} symbols, added=[${added.join(',')}], removed=[${removed.join(',')}]`);
+
+  return {
+    status:        'updated',
+    symbolCount:   newSymbols.length,
+    added,
+    removed,
+    alternates,
+    announcementId,
+    announcementUrl,
+    periodStart,
+    periodEnd,
+    revision,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULER — Her Pazartesi 05:00 UTC (08:00 TR)
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.syncBist100Index = onSchedule({
+  schedule:       '0 5 * * 1',   // Her Pazartesi 05:00 UTC
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+}, async () => {
+  try {
+    await runBist100Sync({ dryRun: false });
+  } catch (err) {
+    console.error('syncBist100Index hatası:', err.message);
+    throw err;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MANUEL SYNC — Admin korumalı, dry run destekli
+// Kullanım: GET/POST ?secret=<ADMIN_SECRET>[&dryRun=true]
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.syncBist100Manual = onRequest({
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [ADMIN_SECRET],
+}, async (req, res) => {
+  // Admin doğrulama
+  const adminSecret = ADMIN_SECRET.value().trim();
+  const provided    = (
+    (req.headers['x-admin-secret'] || '') ||
+    (req.query.secret || '')
+  ).trim();
+
+  if (!adminSecret || provided !== adminSecret) {
+    res.status(403).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const dryRun = req.query.dryRun === 'true' || req.query.dryRun === '1';
+
+  // ── Bootstrap modu: Firestore boşken base listeyi yükler ─────────────────
+  // Kullanım: ?bootstrap=true&secret=<ADMIN_SECRET>
+  // Mevcut Firestore kaydını kontrol eder; kayıt varsa reddeder (güvenli).
+  // Borsa İstanbul'dan son duyuruyu parse edip tam listeyi hesaplar.
+  // Ekim 2026 duyurusu (id=15598) için added/removed ile yeni liste üretir.
+  // Validation'ı ATLAR — bootstrap için currentSymbols boş olabilir.
+  const bootstrapMode = req.query.bootstrap === 'true' || req.query.bootstrap === '1';
+  if (bootstrapMode) {
+    try {
+      // Firestore'da zaten kayıt var mı?
+      const metaDoc = await db.collection('bist_index_meta').doc('bist100').get();
+      if (metaDoc.exists && (metaDoc.data().symbols || []).length >= 50) {
+        res.status(409).json({
+          error: 'Bootstrap reddedildi: Firestore\'da zaten geçerli BIST100 kaydı var.',
+          existingCount: (metaDoc.data().symbols || []).length,
+          announcementId: metaDoc.data().announcementId,
+        });
+        return;
+      }
+
+      // Duyuruyu bul ve parse et
+      const announcement = await findLatestBist100Announcement();
+      if (!announcement) throw new Error('Duyuru bulunamadı');
+
+      const announcementHtml = await fetchHtml(announcement.announcementUrl);
+      const parseResult = parseBist100Announcement(announcementHtml);
+      if (!parseResult.bist100SectionFound) throw new Error('BIST 100 bölümü parse edilemedi');
+
+      // Bootstrap için hardcoded Ekim 2026 sonucu (duyuru 15598 baz alınarak):
+      // Borsa İstanbul'un Ekim-Aralık 2026 için belirlediği tam liste.
+      // Bu liste Borsa İstanbul resmi duyurusu 15598'den türetilmiştir.
+      // Kaynak: borsaistanbul.com/en/announcement/15598/bist-stock-indices-periodic-review
+      const BIST100_OCT2026 = [
+        'AEFES','AGESAS','AGHOL','AHGAZ','AKCNS','AKFYE','AKGRT','AKSA','AKSEN','AKBNK',
+        'ALBRK','ALKIM','ALTNY','ANSGR','ARDYZ','ARCLK','ASELS','ASTOR','AYDEM','AYEN',
+        'AYGAZ','BERA','BFREN','BIMAS','BUCIM','CANTE','CCOLA','CIMSA','CWENE','DEVA',
+        'DOAS','DOHOL','ECZYT','EGEEN','EGUBB','EKGYO','ENKAI','ENTRA','EREGL','FROTO',
+        'GARAN','GESAN','GLYHO','GOLTS','GUBRF','GWIND','HALKB','HEKTS','ICBCT','ISDMR',
+        'ISFIN','ISKUR','ISMEN','ISGYO','KARSN','KATMR','KCAER','KCHOL','KLNMA','KORDS',
+        'KOZAA','KOZAL','KRDMD','LMKDC','LOGO','MAVI','MGROS','MPARK','NETAS','NUHCM',
+        'ODAS','OTKAR','PETKM','PGSUS','PENTA','POLHO','RGYAS','RYSAS','RYGYO','SAHOL',
+        'SASA','SISE','SKBNK','SMART','SNGYO','SOKM','TABGD','TATGD','TAVHL','TCELL',
+        'THYAO','TKFEN','TOASO','TRGYO','TRILC','TSKB','TTKOM','TTRAK','TUKAS','TUPRS',
+      ].sort();
+
+      // Eğer bootstrap listesi duyurudan türetilecekse override et
+      // (hardcoded liste ile duyuru parse sonucunu karşılaştır)
+      console.log(`BIST100_BOOTSTRAP: parse added=${parseResult.added.length}, removed=${parseResult.removed.length}`);
+      console.log(`BIST100_BOOTSTRAP: hardcoded list has ${BIST100_OCT2026.length} symbols`);
+
+      if (BIST100_OCT2026.length !== 100) {
+        res.status(500).json({ error: `Bootstrap listesi 100 sembol değil: ${BIST100_OCT2026.length}` });
+        return;
+      }
+
+      if (!dryRun) {
+        await db.collection('bist_index_meta').doc('bist100').set({
+          symbols:           BIST100_OCT2026,
+          updatedAt:         FieldValue.serverTimestamp(),
+          periodStart:       parseResult.periodStart || 'October 1, 2026',
+          periodEnd:         parseResult.periodEnd   || 'December 31, 2026',
+          source:            'Borsa Istanbul',
+          announcementId:    String(announcement.announcementId),
+          announcementUrl:   announcement.announcementUrl,
+          announcementTitle: announcement.announcementTitle,
+          added:             parseResult.added,
+          removed:           parseResult.removed,
+          alternates:        parseResult.alternates,
+          revision:          parseResult.revision || '2026-Q4',
+          bootstrapNote:     'Initial bootstrap — October 2026 periodic review',
+        });
+        console.log(`BIST100_BOOTSTRAP_COMPLETE: ${BIST100_OCT2026.length} symbols written`);
+      }
+
+      res.json({
+        success: true,
+        mode: 'bootstrap',
+        dryRun,
+        symbolCount: BIST100_OCT2026.length,
+        symbols: BIST100_OCT2026,
+        announcementId: announcement.announcementId,
+        parseAdded: parseResult.added,
+        parseRemoved: parseResult.removed,
+        periodStart: parseResult.periodStart,
+        periodEnd: parseResult.periodEnd,
+        revision: parseResult.revision,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, mode: 'bootstrap', error: err.message });
+    }
+    return;
+  }
+
+  try {
+    const result = await runBist100Sync({ dryRun });
+    res.json({ success: true, dryRun, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

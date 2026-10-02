@@ -82,5 +82,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── BIST Hisse Senetleri (Cloud Function yazar, uygulama okur) ──────────
+    match /bist_stocks/{symbol} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ── BIST Endeks Meta (Cloud Function yazar, uygulama okur) ───────────────
+    match /bist_index_meta/{docId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
   }
 }
