@@ -815,7 +815,7 @@ void syncBistStocksWithIpoItems(List<IpoItem> ipoItems) {
 /// Borsa İstanbul BIST 100 Endeks Bileşenleri
 /// Kaynak: Borsa İstanbul resmi endeks listesi
 /// Son güncelleme: Eylül 2026 revizyonu (01.05.2026 – 30.09.2026 dönemi)
-/// Değişiklikler: AGHOL, TABGD, TUREX çıkarıldı; ODINE, IEYHO, ESEN eklendi.
+/// Değişiklikler: AGHOL, TABGD, TUREX, GENIL, MIATK çıkarıldı; ODINE, IEYHO, ESEN eklendi.
 const List<String> kBist100Symbols = [
   // ── Bankacılık ──────────────────────────────────────────
   'AKBNK', 'ALBRK', 'GARAN', 'HALKB', 'ICBCT',
@@ -859,10 +859,10 @@ const List<String> kBist100Symbols = [
   // ── Çimento & İnşaat ────────────────────────────────────
   'BUCIM', 'NUHCM',
   // ── Tekstil & Diğer ─────────────────────────────────────
-  // TUREX çıkarıldı (Eylül 2026 revizyonu)
+  // TUREX, GENIL, MIATK çıkarıldı (Eylül 2026 revizyonu)
   'ALKIM', 'ALTNY', 'BERA', 'BFREN', 'CANTE',
-  'EGEEN', 'GENIL', 'GESAN', 'GOLTS', 'KORDS',
-  'KOZAL', 'MIATK', 'PENTA', 'POLHO', 'SISE',
+  'EGEEN', 'GESAN', 'GOLTS', 'KORDS',
+  'KOZAL', 'PENTA', 'POLHO', 'SISE',
   'TAVHL', 'TMSN', 'TRILC', 'ULUUN',
 ];
 

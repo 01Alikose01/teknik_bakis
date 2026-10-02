@@ -30,7 +30,7 @@ class _ScannerScreenState extends State<ScannerScreen>
   String _activePeriod = 'G';
   _ScanScope _lastScanScope = _ScanScope.bist500;
 
-  static final List<String> _bist500Symbols =
+  static List<String> get _bist500Symbols =>
       kBistStocks.map((e) => e['symbol']!).toList();
 
   static List<String> get _bist100Symbols => Bist100Service.symbols;

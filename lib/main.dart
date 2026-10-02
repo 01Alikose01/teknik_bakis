@@ -32,7 +32,7 @@ void main() async {
   await HomePriceCache.init();
   await NotificationService.init();
   await NotificationService.requestPermission();
-  Bist100Service.init(); // arka planda başlat, await etme
+  await Bist100Service.init(); // Scanner'a girmeden önce BIST100 listesi yüklensin
   PriceSyncService.start(); // tek merkezi fiyat senkronizasyonu
   await InAppReviewService.init(); // Google Play In-App Review
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
