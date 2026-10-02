@@ -26,6 +26,7 @@ class PurchaseService {
   static final InAppPurchase _iap = InAppPurchase.instance;
 
   // Google Play Console Product / Subscription ID'leri
+  // Yeni sistem: teknik_bakis_premium / monthly + yearly base planları ANA SİSTEM
   static const String kSubscriptionId = 'teknik_bakis_premium';
   static const String kLegacyMonthlyId = 'premium_monthly';
   static const String kLegacyYearlyId = 'premium_yearly';
@@ -34,8 +35,14 @@ class PurchaseService {
   static const String kBasePlanMonthly = 'monthly';
   static const String kBasePlanYearly = 'yearly';
 
-  static final Set<String> _kProductIds = {
+  // Yeni satın alma akışı SADECE yeni sistemi sorgular.
+  // Legacy ürünler yalnızca restore için ayrı alanlar kullanır.
+  static final Set<String> _kNewProductIds = {
     kSubscriptionId,
+  };
+
+  // Legacy restore için ek sorgu (ayrı, yeni sistemle karışmaz)
+  static final Set<String> _kLegacyProductIds = {
     kLegacyMonthlyId,
     kLegacyYearlyId,
   };
@@ -44,11 +51,18 @@ class PurchaseService {
   static bool _isAvailable = false;
   static bool _isLoading = false;
 
-  // Google Play'den çekilen ürün ve teklif bilgileri
+  // YENİ sistem: teknik_bakis_premium ürünü ve offer token'ları
   static ProductDetails? _monthlyProduct;
   static ProductDetails? _yearlyProduct;
   static String? _monthlyOfferToken;
   static String? _yearlyOfferToken;
+
+  // LEGACY ürünler: yalnızca restore işlemleri için ayrı tutulur,
+  // yeni satın alma akışında ASLA kullanılmaz.
+  // ignore: unused_field
+  static ProductDetails? _legacyMonthlyProduct;
+  // ignore: unused_field
+  static ProductDetails? _legacyYearlyProduct;
 
   // Dinamik fiyat bilgileri (Google Play'den dönen yerelleştirilmiş fiyatlar)
   static String _monthlyPriceText = '₺299/ay';
@@ -93,6 +107,8 @@ class PurchaseService {
   }
 
   /// Google Play Store'dan ürün detaylarını ve fiyatlarını sorgular.
+  /// SADECE yeni teknik_bakis_premium ürününü sorgular.
+  /// Legacy ürünler yeni satın alma akışına dahil edilmez.
   static Future<void> loadProducts() async {
     try {
       _isLoading = true;
@@ -104,8 +120,9 @@ class PurchaseService {
         return;
       }
 
+      // Yalnızca yeni sistem ürününü sorgula — legacy ürünler buraya dahil edilmez
       final ProductDetailsResponse response =
-          await _iap.queryProductDetails(_kProductIds);
+          await _iap.queryProductDetails(_kNewProductIds);
 
       if (response.error != null) {
         debugPrint(
@@ -116,7 +133,7 @@ class PurchaseService {
         debugPrint(
             '[PurchaseService] Found product: ${product.id}, price: ${product.price}');
 
-        // Model 1: Yeni Subscription + Base Plans
+        // Yeni Sistem: teknik_bakis_premium / monthly + yearly base plans
         if (product.id == kSubscriptionId &&
             product is GooglePlayProductDetails) {
           final offers =
@@ -126,55 +143,67 @@ class PurchaseService {
             final phases = offer.pricingPhases;
             final priceFormatted =
                 phases.isNotEmpty ? phases.first.formattedPrice : product.price;
-            final rawPrice = priceFormatted.replaceAll('/ay', '').replaceAll('/yıl', '').trim();
+            final rawPrice = priceFormatted
+                .replaceAll('/ay', '')
+                .replaceAll('/yıl', '')
+                .trim();
 
             if (basePlanId.contains('month') || basePlanId == kBasePlanMonthly) {
+              // Yeni sistem monthly → _monthlyProduct
               _monthlyProduct = product;
               _monthlyOfferToken = offer.offerIdToken;
               _monthlyPriceText = '$priceFormatted/ay';
               _monthlyRawPriceText = rawPrice;
+              debugPrint('[PurchaseService] New monthly plan loaded: offerToken=${offer.offerIdToken}');
             } else if (basePlanId.contains('year') ||
                 basePlanId == kBasePlanYearly) {
+              // Yeni sistem yearly → _yearlyProduct
               _yearlyProduct = product;
               _yearlyOfferToken = offer.offerIdToken;
               _yearlyPriceText = '$priceFormatted/yıl';
               _yearlyRawPriceText = rawPrice;
-              _calculateMonthlyEquivalent(phases.isNotEmpty ? phases.first.priceAmountMicros : 0);
+              _calculateMonthlyEquivalent(
+                  phases.isNotEmpty ? phases.first.priceAmountMicros : 0);
+              debugPrint('[PurchaseService] New yearly plan loaded: offerToken=${offer.offerIdToken}');
             }
           }
         }
 
-        // Model 2: Klasik Ayrı Subscription ID'leri
+        // Legacy ürünler yalnızca ayrı alanlarına kaydedilir, ana akışa dahil edilmez
         if (product.id == kLegacyMonthlyId) {
-          _monthlyProduct = product;
-          _monthlyPriceText = '${product.price}/ay';
-          _monthlyRawPriceText = product.price;
-          if (product is GooglePlayProductDetails) {
-            final offers = product.productDetails.subscriptionOfferDetails;
-            if (offers != null && offers.isNotEmpty) {
-              _monthlyOfferToken = offers.first.offerIdToken;
-            }
-          }
+          _legacyMonthlyProduct = product;
+          debugPrint('[PurchaseService] Legacy monthly product found (restore only): ${product.id}');
         } else if (product.id == kLegacyYearlyId) {
-          _yearlyProduct = product;
-          _yearlyPriceText = '${product.price}/yıl';
-          _yearlyRawPriceText = product.price;
-          if (product is GooglePlayProductDetails) {
-            final offers = product.productDetails.subscriptionOfferDetails;
-            if (offers != null && offers.isNotEmpty) {
-              _yearlyOfferToken = offers.first.offerIdToken;
-              final phases = offers.first.pricingPhases;
-              if (phases.isNotEmpty) {
-                _calculateMonthlyEquivalent(phases.first.priceAmountMicros);
-              }
-            }
-          }
+          _legacyYearlyProduct = product;
+          debugPrint('[PurchaseService] Legacy yearly product found (restore only): ${product.id}');
         }
       }
+
+      // Legacy ürünleri de ayrı bir sorguda yükle (restore için)
+      _loadLegacyProductsForRestoreOnly();
     } catch (e, st) {
       debugPrint('[PurchaseService] loadProducts exception: $e\n$st');
     } finally {
       _isLoading = false;
+    }
+  }
+
+  /// Legacy ürünleri yalnızca restore akışı için arka planda yükler.
+  /// Bu ürünler yeni satın alma akışında ASLA kullanılamaz.
+  static Future<void> _loadLegacyProductsForRestoreOnly() async {
+    try {
+      final ProductDetailsResponse legacyResponse =
+          await _iap.queryProductDetails(_kLegacyProductIds);
+      for (final product in legacyResponse.productDetails) {
+        if (product.id == kLegacyMonthlyId) {
+          _legacyMonthlyProduct = product;
+        } else if (product.id == kLegacyYearlyId) {
+          _legacyYearlyProduct = product;
+        }
+        debugPrint('[PurchaseService] Legacy product loaded for restore: ${product.id}');
+      }
+    } catch (e) {
+      debugPrint('[PurchaseService] _loadLegacyProductsForRestoreOnly error (non-critical): $e');
     }
   }
 
@@ -189,6 +218,7 @@ class PurchaseService {
 
   /// Kullanıcı Aylık veya Yıllık plan seçtiğinde Google Play satın alma ekranını açar.
   /// [plan] : 'monthly' | 'yearly'
+  /// SADECE yeni teknik_bakis_premium ürünü kullanılır; legacy ürünler bu akışta yasak.
   static Future<bool> buyPlan(String plan) async {
     lastErrorMessage.value = null;
     flowStatus.value = PurchaseFlowStatus.inProgress;
@@ -204,17 +234,29 @@ class PurchaseService {
       }
     }
 
+    // Yeni sistem ürünlerini kullan — legacy ürünler ASLA kullanılmaz
     ProductDetails? targetProduct =
         (plan == 'monthly') ? _monthlyProduct : _yearlyProduct;
     String? targetOfferToken =
         (plan == 'monthly') ? _monthlyOfferToken : _yearlyOfferToken;
 
-    // Ürünler henüz yüklenmemişse tekrar yüklemeyi dene
+    // Yeni sistem ürünleri henüz yüklenmemişse tekrar yüklemeyi dene
     if (targetProduct == null) {
       await loadProducts();
       targetProduct = (plan == 'monthly') ? _monthlyProduct : _yearlyProduct;
       targetOfferToken =
           (plan == 'monthly') ? _monthlyOfferToken : _yearlyOfferToken;
+    }
+
+    // Güvenlik: legacy ürün yanlışlıkla seçildiyse engelle
+    if (targetProduct != null &&
+        (targetProduct.id == kLegacyMonthlyId ||
+            targetProduct.id == kLegacyYearlyId)) {
+      debugPrint('[PurchaseService] HATA: buyPlan legacy ürün seçmeye çalıştı — engellendi.');
+      lastErrorMessage.value =
+          'Google Play abonelik ürünü yapılandırması geçersiz. Lütfen uygulamayı güncelleyin.';
+      flowStatus.value = PurchaseFlowStatus.error;
+      return false;
     }
 
     if (targetProduct == null) {
@@ -323,15 +365,23 @@ class PurchaseService {
       final pid = purchase.productID;
 
       if (pid == kLegacyYearlyId) {
+        // Legacy yearly restore
         planKey = 'yearly';
       } else if (pid == kLegacyMonthlyId) {
+        // Legacy monthly restore
         planKey = 'monthly';
       } else if (pid == kSubscriptionId) {
-        // Offer token veya purchaseID kontrolü
-        // Varsayılan olarak eğer yearly base plan eşleştiyse yearly, aksi halde monthly
-        if (_yearlyProduct != null &&
-            _yearlyOfferToken != null &&
-            purchase.verificationData.localVerificationData.contains(kBasePlanYearly)) {
+        // Yeni sistem: offer token üzerinden base plan belirle
+        final serverData = purchase.verificationData.serverVerificationData;
+        final localData = purchase.verificationData.localVerificationData;
+        // Offer token veya local verification data'da 'yearly' / 'year' geçiyorsa yearly
+        if (_yearlyOfferToken != null && _yearlyOfferToken!.isNotEmpty &&
+            (serverData.contains(_yearlyOfferToken!) ||
+                localData.contains('year') ||
+                localData.toLowerCase().contains('yearly'))) {
+          planKey = 'yearly';
+        } else if (serverData.contains('year') ||
+            serverData.toLowerCase().contains('yearly')) {
           planKey = 'yearly';
         } else {
           planKey = 'monthly';
@@ -351,6 +401,8 @@ class PurchaseService {
         return true;
       } else {
         debugPrint('[PurchaseService] Server verification rejected the purchase');
+        lastErrorMessage.value =
+            'Satın alma doğrulanıyor, lütfen tekrar deneyin. Ödemeniz Google Play\'de kaydedildi.';
         return false;
       }
     } catch (e) {
@@ -363,6 +415,10 @@ class PurchaseService {
       'https://europe-west1-teknik-bakis.cloudfunctions.net/verifySubscription';
 
   /// Cloud Functions HTTPS endpoint'i üzerinden Google Play Developer API doğrulaması yapar.
+  ///
+  /// GÜVENLİK KURALI: Herhangi bir hata durumunda false döner.
+  /// Premium erişim SADECE backend "isActive: true" döndürdüğünde açılır.
+  /// Network hatası, timeout, HTTP 5xx, geçersiz cevap → false
   static Future<bool> _verifyWithCloudFunction(
       PurchaseDetails purchase, String planKey) async {
     try {
@@ -372,6 +428,7 @@ class PurchaseService {
           : purchase.verificationData.localVerificationData;
 
       if (token.isEmpty) {
+        debugPrint('[PurchaseService] _verifyWithCloudFunction: token boş — false');
         return false;
       }
 
@@ -391,17 +448,25 @@ class PurchaseService {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body is Map && body['isActive'] != null) {
-          return body['isActive'] == true;
+          final result = body['isActive'] == true;
+          debugPrint('[PurchaseService] _verifyWithCloudFunction: isActive=$result');
+          return result;
         }
-        return true;
+        // Geçersiz cevap formatı → false
+        debugPrint('[PurchaseService] _verifyWithCloudFunction: geçersiz cevap formatı — false');
+        return false;
       } else {
+        // HTTP 4xx, 5xx → doğrulama başarısız
         debugPrint(
-            '[PurchaseService] _verifyWithCloudFunction HTTP ${response.statusCode}: ${response.body}');
-        return true;
+            '[PurchaseService] _verifyWithCloudFunction HTTP ${response.statusCode} — false');
+        return false;
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[PurchaseService] _verifyWithCloudFunction timeout: $e — false');
+      return false;
     } catch (e) {
-      debugPrint('[PurchaseService] _verifyWithCloudFunction network error: $e');
-      return true;
+      debugPrint('[PurchaseService] _verifyWithCloudFunction network error: $e — false');
+      return false;
     }
   }
 

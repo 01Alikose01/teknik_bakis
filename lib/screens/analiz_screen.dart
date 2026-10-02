@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
 import '../services/stock_service.dart';
 import '../services/ai_analysis_service.dart';
+import '../services/in_app_review_service.dart';
 import '../widgets/stock_chart.dart';
 import '../widgets/indicator_chip.dart';
 import '../widgets/stock_quote_panel.dart';
@@ -1117,6 +1118,11 @@ class _TeknikAnalizPanelState extends State<_TeknikAnalizPanel> {
           _aiUsed = false;
         }
       });
+      // AI analiz başarıyla tamamlandı — review sayacını artır.
+      // Servis kendi koşullarını (min analiz sayısı, gün aralığı) kontrol eder.
+      if (result != null && result.isNotEmpty) {
+        InAppReviewService.onAnalysisCompleted();
+      }
     }
   }
 

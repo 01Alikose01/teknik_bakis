@@ -5,6 +5,7 @@ import '../main.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
 import '../services/purchase_service.dart';
+import '../services/in_app_review_service.dart';
 import 'payment_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -105,6 +106,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _SettingsItem(
                       title: 'Sürüm',
                       trailing: const Text('1.0.0', style: TextStyle(color: Colors.grey)),
+                    ),
+                    _SettingsItem(
+                      title: 'Uygulamayı Değerlendir',
+                      leadingIcon: Icons.star_outline_rounded,
+                      leadingColor: const Color(0xFFFF9500),
+                      trailingIcon: Icons.open_in_new,
+                      onTap: () => InAppReviewService.openStoreListing(),
                     ),
                   ]),
 

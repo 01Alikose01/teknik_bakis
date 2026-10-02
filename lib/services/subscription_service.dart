@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'device_id_service.dart';
+import 'trial_backend_service.dart';
 
 /// Abonelik durumunu ve deneme süresini yöneten servis.
 /// Hive box'ı kullanır — kalıcı depolama.
@@ -25,9 +26,47 @@ class SubscriptionService {
       _initialized = true;
     }
 
-    await _startTrialForNewUserIfNeeded();
+    // Backend'den trial başlangıcını senkronize et (tekrar trial açığını kapatır)
+    // Bu çağrı, uygulama silinip yeniden yüklendiğinde eski trial'ı geri getirir.
+    await _syncTrialFromBackend();
+
     // Google Play Developer API ile doğrulanmış hakları arka planda senkronize et
     syncWithBackendEntitlements();
+  }
+
+  /// Firestore trials/{deviceId} kaydından trial başlangıcını senkronize eder.
+  ///
+  /// Akış:
+  ///   1. TrialBackendService.syncTrial() çağrılır
+  ///   2. Backend'de kayıt varsa → mevcut trialStart kullanılır (Hive güncellenir)
+  ///   3. Kayıt yoksa → backend yeni oluşturur, trialStart Hive'a yazılır
+  ///   4. Offline/hata → Hive'daki mevcut değer korunur
+  ///
+  /// Hive yalnızca CACHE — gerçek kaynak backend'dir.
+  static Future<void> _syncTrialFromBackend() async {
+    try {
+      final backendTrialStart = await TrialBackendService.syncTrial();
+
+      if (backendTrialStart != null) {
+        // Backend'den gelen trialStart değerini yerel cache'e yaz
+        // (Uygulama silinip yeniden yüklense bile backend'deki tarih korunur)
+        final currentLocal = _box.get(_kTrialStart) as String?;
+        if (currentLocal != backendTrialStart) {
+          await _box.put(_kTrialStart, backendTrialStart);
+        }
+      } else {
+        // Backend erişilemez (offline) — yerel Hive değeri korunur
+        // Yerel değer yoksa yeni trial başlatılır (ilk kurulum + offline)
+        if (_box.get(_kTrialStart) == null) {
+          await startGuestTrial();
+        }
+      }
+    } catch (_) {
+      // Hata durumunda yerel değer korunur
+      if (_box.get(_kTrialStart) == null) {
+        await startGuestTrial();
+      }
+    }
   }
 
   /// Cloud Firestore `entitlements/{deviceId}` kaydı ile cihazın yerel abonelik
@@ -97,6 +136,8 @@ class SubscriptionService {
 
   /// 10 günlük ücretsiz denemeyi, daha önce başlamamışsa başlatır.
   /// Trial başlangıcı kaydedilmişse hiçbir zaman güncellenmez.
+  /// NOT: Normal akışta _syncTrialFromBackend() backend kaydını oluşturur.
+  /// Bu metod yalnızca offline ilk kurulum fallback olarak kullanılır.
   static Future<void> startGuestTrial() async {
     if (_box.get(_kTrialStart) == null) {
       await _box.put(_kTrialStart, DateTime.now().toIso8601String());
@@ -105,7 +146,8 @@ class SubscriptionService {
   }
 
   /// İlk kez uygulamayı kullanan kullanıcıya trial'ı otomatik tanımlar.
-  /// Eski ücretsiz (`guest`) kayıtlar ile mevcut ücretli kayıtlar korunur.
+  /// NOT: Bu metod artık _syncTrialFromBackend() tarafından dolaylı olarak çağrılır.
+  // ignore: unused_element
   static Future<void> _startTrialForNewUserIfNeeded() async {
     if (_box.get(_kTrialStart) != null) return;
     if (plan != 'none') return;

@@ -727,11 +727,69 @@ const List<Map<String, String>> _baseBistStocks = [
 
 List<Map<String, String>> kBistStocks = List<Map<String, String>>.from(_baseBistStocks);
 
+/// Firestore'dan gelen verilerle [kBistStocks] ve [kBist100SymbolsLive]'ı günceller.
+///
+/// [firestoreStocks]: Firestore `bist_stocks` collection'ından çekilen
+///   `{'symbol': 'AKBNK', 'name': 'Akbank T.A.Ş.'}` formatlı liste.
+///   Boş gelirse [kBistStocks] güncellenmez, [_baseBistStocks] korunur.
+///
+/// [firestoreBist100]: Firestore `bist_index_meta/bist100` dokümanındaki
+///   `symbols` alanından gelen sembol listesi.
+///   Boş gelirse [kBist100SymbolsLive] güncellenmez, sabit liste korunur.
+///
+/// IPO kaynaklı hisseler daha sonra [syncBistStocksWithIpoItems] ile
+/// üstüne ekleneceğinden burada IPO verisi beklenmez.
+void syncBistStocksFromFirestore({
+  required List<Map<String, String>> firestoreStocks,
+  required List<String> firestoreBist100,
+}) {
+  // ── kBistStocks güncelle ────────────────────────────────────────────────
+  if (firestoreStocks.isNotEmpty) {
+    final merged = <Map<String, String>>[];
+    final seenSymbols = <String>{};
+
+    for (final entry in firestoreStocks) {
+      final symbol = (entry['symbol'] ?? '').toString().trim().toUpperCase();
+      final name = (entry['name'] ?? '').toString().trim();
+      if (symbol.isEmpty || seenSymbols.contains(symbol)) continue;
+      seenSymbols.add(symbol);
+      merged.add({'symbol': symbol, 'name': name.isNotEmpty ? name : symbol});
+    }
+
+    // Firestore'da olmayan ama _baseBistStocks'ta olan hisseler korunur
+    // (kısmi Firestore güncellemelerine karşı güvenlik katmanı).
+    for (final entry in _baseBistStocks) {
+      final symbol = (entry['symbol'] ?? '').toString().toUpperCase();
+      if (symbol.isEmpty || seenSymbols.contains(symbol)) continue;
+      seenSymbols.add(symbol);
+      merged.add(Map<String, String>.from(entry));
+    }
+
+    merged.sort((a, b) =>
+        (a['symbol'] ?? '').toLowerCase().compareTo((b['symbol'] ?? '').toLowerCase()));
+    kBistStocks = merged;
+  }
+
+  // ── kBist100SymbolsLive güncelle ────────────────────────────────────────
+  if (firestoreBist100.isNotEmpty) {
+    final symbols = firestoreBist100
+        .map((s) => s.trim().toUpperCase())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (symbols.length >= 50) {
+      kBist100SymbolsLive = symbols;
+    }
+  }
+}
+
 void syncBistStocksWithIpoItems(List<IpoItem> ipoItems) {
   final merged = <Map<String, String>>[];
   final seenSymbols = <String>{};
 
-  for (final entry in _baseBistStocks) {
+  // Firestore'dan güncelleme yapılmışsa kBistStocks zaten günceldir;
+  // yapılmamışsa _baseBistStocks ile aynı içeriği taşır — her iki durumda
+  // kBistStocks'u temel almak en güvenli yaklaşımdır.
+  for (final entry in kBistStocks) {
     final symbol = (entry['symbol'] ?? '').toString().toUpperCase();
     if (symbol.isEmpty || seenSymbols.contains(symbol)) continue;
     seenSymbols.add(symbol);
@@ -808,3 +866,7 @@ const List<String> kBist100Symbols = [
   'TAVHL', 'TMSN', 'TRILC', 'ULUUN',
 ];
 
+// ── Runtime BIST 100 listesi ────────────────────────────────────────────────
+// Firestore'dan güncellenmeden önce kBist100Symbols sabiti kullanılır.
+// Bist100Service.init() tamamlandığında bu değişken güncellenir.
+List<String> kBist100SymbolsLive = List<String>.from(kBist100Symbols);

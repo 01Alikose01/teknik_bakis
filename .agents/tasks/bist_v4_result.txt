@@ -1,0 +1,663 @@
+=== BIST100 v4 - DUYURU TABLO ANALIZI ===
+
+=== ANN 15598 - BIST100 TABLO/LISTE ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=199978
+Tablo sayisi: 3
+
+--- TABLO 1 ---
+Hucre sayisi: 30
+  CELL: STOCKS TO BE INCLUDED
+  CELL: STOCKS TO BE EXCLUDED
+  CELL: SUBSTITUTE STOCKS
+  CELL: 1
+  CELL: TRMET
+  CELL: TR ANADOLU METAL MADENCILIK
+  CELL: 1
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: 1
+  CELL: BTCIM
+  CELL: BATICIM BATI ANADOLU
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 2
+  CELL: TURSG
+  CELL: TURKIYE SIGORTA
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 3
+  CELL: OYAKC
+  CELL: OYAK CIMENTO
+
+--- TABLO 2 ---
+Hucre sayisi: 57
+  CELL: STOCKS TO BE INCLUDED
+  CELL: STOCKS TO BE EXCLUDED
+  CELL: SUBSTITUTE STOCKS
+  CELL: 1
+  CELL: CVKMD
+  CELL: CVK MADEN
+  CELL: 1
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: 1
+  CELL: OTKAR
+  CELL: OTOKAR
+  CELL: 2
+  CELL: CWENE
+  CELL: CW ENERJI
+  CELL: 2
+  CELL: EFOR
+  CELL: EFOR YATIRIM
+  CELL: 2
+  CELL: SOKM
+  CELL: SOK MARKETLER TICARET
+  CELL: 3
+  CELL: DOAS
+  CELL: DOGUS OTOMOTIV
+  CELL: 3
+  CELL: KTLEV
+  CELL: KATILIMEVIM TAS. FIN.
+  CELL: 3
+  CELL: ARCLK
+  CELL: ARCELIK
+  CELL: 4
+  CELL: ENERY
+  CELL: ENERYA ENERJI
+  CELL: 4
+  CELL: KUYAS
+  CELL: KUYAS YATIRIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 5
+  CELL: MAVI
+  CELL: MAVI GIYIM
+  CELL: 5
+  CELL: MIATK
+  CELL: MIA TEKNOLOJI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 6
+  CELL: TSKB
+  CELL: T.S.K.B.
+  CELL: 6
+  CELL: PASEU
+  CELL: PASIFIK EURASIA LOJISTIK
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+
+--- TABLO 3 ---
+Hucre sayisi: 246
+  CELL: STOCKS TO BE INCLUDED
+  CELL: STOCKS TO BE EXCLUDED
+  CELL: SUBSTITUTE STOCKS
+  CELL: 1
+  CELL: AGHOL
+  CELL: ANADOLU GRUBU HOLDING
+  CELL: 1
+  CELL: BALSU
+  CELL: BALSU GIDA
+  CELL: 1
+  CELL: KLGYO
+  CELL: KILER GMYO
+  CELL: 2
+  CELL: AHGAZ
+  CELL: AHLATCI DOGALGAZ
+  CELL: 2
+  CELL: BSOKE
+  CELL: BATICIM CIMENTO
+  CELL: 2
+  CELL: RYGYO
+  CELL: REYSAS GMYO
+  CELL: 3
+  CELL: AKCNS
+  CELL: AKCANSA
+  CELL: 3
+  CELL: DAPGM
+  CELL: DAP GAYRIMENKUL
+  CELL: 3
+  CELL: TMSN
+  CELL: TUMOSAN MOTOR VE TRAKTOR
+  CELL: 4
+  CELL: AKFYE
+  CELL: AKFEN YEN. ENERJI
+  CELL: 4
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 5
+  CELL: ALBRK
+  CELL: ALBARAKA TURK
+  CELL: 5
+  CELL: EFOR
+  CELL: EFOR YATIRIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 6
+  CELL: ANHYT
+  CELL: ANADOLU HAYAT EMEK.
+  CELL: 6
+  CELL: ESEN
+  CELL: ESENBOGA ELEKTRIK
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 7
+  CELL: AYGAZ
+  CELL: AYGAZ
+  CELL: 7
+  CELL: EUPWR
+  CELL: EUROPOWER ENERJI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 8
+  CELL: BINHO
+  CELL: 1000 YATIRIMLAR HOL.
+  CELL: 8
+  CELL: GENIL
+  CELL: GEN ILAC
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 9
+  CELL: ECZYT
+  CELL: ECZACIBASI YATIRIM
+  CELL: 9
+  CELL: GESAN
+  CELL: GIRISIM ELEKTRIK SANAYI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 10
+  CELL: EGEEN
+  CELL: EGE ENDUSTRI
+  CELL: 10
+  CELL: GRTHO
+  CELL: GRAINTURK HOLDING
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 11
+  CELL: EGGUB
+  CELL: EGE GUBRE
+  CELL: 11
+  CELL: GSRAY
+  CELL: GALATASARAY SPORTIF
+  CELL: &nbsp;
+
+--- ARTICLE/CONTENT DIV ---
+
+--- CONTENT DIV 1 (ilk 2000 char) ---
+
+
+--- CONTENT DIV 2 (ilk 2000 char) ---
+
+
+--- CONTENT DIV 3 (ilk 2000 char) ---
+Corporate
+
+--- TUM METIN (JS cikartildi) ---
+BIST100 BOLUMU:
+BIST 100, BIST 500, BIST Liquid Banks, BIST Liquid 10 Ex Banks, BIST Sustainability and BIST Sustainability 25 indices has been completed in accordance with the BIST Market Cap Weighted Stock Indices Methodology. It has been decided to make the changes listed in the below table for the period October 1, 2026 – December 31, 2026. PERIODIC INDEX CHANGES FOR THE PERIOD OCTOBER 1, 2026-DECEMBER 31, 2026 BIST 30 INDEX STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS 1 TRMET TR ANADOLU METAL MADENCILIK 1 DSTKF DESTEK FINANS FAKTORING 1 BTCIM BATICIM BATI ANADOLU 2 TURSG TURKIYE SIGORTA 3 OYAKC OYAK CIMENTO BIST 50 INDEX STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS 1 CVKMD CVK MADEN 1 DSTKF DESTEK FINANS FAKTORING 1 OTKAR OTOKAR 2 CWENE CW ENERJI 2 EFOR EFOR YATIRIM 2 SOKM SOK MARKETLER TICARET 3 DOAS DOGUS OTOMOTIV 3 KTLEV KATILIMEVIM TAS. FIN. 3 ARCLK ARCELIK 4 ENERY ENERYA ENERJI 4 KUYAS KUYAS YATIRIM 5 MAVI MAVI GIYIM 5 MIATK MIA TEKNOLOJI 6 TSKB T.S.K.B. 6 PASEU PASIFIK EURASIA LOJISTIK BIST 100 INDEX STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS 1 AGHOL ANADOLU GRUBU HOLDING 1 BALSU BALSU GIDA 1 KLGYO KILER GMYO 2 AHGAZ AHLATCI DOGALGAZ 2 BSOKE BATICIM CIMENTO 2 RYGYO REYSAS GMYO 3 AKCNS AKCANSA 3 DAPGM DAP GAYRIMENKUL 3 TMSN TUMOSAN MOTOR VE TRAKTOR 4 AKFYE AKFEN YEN. ENERJI 4 DSTKF DESTEK FINANS FAKTORING 5 ALBRK ALBARAKA TURK 5 EFOR EFOR YATIRIM 6 ANHYT ANADOLU HAYAT EMEK. 6 ESEN ESENBOGA ELEKTRIK 7 AYGAZ AYGAZ 7 EUPWR EUROPOWER ENERJI 8 BINHO 1000 YATIRIMLAR HOL. 8 GENIL GEN ILAC 9 ECZYT ECZACIBASI YATIRIM 9 GESAN GIRISIM ELEKTRIK SANAYI 10 EGEEN EGE ENDUSTRI 10 GRTHO GRAINTURK HOLDING 11 EGGUB EGE GUBRE 11 GSRAY GALATASARAY SPORTIF 12 ENTRA IC ENTERRA YEN. ENERJI 12 IEYHO ISIKLAR ENERJI YAPI HOL. 13 GLYHO GLOBAL YAT. HOLDING 13 IZENR IZDEMIR ENERJI 14 GWIND GALATA WIND ENERJI 14 KLRHO KILER HOLDING 15 ISDMR ISKENDERUN DEMIR CELIK 15 KTLEV KATILIMEVIM TAS. FIN. 16 KARSN KARSAN OTOMOTIV 16 KUYAS KUYAS YATIRIM 17 KATMR KATMERCILER EKIPMAN 17 MAGEN MARGUN ENERJI 18 KCAER KOCAER CELIK 18 MIATK MIA TEKNOLOJI 19 KORDS KORDSA TEKNIK TEKSTIL 19 ODINE ODINE TEKNOLOJI 20 LMKDC LIMAK DOGU ANADOLU 20 PASEU PASIFIK EURASIA LOJISTIK 21 RGYAS RONESANS GAYRIMENKUL YAT. 21 PATEK PASIFIK TEKNOLOJI 22 RYSAS REYSAS LOJISTIK 22 PSGYO PASIFIK GMYO 23 SNGYO SINPAS GMYO 23 QUAGR QUA GRANITE HAYAL YAPI 24 TABGD TAB GIDA 24 RALYH RAL YATIRIM HOLDING 25 TCKRC KIRAC GALVANIZ 25 REEDR REEDER TEKNOLOJI 26 TRGYO TORUNLAR GMYO 26 SARKY SARKUYSAN 27 TTRAK TURK TRAKTOR 27 SKBNK SEKERBANK BIST 500 INDEX STOCKS TO BE INCLUDED STOCKS TO BE EXCLUDED SUBSTITUTE STOCKS 1 ALBTN ALBAYRAK BETON SANAYI 1 BOSSA BOSSA 1 SKYMD SEKER YATIRIM 2 BETAE BETA ENERJI VE TEKNOLOJI 2 BRISA BRISA 2 DNISI DINAMIK ISI MAKINA YALITIM 3 CITAS CITLEKCI MAGAZACILIK GIDA 3 CEOEM CEO EVENT MEDYA 3 ETILR ETILER GIDA 4 EKIM EKIM TURIZM 4 DESA DESA DERI 5 GOLDA GOLDA GIDA 5 DNISI DINAMIK ISI MAKINA YALITIM 6 ISVEA ISVEA SERAMIK VE BANYO 6 DOKTA DOKTAS DOKUMCULUK 7 
+
+=== TR DUYURU 15598 ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=199442
+Tablo sayisi: 4
+
+--- TABLO 1 ---
+  CELL: ALINACAK PAYLAR
+  CELL: ÇIKARILACAK PAYLAR
+  CELL: YEDEK PAYLAR
+  CELL: 1
+  CELL: TRMET
+  CELL: TR ANADOLU METAL MADENCILIK
+  CELL: 1
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: 1
+  CELL: BTCIM
+  CELL: BATICIM BATI ANADOLU
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 2
+  CELL: TURSG
+  CELL: TURKIYE SIGORTA
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 3
+  CELL: OYAKC
+  CELL: OYAK CIMENTO
+
+--- TABLO 2 ---
+  CELL: ALINACAK PAYLAR
+  CELL: ÇIKARILACAK PAYLAR
+  CELL: YEDEK PAYLAR
+  CELL: 1
+  CELL: CVKMD
+  CELL: CVK MADEN
+  CELL: 1
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: 1
+  CELL: OTKAR
+  CELL: OTOKAR
+  CELL: 2
+  CELL: CWENE
+  CELL: CW ENERJI
+  CELL: 2
+  CELL: EFOR
+  CELL: EFOR YATIRIM
+  CELL: 2
+  CELL: SOKM
+  CELL: SOK MARKETLER TICARET
+  CELL: 3
+  CELL: DOAS
+  CELL: DOGUS OTOMOTIV
+  CELL: 3
+  CELL: KTLEV
+  CELL: KATILIMEVIM TAS. FIN.
+  CELL: 3
+  CELL: ARCLK
+  CELL: ARCELIK
+  CELL: 4
+  CELL: ENERY
+  CELL: ENERYA ENERJI
+  CELL: 4
+  CELL: KUYAS
+  CELL: KUYAS YATIRIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 5
+  CELL: MAVI
+  CELL: MAVI GIYIM
+  CELL: 5
+  CELL: MIATK
+  CELL: MIA TEKNOLOJI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 6
+  CELL: TSKB
+  CELL: T.S.K.B.
+  CELL: 6
+  CELL: PASEU
+  CELL: PASIFIK EURASIA LOJISTIK
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+
+--- TABLO 3 ---
+  CELL: ALINACAK PAYLAR
+  CELL: ÇIKARILACAK PAYLAR
+  CELL: YEDEK PAYLAR
+  CELL: 1
+  CELL: AGHOL
+  CELL: ANADOLU GRUBU HOLDING
+  CELL: 1
+  CELL: BALSU
+  CELL: BALSU GIDA
+  CELL: 1
+  CELL: KLGYO
+  CELL: KILER GMYO
+  CELL: 2
+  CELL: AHGAZ
+  CELL: AHLATCI DOGALGAZ
+  CELL: 2
+  CELL: BSOKE
+  CELL: BATICIM CIMENTO
+  CELL: 2
+  CELL: RYGYO
+  CELL: REYSAS GMYO
+  CELL: 3
+  CELL: AKCNS
+  CELL: AKCANSA
+  CELL: 3
+  CELL: DAPGM
+  CELL: DAP GAYRIMENKUL
+  CELL: 3
+  CELL: TMSN
+  CELL: TUMOSAN MOTOR VE TRAKTOR
+  CELL: 4
+  CELL: AKFYE
+  CELL: AKFEN YEN. ENERJI
+  CELL: 4
+  CELL: DSTKF
+  CELL: DESTEK FINANS FAKTORING
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 5
+  CELL: ALBRK
+  CELL: ALBARAKA TURK
+  CELL: 5
+  CELL: EFOR
+  CELL: EFOR YATIRIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 6
+  CELL: ANHYT
+  CELL: ANADOLU HAYAT EMEK.
+  CELL: 6
+  CELL: ESEN
+  CELL: ESENBOGA ELEKTRIK
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 7
+  CELL: AYGAZ
+  CELL: AYGAZ
+  CELL: 7
+  CELL: EUPWR
+  CELL: EUROPOWER ENERJI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 8
+  CELL: BINHO
+  CELL: 1000 YATIRIMLAR HOL.
+  CELL: 8
+  CELL: GENIL
+  CELL: GEN ILAC
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 9
+  CELL: ECZYT
+  CELL: ECZACIBASI YATIRIM
+  CELL: 9
+  CELL: GESAN
+  CELL: GIRISIM ELEKTRIK SANAYI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 10
+  CELL: EGEEN
+  CELL: EGE ENDUSTRI
+  CELL: 10
+  CELL: GRTHO
+  CELL: GRAINTURK HOLDING
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 11
+  CELL: EGGUB
+  CELL: EGE GUBRE
+  CELL: 11
+  CELL: GSRAY
+  CELL: GALATASARAY SPORTIF
+  CELL: &nbsp;
+
+--- TABLO 4 ---
+  CELL: ALINACAK PAYLAR
+  CELL: ÇIKARILACAK PAYLAR
+  CELL: YEDEK PAYLAR
+  CELL: 1
+  CELL: ALBTN
+  CELL: ALBAYRAK BETON SANAYI
+  CELL: 1
+  CELL: BOSSA
+  CELL: BOSSA
+  CELL: 1
+  CELL: SKYMD
+  CELL: SEKER YATIRIM
+  CELL: 2
+  CELL: BETAE
+  CELL: BETA ENERJI VE TEKNOLOJI
+  CELL: 2
+  CELL: BRISA
+  CELL: BRISA
+  CELL: 2
+  CELL: DNISI
+  CELL: DINAMIK ISI MAKINA YALITIM
+  CELL: 3
+  CELL: CITAS
+  CELL: CITLEKCI MAGAZACILIK GIDA
+  CELL: 3
+  CELL: CEOEM
+  CELL: CEO EVENT MEDYA
+  CELL: 3
+  CELL: ETILR
+  CELL: ETILER GIDA
+  CELL: 4
+  CELL: EKIM
+  CELL: EKIM TURIZM
+  CELL: 4
+  CELL: DESA
+  CELL: DESA DERI
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 5
+  CELL: GOLDA
+  CELL: GOLDA GIDA
+  CELL: 5
+  CELL: DNISI
+  CELL: DINAMIK ISI MAKINA YALITIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 6
+  CELL: ISVEA
+  CELL: ISVEA SERAMIK VE BANYO
+  CELL: 6
+  CELL: DOKTA
+  CELL: DOKTAS DOKUMCULUK
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 7
+  CELL: KARCL
+  CELL: KARDEMIR CELIK
+  CELL: 7
+  CELL: DURDO
+  CELL: DURAN DOGAN BASIM
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 8
+  CELL: KPEKS
+  CELL: KAPEKS KIMYA
+  CELL: 8
+  CELL: ETILR
+  CELL: ETILER GIDA
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 9
+  CELL: MASFN
+  CELL: MASFEN ENERJI
+  CELL: 9
+  CELL: FADE
+  CELL: FADE GIDA
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 10
+  CELL: METEN
+  CELL: METGUN ENERJI
+  CELL: 10
+  CELL: HATEK
+  CELL: HATAY TEKSTIL
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: &nbsp;
+  CELL: 11
+  CELL: ORZAX
+  CELL: ORZAKS ILAC
+  CELL: 11
+  CELL: KRPLS
+  CELL: KOROPLAST TEMIZLIK AMBALAJ
+  CELL: &nbsp;
+
+=== /en/indices/index-announcements ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=199631
+METIN (3000):Index Announcements | Borsa İstanbul A.Ş. Corporate About Borsa İstanbul Regulations Message from the CEO Organization Legal Framework Milestones in Borsa İstanbul History International Memberships Corporate Identity Subsidiaries and Affiliates Regulations Human Resources Careers Training Publications Sustainability Library Markets Equity Market Market Functioning Markets Products Settlement Principles Trading Hours Exchange Fees Debt Securities Market Market Functioning Products Trading Hours Exchange Fees / Registration Fees Swap Market Money Market Derivatives Market (VIOP) Market Functioning Contract Specifications Futures Options Settlement and Risk Management Education Precious Metals And Diamond Market Precious Metals Market Precious Metals Lending Market Diamond and Precious Stones Market Responsible Precious Metal Supply Chain Trading Hours Borsa İstanbul Fee Schedule Audit and Market Surveillance Activities Audits on The Authenticity of The Notifications on Off-Exchange Fixed Income Transactions Audit of Data Vendors Surveillance of Members Companies Listed Companies Public Offering and Listing in Borsa İstanbul Public Disclosure Platform Bell-ringing Ceremony Indices BIST Stock Indices Benchmark Indices Sustainability Dividend Participation Corporate Governance Buyback SME Industrial IPO Liquid Market Sector City BIST-KYD Indices GDS CPI Lease Certificates Corporate Bond Government Eurobond Corporate Eurobond Repo Indices 1 Month Indicative Deposit 1 Month Indicative Profit Share Gold Price Fund BIST Sustainability Themed Debt Securities Indices BIST Commodity and Commodity Denominated Securities Indices BIST Strategy Indices Risk Control Leveraged And Short Indices TLREF TLREFK Methodologies and Changes Index Announcements Index Periodical Calendars Index Calculation Service Index Data Licensing of Indices Compliance with IOSCO Principles International Indices Index Membership Login Data Data Equity Market Data Debt Securities Market Data Derivatives Market Data Precious Metals And Diamond Market Index Data TLREF Data TLREFK Data Consolidated Data Daily Bulletin Data Dissemination Data Vendors Directory Borsa İstanbul Data Distribution Agreement Audit of Data Vendors Market Data Products Dissemination of other Exchanges&#039; Data Borsa İstanbul Point-of-Presence in London Equinix LD5 Index Creation Historical Data Sales Technology BISTECH Technology Connectivity Protocols Technology Services Primary Data Center Co-location Time Server Service Risk Management Business Partners Colocated Brokers Service Vendors Network Providers Telecommunication Operators Technical Resources Announcements Technical Documents Test Environments Client Applications BISTECH CONNECT &amp; VERDA Support &amp; Contact Investor Relations Investor Relations Reports Corporate Governance General Assembly Meetings Contact Investor Relations Members Members List Granting Authorization to Trade Representation of Members Market Maker Members Participation Finance Wh
+
+Ann linki sayisi: 0
+
+=== /en/indices/methodologies-and-changes ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=116196
+PDF link sayisi: 33
+PDF:/files/bist-mcw-equity-indices-m-eng-202609-clean.pdf
+PDF:/files/ks-nonpd-pay-endeksleri-eng-202509-temiz.pdf
+PDF:/files/bist-mcw-equity-indices-m-eng-2026-01-clean.pdf
+PDF:/files/kural-seti-son-hali-ingilizce-2025.pdf
+PDF:/file/kural-setleri/BIST_MCW_Equity_Indices_M_ENG_202505_Clean.pdf
+PDF:/files/bist-mcw-equity-indices-m-eng-202408-final.pdf
+PDF:https://borsaistanbul.com/files/1-bist-piyasa-degeri-agirlikli-pay-endeksleri-mavi-en-sablon-son-hali.pdf
+PDF:/files/bist-market-cap-weighted-stock-indices-methodology-22122023.pdf
+PDF:/files/bist-mc-weighted-stock-indices-m-2023-11-xutum-temiz.pdf
+PDF:/files/bist-mc-weighted-stock-indices-methodology-2023-08.pdf
+PDF:/files/bist-kyd-indices-methodology-aug-2024.pdf
+PDF:/files/bist-kyd-indices-methodology-may-2024.pdf
+PDF:/files/bist-kyd-indices-methodology-march-2024.pdf
+PDF:/files/bist-kyd-indices-methodology-25122023.pdf
+PDF:/files/-bist-kyd-indices-methodology.pdf
+PDF:/files/bist-kyd-indices-methodology.pdf
+PDF:/files/ks-stds-indices-202601-final-eng.pdf
+PDF:/files/ks_stds_indices_202509.pdf
+PDF:/files/bist-sustainability-themed-debt-securities-indices-methodology.pdf
+PDF:/files/ks-ee-endeksler-202511-eng.pdf
+
+=== TÜÜM DUYURULAR - bist-stock-indices periodic ===
+
+Sayfa 0: 25 duyuru, 8 periodic
+  PERIODIC: /en/announcement/15603/bist-participation-indices-periodic-review
+  PERIODIC: /en/announcement/15601/bist-kyd-corporate-eurobond-indices-periodic-review
+  PERIODIC: /en/announcement/15600/bist-kyd-fund-indices-periodic-review
+  PERIODIC: /en/announcement/15598/bist-stock-indices-periodic-review
+  PERIODIC: /en/announcement/15585/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15547/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15527/bist-sustainability-themed-debt-securities-indices-periodic-review
+  PERIODIC: /en/announcement/15523/bist-dividend-and-bist-dividend-25-indices-periodic-review
+
+Sayfa 1: 25 duyuru, 9 periodic
+  PERIODIC: /en/announcement/15498/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15487/bist-kyd-fund-indices-periodic-review
+  PERIODIC: /en/announcement/15486/bist-kyd-corporate-eurobond-indices-periodic-review
+  PERIODIC: /en/announcement/15483/bist-stock-indices-periodic-review
+  PERIODIC: /en/announcement/15469/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15460/bist-sme-industrial-index-periodic-review
+  PERIODIC: /en/announcement/15421/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15415/bist-participation-indices-periodic-review
+  PERIODIC: /en/announcement/15412/bist-sustainability-themed-debt-securities-indices-periodic-review
+
+Sayfa 2: 25 duyuru, 6 periodic
+  PERIODIC: /en/announcement/15408/bist-dividend-and-bist-dividend-25-indices-periodic-review
+  PERIODIC: /en/announcement/15400/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15394/bist-kyd-fund-indices-periodic-review
+  PERIODIC: /en/announcement/15393/bist-kyd-corporate-eurobond-indices-periodic-review
+  PERIODIC: /en/announcement/15392/borsa-istanbul-announces-constituent-changes-bist-stock-indices-second-quarter-2026
+  PERIODIC: /en/announcement/15376/bist-buyback-index-periodic-review
+
+Sayfa 3: 25 duyuru, 6 periodic
+  PERIODIC: /en/announcement/15349/bist-buyback-index-periodic-review
+  PERIODIC: /en/announcement/15333/bist-sustainability-themed-debt-securities-indices-periodic-review
+  PERIODIC: /en/announcement/15326/bist-dividend-and-bist-dividend-25-indices-periodic-review
+  PERIODIC: /en/announcement/15297/bist-kyd-corporate-eurobond-indices-periodic-review
+  PERIODIC: /en/announcement/15296/bist-kyd-fund-indices-periodic-review
+  PERIODIC: /en/announcement/15293/borsa-istanbul-announces-constituent-changes-bist-stock-indices-first-quarter-2026
+
+Sayfa 4: 25 duyuru, 4 periodic
+  PERIODIC: /en/announcement/15249/bist-sustainability-themed-debt-securities-indices-periodic-review
+  PERIODIC: /en/announcement/15235/bist-kyd-corporate-eurobond-indices-periodic-review
+  PERIODIC: /en/announcement/15227/bist-kyd-fund-indices-periodic-review
+  PERIODIC: /en/announcement/15220/borsa-istanbul-announces-constituent-changes-bist-stock-indices-fourth-quarter-2025
+
+=== datastore.borsaistanbul.com ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=1846
+BODY_3000:<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Borsa İstanbul DataStore</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="/" />
+<meta name="data-market-client/config/environment" content="%7B%22modulePrefix%22%3A%22data-market-client%22%2C%22environment%22%3A%22production%22%2C%22baseURL%22%3A%22/%22%2C%22locationType%22%3A%22auto%22%2C%22EmberENV%22%3A%7B%22FEATURES%22%3A%7B%7D%7D%2C%22i18n%22%3A%7B%22defaultLocale%22%3A%22tr%22%7D%2C%22APP%22%3A%7B%22ember-cli-jquery-ui%22%3A%7B%22theme%22%3A%22ui-darkness%22%7D%2C%22download_url%22%3A%22%22%2C%22cookie_secure%22%3Atrue%2C%22cookie_domain%22%3A%22borsaistanbul.com%22%2C%22name%22%3A%22data-market-client%22%2C%22version%22%3A%220.0.0.6297f940%22%7D%2C%22contentSecurityPolicy%22%3A%7B%22default-src%22%3A%22%27none%27%22%2C%22script-src%22%3A%22%27self%27%20%27unsafe-eval%27%22%2C%22font-src%22%3A%22%27self%27%20https%3A//fonts.gstatic.com%20%22%2C%22connect-src%22%3A%22%27self%27%22%2C%22img-src%22%3A%22%27self%27%20%27unsafe-inline%27%22%2C%22style-src%22%3A%22%27self%27%20%27unsafe-inline%27%20https%3A//fonts.googleapis.com%22%2C%22media-src%22%3A%22%27self%27%22%7D%2C%22contentSecurityPolicyHeader%22%3A%22Content-Security-Policy-Report-Only%22%2C%22exportApplicationGlobal%22%3Afalse%7D" />
+
+    <link rel="stylesheet" href="assets/vendor-12057e0e8b4ba916313b716da768baaf.css">
+    <link rel="stylesheet" href="assets/data-market-client-e00b2e610622755d2cab0aec4595f751.css">
+    
+
+    
+  </head>
+  <body>
+    
+
+    <script src="assets/vendor-bb18a1d3a61fd4df144891d8665d893c.js"></script>
+    <script src="assets/data-market-client-c270ce7533a99e87d910769e697160ef.js"></script>
+
+    
+  </body>
+</html>
+
+
+=== /en/index/index-data ===
+HTTP=200 CT=text/html; charset=UTF-8 LEN=82523
+METIN_2000:.js img.lazyload:not([src]) { visibility: hidden; }.js img.lazyloaded[data-sizes=auto] { display: block; width: 100%; } Index Data | Borsa İstanbul A.Ş. Corporate About Borsa İstanbul Regulations Message from the CEO Organization Legal Framework Milestones in Borsa İstanbul History International Memberships Corporate Identity Subsidiaries and Affiliates Regulations Human Resources Careers Training Publications Sustainability Library Markets Equity Market Market Functioning Markets Products Settlement Principles Trading Hours Exchange Fees Debt Securities Market Market Functioning Products Trading Hours Exchange Fees / Registration Fees Swap Market Money Market Derivatives Market (VIOP) Market Functioning Contract Specifications Futures Options Settlement and Risk Management Education Precious Metals And Diamond Market Precious Metals Market Precious Metals Lending Market Diamond and Precious Stones Market Responsible Precious Metal Supply Chain Trading Hours Borsa İstanbul Fee Schedule Audit and Market Surveillance Activities Audits on The Authenticity of The Notifications on Off-Exchange Fixed Income Transactions Audit of Data Vendors Surveillance of Members Companies Listed Companies Public Offering and Listing in Borsa İstanbul Public Disclosure Platform Bell-ringing Ceremony Indices BIST Stock Indices Benchmark Indices Sustainability Dividend Participation Corporate Governance Buyback SME Industrial IPO Liquid Market Sector City BIST-KYD Indices GDS CPI Lease Certificates Corporate Bond Government Eurobond Corporate Eurobond Repo Indices 1 Month Indicative Deposit 1 Month Indicative Profit Share Gold Price Fund BIST Sustainability Themed Debt Securities Indices BIST Commodity and Commodity Denominated Securities Indices BIST Strategy Indices Risk Control Leveraged And Short Indices TLREF TLREFK Methodologies and Changes Index Announcements Index Periodical Calendars Index Calculation Service Index Data Licensing of Indices Compliance with IOSCO Principles Intern
+MATCH:/en/corporate/about-us/international-memberships
+MATCH:/en/corporate/sustainability/bist-sustainability-25-index-futures
+MATCH:/en/data
+MATCH:/en/data/consolidated-data
+MATCH:/en/data/daily-bulletin
+MATCH:/en/data/data-dissemination
+MATCH:/en/data/data-dissemination/audit-data-vendors
+MATCH:/en/data/data-dissemination/borsa-istanbul-data-distribution-agreement
+MATCH:/en/data/data-dissemination/borsa-istanbul-point-presence-london-equinix-ld5
+MATCH:/en/data/data-dissemination/data-vendors-directory
+MATCH:/en/data/data-dissemination/dissemination-other-exchanges-data
+MATCH:/en/data/data-dissemination/index-creation
+MATCH:/en/data/data-dissemination/market-data-products
+MATCH:/en/data/debt-securities-market-data
+MATCH:/en/data/derivatives-market-data
+MATCH:/en/data/equity-market-data
+MATCH:/en/data/historical-data-sales
+MATCH:/en/data/precious-metals-and-diamond-market
+MATCH:/en/index/index-data
+MATCH:/en/indices/index-announcements
+MATCH:/en/indices/index-calculation-service
+MATCH:/en/indices/index-membership-login
+MATCH:/en/indices/index-periodical-calendars
+MATCH:/en/markets/audit-and-market-surveillance-activities/surveillance-members
+MATCH:/en/members
+MATCH:/en/members/granting-authorization-trade
+MATCH:/en/members/market-maker-members
+MATCH:/en/members/member-list
+MATCH:/en/members/representation-members
+MATCH:/en/personal-data-processing-information
+MATCH:/en/technology-services/primary-data-center
+MATCH:/endeksler/endeks-verileri
+MATCH:/files/DataFilePaths.zip
+MATCH:http://www.borsaistanbul.com/en/index/index-data
+MATCH:http://www.borsaistanbul.com/endeksler/endeks-verileri
+MATCH:https://datastore.borsaistanbul.com/
+
+=== DONE v4 ===

@@ -20,6 +20,7 @@ import 'services/purchase_service.dart';
 import 'services/bist100_service.dart';
 import 'services/home_price_cache.dart';
 import 'services/price_sync_service.dart';
+import 'services/in_app_review_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,7 @@ void main() async {
   await NotificationService.requestPermission();
   Bist100Service.init(); // arka planda başlat, await etme
   PriceSyncService.start(); // tek merkezi fiyat senkronizasyonu
+  await InAppReviewService.init(); // Google Play In-App Review
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const TeknikBakisApp());
 }

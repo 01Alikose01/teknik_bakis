@@ -28,6 +28,7 @@ dependencies:
   in_app_purchase_android: ^0.5.3
   device_info_plus: ^12.0.0
   in_app_update: ^5.0.0
+  in_app_review: ^2.0.9
 
 dev_dependencies:
   flutter_test:
