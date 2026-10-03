@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-002",
+  "type": "chore",
+  "description": "flutter analyze (tam proje) ve flutter build appbundle --release ile AAB oluşturma. FEAT-001'den bağımsız olarak sıralama gereği sondadır. FEAT-001 tamamlanmadan çalıştırılmamalı.",
+  "status": "completed",
+  "steps": [
+    "1. FEAT-001'in tüm değişikliklerini git'e commit et. Commit mesajı: 'fix: KAP haber dedup kök neden düzeltmesi — disclosure_id öncelikli, fetchLatest dedupe() eklendi'",
+    "2. flutter analyze komutunu çalıştır. Çıktıyı findings alanına yaz. Bu değişikliklerle ilgili yeni hata/warning olmamalı.",
+    "3. flutter build appbundle --release komutunu çalıştır. build/app/outputs/bundle/release/app-release.aab dosyasının oluştuğunu doğrula.",
+    "4. FEAT-002 status'unu 'completed' olarak güncelle. findings alanına: flutter analyze sonucu (hata sayısı) ve AAB dosyasının tam yolunu yaz."
+  ],
+  "acceptance_criteria": [
+    "flutter analyze bu değişikliklerle ilgili sıfır yeni hata/warning üretir",
+    "flutter build appbundle --release başarıyla tamamlanır",
+    "build/app/outputs/bundle/release/app-release.aab dosyası var",
+    "Commit başarıyla oluşturuldu"
+  ],
+  "verification": [
+    "flutter analyze",
+    "flutter build appbundle --release",
+    "Test-Path build/app/outputs/bundle/release/app-release.aab"
+  ],
+  "blocked_reason": null,
+  "findings": "flutter analyze: 266 issues found — hepsi önceden mevcut olan uyarılar (analiz_screen.dart, analiz_screenyedekk.dart, buy_screen.dart, kap_ai/ vb.). news_screen.dart ve kap_disclosure_service.dart'ta sıfır yeni hata/warning. Commit: 17dec4d 'fix: KAP haber dedup kok neden duzeltmesi - disclosure_id oncelikli, fetchLatest dedupe() eklendi'. AAB: build/app/outputs/bundle/release/app-release.aab oluşturuldu (flutter build appbundle --release başarıyla tamamlandı)."
+}

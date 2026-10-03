@@ -16,6 +16,8 @@ class SubscriptionService {
   static const String _kTrialStart =
       'trialStart'; // ISO8601 — 10 günlük deneme başlangıcı
   static const String _kOnboarded = 'onboarded'; // bool
+  // Firestore'a trialConsumed:true başarıyla yazıldıysa true — tekrar çağrımı önler
+  static const String _kConsumedSent = 'consumedSent'; // bool
 
   static late Box<dynamic> _box;
   static bool _initialized = false;
@@ -26,47 +28,60 @@ class SubscriptionService {
       _initialized = true;
     }
 
-    // Backend'den trial başlangıcını senkronize et (tekrar trial açığını kapatır)
-    // Bu çağrı, uygulama silinip yeniden yüklendiğinde eski trial'ı geri getirir.
+    // Backend'den trial başlangıcını senkronize et.
+    // ZORUNLU: Backend erişilemezse trial başlatılmaz.
     await _syncTrialFromBackend();
+
+    // Trial 10 günü doldurduysa Firestore'a markConsumed yaz.
+    await _checkAndMarkConsumed();
 
     // Google Play Developer API ile doğrulanmış hakları arka planda senkronize et
     syncWithBackendEntitlements();
   }
 
-  /// Firestore trials/{deviceId} kaydından trial başlangıcını senkronize eder.
+  /// Firestore trials/{deviceId} kaydından trial durumunu senkronize eder.
   ///
-  /// Akış:
-  ///   1. TrialBackendService.syncTrial() çağrılır
-  ///   2. Backend'de kayıt varsa → mevcut trialStart kullanılır (Hive güncellenir)
-  ///   3. Kayıt yoksa → backend yeni oluşturur, trialStart Hive'a yazılır
-  ///   4. Offline/hata → Hive'daki mevcut değer korunur
+  /// Kurallar:
+  ///   1. Backend erişilemezse (offline/hata) → trial başlatma, mevcut Hive korunur.
+  ///   2. Backend trialConsumed:true dönüyorsa → trial başlatma.
+  ///   3. Backend trialConsumed:false dönüyorsa → trialStart Hive'a yazılır.
   ///
   /// Hive yalnızca CACHE — gerçek kaynak backend'dir.
   static Future<void> _syncTrialFromBackend() async {
-    try {
-      final backendTrialStart = await TrialBackendService.syncTrial();
+    final result = await TrialBackendService.syncTrial();
 
-      if (backendTrialStart != null) {
-        // Backend'den gelen trialStart değerini yerel cache'e yaz
-        // (Uygulama silinip yeniden yüklense bile backend'deki tarih korunur)
-        final currentLocal = _box.get(_kTrialStart) as String?;
-        if (currentLocal != backendTrialStart) {
-          await _box.put(_kTrialStart, backendTrialStart);
-        }
-      } else {
-        // Backend erişilemez (offline) — yerel Hive değeri korunur
-        // Yerel değer yoksa yeni trial başlatılır (ilk kurulum + offline)
-        if (_box.get(_kTrialStart) == null) {
-          await startGuestTrial();
-        }
-      }
-    } catch (_) {
-      // Hata durumunda yerel değer korunur
-      if (_box.get(_kTrialStart) == null) {
-        await startGuestTrial();
+    if (!result.backendReachable) {
+      // Backend'e ulaşılamadı — mevcut Hive değeri korunur, yeni trial başlatılmaz.
+      // Hive'da trialStart yoksa kullanıcı premium ekranıyla karşılaşır.
+      return;
+    }
+
+    if (result.trialConsumed) {
+      // Bu cihazda trial daha önce kullanılmış — kesinlikle yeni trial başlatma.
+      // Hive'daki trialStart silinmez (geçmiş kayıt korunur), ancak yeni yazmayız.
+      return;
+    }
+
+    // Backend: eligible (trialConsumed:false) → trialStart Hive'a yaz
+    if (result.trialStart != null) {
+      final currentLocal = _box.get(_kTrialStart) as String?;
+      if (currentLocal != result.trialStart) {
+        await _box.put(_kTrialStart, result.trialStart);
       }
     }
+  }
+
+  /// Trial 10 günü doldurduysa ve henüz Firestore'a yazılmamışsa markConsumed çağırır.
+  /// Lokal _kConsumedSent flag'i ile tekrar tekrar çağrılması önlenir.
+  static Future<void> _checkAndMarkConsumed() async {
+    if (isPaidSubscriber) return;
+    if (_box.get(_kConsumedSent, defaultValue: false) as bool) return;
+    if (trialStart == null) return;
+    if (daysSinceTrial < 10) return;
+
+    // Trial süresi dolmuş — backend'e yaz
+    await TrialBackendService.markConsumed();
+    await _box.put(_kConsumedSent, true);
   }
 
   /// Cloud Firestore `entitlements/{deviceId}` kaydı ile cihazın yerel abonelik
@@ -134,24 +149,23 @@ class SubscriptionService {
   /// Ayarlar'dan yıllık plan seçildi
   static Future<void> selectYearlyPlan() => startPaidSubscription('yearly');
 
-  /// 10 günlük ücretsiz denemeyi, daha önce başlamamışsa başlatır.
-  /// Trial başlangıcı kaydedilmişse hiçbir zaman güncellenmez.
-  /// NOT: Normal akışta _syncTrialFromBackend() backend kaydını oluşturur.
-  /// Bu metod yalnızca offline ilk kurulum fallback olarak kullanılır.
+  /// 10 günlük ücretsiz denemeyi başlatır.
+  ///
+  /// Bu metod yalnızca Hive'da trialStart yoksa ve _syncTrialFromBackend()
+  /// backend'den eligible onayı aldıysa çalışır. Hive'da trialStart zaten
+  /// varsa (backend tarafından yazılmışsa) hiçbir şey yapmaz.
+  ///
+  /// Onboarding/premium_gate ekranlarından çağrıldığında:
+  /// - Backend init() sırasında zaten çalışmış ve Hive'a yazmışsa → no-op (doğru)
+  /// - Backend offline idiyse Hive'da değer yok → no-op (trial başlatılmaz, doğru)
+  /// - Backend consumed döndüyse Hive'da değer yok → no-op (trial başlatılmaz, doğru)
   static Future<void> startGuestTrial() async {
-    if (_box.get(_kTrialStart) == null) {
-      await _box.put(_kTrialStart, DateTime.now().toIso8601String());
+    // Backend zaten _syncTrialFromBackend() ile yönetiyor.
+    // Bu metod yalnızca Hive'da değer varsa markOnboarded yapar; yoksa dokunmaz.
+    if (_box.get(_kTrialStart) != null) {
+      await markOnboarded();
     }
-    await markOnboarded();
-  }
-
-  /// İlk kez uygulamayı kullanan kullanıcıya trial'ı otomatik tanımlar.
-  /// NOT: Bu metod artık _syncTrialFromBackend() tarafından dolaylı olarak çağrılır.
-  // ignore: unused_element
-  static Future<void> _startTrialForNewUserIfNeeded() async {
-    if (_box.get(_kTrialStart) != null) return;
-    if (plan != 'none') return;
-    await startGuestTrial();
+    // Hive'da trialStart yoksa backend onayı olmadan trial başlatılmaz.
   }
 
   // ─── Durum sorguları ──────────────────────────────────────────────────────

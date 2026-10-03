@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:in_app_update/in_app_update.dart';
 
 /// Google Play In-App Update API ile güncelleme kontrolü yapar.
-/// 
+///
 /// Kullanım:
 ///   await UpdateService.checkForUpdate(context);
 ///
@@ -48,7 +48,11 @@ class UpdateService {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.system_update_rounded, color: Color(0xFF34C759), size: 24),
+            Icon(
+              Icons.system_update_rounded,
+              color: Color(0xFF34C759),
+              size: 24,
+            ),
             SizedBox(width: 10),
             Text(
               'Güncelleme Mevcut',
@@ -69,10 +73,7 @@ class UpdateService {
           // Sonra hatırlat
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              'Sonra',
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: const Text('Sonra', style: TextStyle(color: Colors.white54)),
           ),
           // Güncelle
           ElevatedButton(
@@ -80,7 +81,8 @@ class UpdateService {
               backgroundColor: const Color(0xFF34C759),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () async {
               Navigator.of(ctx).pop();

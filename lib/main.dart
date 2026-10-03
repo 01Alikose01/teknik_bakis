@@ -1,8 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/analiz_screen.dart';
@@ -21,9 +23,11 @@ import 'services/bist100_service.dart';
 import 'services/home_price_cache.dart';
 import 'services/price_sync_service.dart';
 import 'services/in_app_review_service.dart';
+import 'services/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   await PortfolioService.init();
   await SettingsService.init();
@@ -38,6 +42,7 @@ void main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const TeknikBakisApp());
 }
+
 class TeknikBakisApp extends StatefulWidget {
   const TeknikBakisApp({super.key});
 
@@ -67,10 +72,7 @@ class _TeknikBakisAppState extends State<TeknikBakisApp> {
           debugShowCheckedModeBanner: false,
           navigatorKey: appNavigatorKey,
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          supportedLocales: const [
-            Locale('tr'),
-            Locale('en'),
-          ],
+          supportedLocales: const [Locale('tr'), Locale('en')],
           locale: const Locale('tr'),
           theme: ThemeData(
             brightness: Brightness.light,
@@ -109,9 +111,7 @@ class _TeknikBakisAppState extends State<TeknikBakisApp> {
             ),
           ),
           themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: SplashScreen(
-            nextScreen: _getInitialScreen(),
-          ),
+          home: SplashScreen(nextScreen: _getInitialScreen()),
         );
       },
     );
@@ -186,7 +186,27 @@ class MainNavigationState extends State<MainNavigation> {
       setState(() => _currentIndex = 0);
       return false; // ana sayfaya git
     }
-    return true; // ana sayfadayız, uygulamayı kapat
+    if (!mounted) return false;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: const Text('Uygulamadan çıkmak istiyor musunuz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Hayır'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              SystemNavigator.pop();
+            },
+            child: const Text('Evet'),
+          ),
+        ],
+      ),
+    );
+    return false;
   }
 
   @override
@@ -204,6 +224,11 @@ class MainNavigationState extends State<MainNavigation> {
       NotificationService.registerContextProvider(
         () => appNavigatorKey.currentContext,
       );
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      UpdateService.checkForUpdate(context);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -228,89 +253,97 @@ class MainNavigationState extends State<MainNavigation> {
         }
       },
       child: Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          const HomeScreen(),
-          const ScannerScreen(),
-          // Key ile rebuild zorlanır — sembol değişince yeni instance
-          AnalizScreen(
-            key: ValueKey(_analizSymbol),
-            initialSymbol: _analizSymbol,
-            initialName: _analizName,
-          ),
-          const NewsScreen(),
-          const IpoScreen(),
-          const SettingsScreen(),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          if (i != _currentIndex) {
-            _pushTab(i);
-            setState(() => _currentIndex = i);
-          }
-        },
-        backgroundColor: theme.colorScheme.surface,
-        selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-        type: BottomNavigationBarType.fixed,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        selectedLabelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            const HomeScreen(),
+            const ScannerScreen(),
+            // Key ile rebuild zorlanır — sembol değişince yeni instance
+            AnalizScreen(
+              key: ValueKey(_analizSymbol),
+              initialSymbol: _analizSymbol,
+              initialName: _analizName,
+            ),
+            const NewsScreen(),
+            const IpoScreen(),
+            const SettingsScreen(),
+          ],
         ),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        elevation: 8,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) {
+            if (i != _currentIndex) {
+              _pushTab(i);
+              setState(() => _currentIndex = i);
+            }
+          },
+          backgroundColor: theme.colorScheme.surface,
+          selectedItemColor: theme.colorScheme.primary,
+          unselectedItemColor: theme.colorScheme.onSurface.withValues(
+            alpha: 0.65,
+          ),
+          type: BottomNavigationBarType.fixed,
+          showSelectedLabels: true,
+          showUnselectedLabels: true,
+          selectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          elevation: 8,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF34C759).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.home, color: Color(0xFF34C759)),
               ),
-              child: const Icon(Icons.home, color: Color(0xFF34C759)),
+              label: 'Anasayfa',
             ),
-            label: 'Anasayfa',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.search_outlined),
-            activeIcon: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.search_outlined),
+              activeIcon: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF34C759).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.search, color: Color(0xFF34C759)),
               ),
-              child: const Icon(Icons.search, color: Color(0xFF34C759)),
+              label: 'Tarama',
             ),
-            label: 'Tarama',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            activeIcon: Icon(Icons.bar_chart, color: Color(0xFF34C759)),
-            label: 'Analiz',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.article_outlined),
-            activeIcon: Icon(Icons.article, color: Color(0xFF34C759)),
-            label: 'Haberler',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.rocket_launch_outlined),
-            activeIcon: Icon(Icons.rocket_launch, color: Color(0xFF34C759)),
-            label: 'Halka Arz',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings, color: Color(0xFF34C759)),
-            label: 'Ayarlar',
-          ),
-        ],
-      ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_outlined),
+              activeIcon: Icon(Icons.bar_chart, color: Color(0xFF34C759)),
+              label: 'Analiz',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.article_outlined),
+              activeIcon: Icon(Icons.article, color: Color(0xFF34C759)),
+              label: 'Haberler',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.rocket_launch_outlined),
+              activeIcon: Icon(Icons.rocket_launch, color: Color(0xFF34C759)),
+              label: 'Halka Arz',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings, color: Color(0xFF34C759)),
+              label: 'Ayarlar',
+            ),
+          ],
+        ),
       ),
     );
   }
