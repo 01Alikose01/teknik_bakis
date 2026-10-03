@@ -596,8 +596,9 @@ class _IpoScreenState extends State<IpoScreen>
         .where((item) => item.status == IpoStatus.trading)
         .toList()
       ..sort((a, b) {
-        final aDate = a.listingDate ?? a.sortDate ?? DateTime(1970);
-        final bDate = b.listingDate ?? b.sortDate ?? DateTime(1970);
+        // Sort strictly by listingDate; items without listingDate fall to end.
+        final aDate = a.listingDate ?? DateTime(1970);
+        final bDate = b.listingDate ?? DateTime(1970);
         return bDate.compareTo(aDate);
       });
 
