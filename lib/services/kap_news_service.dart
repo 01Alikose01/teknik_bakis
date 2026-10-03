@@ -25,6 +25,20 @@ class KapNewsService {
     }).toList();
   }
 
+  static List<KapNewsItem> dedupe(List<KapNewsItem> items) {
+    final unique = <KapNewsItem>[];
+    final seenKeys = <String>{};
+
+    for (final item in items) {
+      final key = _buildDeduplicationKey(item);
+      if (seenKeys.add(key)) {
+        unique.add(item);
+      }
+    }
+
+    return unique;
+  }
+
   static String buildInvestingNewsUrl(String symbol, {String? name}) {
     final normalizedSymbol = symbol.trim().toUpperCase();
     final fallbackName = (name ?? _findStockName(symbol) ?? symbol).trim();
@@ -232,7 +246,8 @@ class KapNewsService {
           final rawList = data['items'] as List?;
           if (rawList != null && rawList.isNotEmpty) {
             lastUpdated = data['lastUpdated']?.toString() ?? '';
-            return rawList
+            return dedupe(
+              rawList
                 .map((d) => KapNewsItem(
                       title: d['title']?.toString() ?? 'KAP Bildirimi',
                       summary: d['summary']?.toString() ?? '',
@@ -240,8 +255,11 @@ class KapNewsService {
                       time: d['time']?.toString() ?? _fmtNow(),
                       url: d['url']?.toString() ?? '',
                       isWithin72h: d['within72h'] == true,
+                      disclosureIndex: d['disclosureIndex']?.toString() ?? d['id']?.toString(),
+                      disclosureType: d['disclosureType']?.toString() ?? d['disclosureClass']?.toString(),
                     ))
-                .toList();
+                .toList(),
+            );
           }
         }
       } catch (_) {}
@@ -276,6 +294,8 @@ class KapNewsService {
               time: dt != null ? _fmtDate(dt) : _fmtNow(),
               url: d['id'] != null ? 'https://www.kap.org.tr/tr/Bildirim/${d['id']}' : '',
               isWithin72h: dt != null && dt.isAfter(cutoff),
+              disclosureIndex: d['id']?.toString(),
+              disclosureType: d['disclosureClass']?.toString(),
             ));
           }
           if (items.isNotEmpty) break;
@@ -284,9 +304,10 @@ class KapNewsService {
     }
 
     lastUpdated = '';
-    final filtered = items.where((i) => i.isWithin72h).toList();
+    final filtered = dedupe(items.where((i) => i.isWithin72h).toList());
     if (filtered.isNotEmpty) return filtered;
-    if (items.isNotEmpty) return items;
+    final dedupedItems = dedupe(items);
+    if (dedupedItems.isNotEmpty) return dedupedItems;
 
     return _fallback();
   }
@@ -358,4 +379,37 @@ class KapNewsService {
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   static String _fmtNow() => _fmtDate(DateTime.now());
+
+  static String _buildDeduplicationKey(KapNewsItem item) {
+    // 1. En güvenilir: KAP'ın kendi tekil ID'si
+    if (item.disclosureIndex != null && item.disclosureIndex!.isNotEmpty) {
+      return 'IDX:${item.disclosureIndex}';
+    }
+    // 2. İkinci güvenilir: bildirim URL'i
+    if (item.url.isNotEmpty) {
+      return 'URL:${item.url}';
+    }
+    // 3. Fallback: şirket + temizlenmiş başlık + bildirim türü + zaman
+    final company = item.source.trim().toUpperCase();
+    final title = item.cleanTitle
+        .toUpperCase()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final type = (item.disclosureType ?? '').toUpperCase();
+    final time = _normalizeTime(item.time);
+    return '$company|$title|$type|$time';
+  }
+
+  static String _normalizeTime(String value) {
+    final parsed = _tryParseDate(value);
+    if (parsed != null) {
+      return '${parsed.year.toString().padLeft(4, '0')}-'
+          '${parsed.month.toString().padLeft(2, '0')}-'
+          '${parsed.day.toString().padLeft(2, '0')} '
+          '${parsed.hour.toString().padLeft(2, '0')}:'
+          '${parsed.minute.toString().padLeft(2, '0')}';
+    }
+
+    return value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
 }

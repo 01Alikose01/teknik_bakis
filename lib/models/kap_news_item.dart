@@ -5,6 +5,8 @@ class KapNewsItem {
   final String time;
   final String url;
   final bool isWithin72h;
+  final String? disclosureIndex;
+  final String? disclosureType;
 
   const KapNewsItem({
     required this.title,
@@ -13,6 +15,8 @@ class KapNewsItem {
     required this.time,
     required this.url,
     this.isWithin72h = true,
+    this.disclosureIndex,
+    this.disclosureType,
   });
 
   /// ***THYAO*** gibi sembol öneklerini temizler.

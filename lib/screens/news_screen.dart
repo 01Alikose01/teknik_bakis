@@ -1,29 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:async';
-import 'dart:convert';
+import '../models/borsa_news_item.dart';
 import '../models/kap_news_item.dart';
+import '../services/borsa_news_service.dart';
+import '../services/kap_disclosure_service.dart';
 import '../services/kap_news_service.dart';
 import '../services/subscription_service.dart';
 import 'news_detail_screen.dart';
 import 'kap_ai_list_screen.dart';
 import 'premium_gate_screen.dart';
-
-// Borsa haberleri için yerel model
-class _BorsaNewsItem {
-  final String title, summary, source, time, url, category;
-  final DateTime? publishedDate;
-
-  const _BorsaNewsItem({
-    required this.title,
-    required this.summary,
-    required this.source,
-    required this.time,
-    required this.url,
-    required this.category,
-    this.publishedDate,
-  });
-}
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -36,7 +21,7 @@ class _NewsScreenState extends State<NewsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<KapNewsItem> _kapNews = [];
-  List<_BorsaNewsItem> _borsaNews = [];
+  List<BorsaNewsItem> _borsaNews = [];
   bool _loadingKap = false;
   bool _loadingBorsa = false;
   Timer? _refreshTimer;
@@ -66,7 +51,10 @@ class _NewsScreenState extends State<NewsScreen>
   Future<void> _loadKap() async {
     if (mounted) setState(() => _loadingKap = true);
     try {
-      final items = await KapNewsService.fetch();
+      var items = await KapDisclosureService.fetchLatest();
+      if (items.isEmpty) {
+        items = await KapNewsService.fetch();
+      }
       if (mounted) {
         setState(() {
           _kapNews = items;
@@ -74,253 +62,33 @@ class _NewsScreenState extends State<NewsScreen>
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingKap = false);
+      try {
+        final items = await KapNewsService.fetch();
+        if (mounted) {
+          setState(() {
+            _kapNews = items;
+            _loadingKap = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _loadingKap = false);
+      }
     }
   }
 
   Future<void> _loadBorsa() async {
     if (mounted) setState(() => _loadingBorsa = true);
-
-    final rssSources = [
-      {
-        'url': _googleNewsUrl('borsa Türkiye'),
-        'source': 'Google News / Borsa',
-        'category': 'Borsa',
-      },
-      {
-        'url': _googleNewsUrl('iş Türkiye'),
-        'source': 'Google News / İş',
-        'category': 'İş',
-      },
-      {
-        'url': _googleNewsUrl('bilim teknoloji Türkiye'),
-        'source': 'Google News / Bilim & Teknoloji',
-        'category': 'Bilim & Teknoloji',
-      },
-      {
-        'url': 'https://www.investing.com/rss/news_1.rss',
-        'source': 'Investing.com',
-        'category': 'Borsa',
-      },
-      {
-        'url': 'https://www.bloomberght.com/rss',
-        'source': 'Bloomberg HT',
-        'category': 'Borsa',
-      },
-      {
-        'url': 'https://bigpara.hurriyet.com.tr/rss/borsa/',
-        'source': 'BigPara',
-        'category': 'Borsa',
-      },
-      {
-        'url': 'https://www.haberturk.com/rss/ekonomi.xml',
-        'source': 'Habertürk Ekonomi',
-        'category': 'Borsa',
-      },
-      {
-        'url': 'https://feeds.bbci.co.uk/turkce/ekonomi/rss.xml',
-        'source': 'BBC Türkçe Ekonomi',
-        'category': 'Borsa',
-      },
-    ];
-
-    final feeds = await Future.wait(
-      rssSources.map((src) => _fetchRssFeed(
-            src['url']!,
-            src['source']!,
-            src['category']!,
-          )),
-    );
-
-    final items = feeds.expand((item) => item).toList();
-    items.sort((a, b) {
-      final aDate = a.publishedDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bDate = b.publishedDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return bDate.compareTo(aDate);
-    });
-
-    final cutoff = DateTime.now().subtract(const Duration(days: 10));
-    final recentItems = items.where((item) {
-      final publishedDate = item.publishedDate;
-      if (publishedDate == null) return true;
-      return publishedDate.isAfter(cutoff) || publishedDate.isAtSameMomentAs(cutoff);
-    }).toList();
-
-    if (mounted) {
-      setState(() {
-        _borsaNews = recentItems.isNotEmpty ? recentItems : _borsaFallback();
-        _loadingBorsa = false;
-      });
-    }
-  }
-
-  String _googleNewsUrl(String query) {
-    return Uri.https('news.google.com', '/rss/search', {
-      'q': query,
-      'hl': 'tr',
-      'gl': 'TR',
-      'ceid': 'TR:tr',
-    }).toString();
-  }
-
-  Future<List<_BorsaNewsItem>> _fetchRssFeed(
-    String url,
-    String source,
-    String category,
-  ) async {
     try {
-      final apiUrl = Uri.https('api.rss2json.com', '/v1/api.json', {
-        'rss_url': url,
-      });
-      final resp = await http
-          .get(apiUrl, headers: {'User-Agent': 'Mozilla/5.0'})
-          .timeout(const Duration(seconds: 12));
-      if (resp.statusCode != 200) return [];
-
-      final decoded = jsonDecode(resp.body);
-      if (decoded is! Map) return [];
-
-      final rawItems = decoded['items'];
-      if (rawItems is! List) return [];
-
-      return rawItems.whereType<Map>().map((item) {
-        final rawMap = Map<String, dynamic>.from(item as Map);
-        final title = '${rawMap['title'] ?? ''}'.trim();
-        final description = _stripHtml(
-          '${rawMap['description'] ?? rawMap['content'] ?? ''}',
-        );
-        final link = '${rawMap['link'] ?? rawMap['guid'] ?? rawMap['url'] ?? ''}'.trim();
-        final rawDate = '${rawMap['pubDate'] ?? rawMap['published'] ?? rawMap['updated'] ?? ''}'.trim();
-        final dt = _tryParsePubDate(rawDate);
-
-        return _BorsaNewsItem(
-          title: title,
-          summary: description,
-          source: source,
-          time: dt != null ? _fmtDate(dt) : _fmtNow(),
-          url: link,
-          category: category,
-          publishedDate: dt,
-        );
-      }).where((item) => item.title.isNotEmpty).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  DateTime? _tryParsePubDate(String raw) {
-    if (raw.isEmpty) return null;
-    try {
-      return DateTime.parse(raw).toLocal();
-    } catch (_) {}
-    try {
-      final months = {
-        'Jan': 1,
-        'Feb': 2,
-        'Mar': 3,
-        'Apr': 4,
-        'May': 5,
-        'Jun': 6,
-        'Jul': 7,
-        'Aug': 8,
-        'Sep': 9,
-        'Oct': 10,
-        'Nov': 11,
-        'Dec': 12,
-      };
-      // Örnek format: "Mon, 21 Sep 2026 10:00:00 +0000" veya "Mon, 21 Sep 2026 10:00:00 GMT"
-      final parts = raw.replaceAll(',', '').trim().split(RegExp(r'\s+'));
-      if (parts.length >= 5) {
-        final day = int.tryParse(parts[1]) ?? 1;
-        final month = months[parts[2]] ?? 1;
-        final year = int.tryParse(parts[3]) ?? 2026;
-        final timeParts = parts[4].split(':');
-        final hour = int.tryParse(timeParts[0]) ?? 0;
-        final min = int.tryParse(timeParts.length > 1 ? timeParts[1] : '0') ?? 0;
-
-        // Timezone offset'i parse et (örn: +0300, -0500, GMT, UTC, Z)
-        int offsetMinutes = 0;
-        if (parts.length >= 6) {
-          final tz = parts[5].trim().toUpperCase();
-          if (tz == 'GMT' || tz == 'UTC' || tz == 'Z') {
-            offsetMinutes = 0;
-          } else if (RegExp(r'^[+-]\d{4}$').hasMatch(tz)) {
-            final sign = tz[0] == '+' ? 1 : -1;
-            final tzHour = int.tryParse(tz.substring(1, 3)) ?? 0;
-            final tzMin = int.tryParse(tz.substring(3, 5)) ?? 0;
-            offsetMinutes = sign * (tzHour * 60 + tzMin);
-          }
-        }
-
-        // UTC'ye çevir, sonra yerel saate dönüştür
-        final utc = DateTime.utc(year, month, day, hour, min)
-            .subtract(Duration(minutes: offsetMinutes));
-        return utc.toLocal();
+      final items = await BorsaNewsService.fetchLatest();
+      if (mounted) {
+        setState(() {
+          _borsaNews = items;
+          _loadingBorsa = false;
+        });
       }
-    } catch (_) {}
-    return null;
-  }
-
-  String _fmtDate(DateTime dt) =>
-      '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} '
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-
-  String _fmtNow() => _fmtDate(DateTime.now());
-
-  String _stripHtml(String html) =>
-      html.replaceAll(RegExp(r'<[^>]*>'), '')
-          .replaceAll('&nbsp;', ' ')
-          .replaceAll('&amp;', '&')
-          .replaceAll('&lt;', '<')
-          .replaceAll('&gt;', '>')
-          .replaceAll('&quot;', '"')
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
-
-  List<_BorsaNewsItem> _borsaFallback() {
-    final now = _fmtNow();
-    return [
-      _BorsaNewsItem(
-        title: 'Borsa İstanbul’da hisseler haftalık toparlanma sinyali veriyor',
-        summary: 'Bankacılık ve holding hisseleri, yabancı yatırımcı akışındaki canlanma ile dikkat çekiyor.',
-        source: 'Investing.com',
-        time: now,
-        url: 'https://tr.investing.com/news/stock-market-news',
-        category: 'Borsa',
-      ),
-      _BorsaNewsItem(
-        title: 'İş dünyasında yatırım ve birleşme haberleri yoğunlaşıyor',
-        summary: 'Kurumsal faaliyetler, şirket birleşmeleri ve yatırım duyurularında yeni gelişmeler izleniyor.',
-        source: 'Google News / İş',
-        time: now,
-        url: 'https://news.google.com',
-        category: 'İş',
-      ),
-      _BorsaNewsItem(
-        title: 'Bilim ve teknoloji alanında yeni ürün ve yatırım duyuruları artıyor',
-        summary: 'Yapay zeka, enerji ve üretim teknolojilerindeki gelişmeler gündemi hareket ettiriyor.',
-        source: 'Google News / Bilim & Teknoloji',
-        time: now,
-        url: 'https://news.google.com',
-        category: 'Bilim & Teknoloji',
-      ),
-      _BorsaNewsItem(
-        title: 'Döviz kurlarında oynaklık sürüyor',
-        summary: 'Dolar/TL ve euro/TL hareketleri yatırımcıların kısa vadeli pozisyonlarını etkiliyor.',
-        source: 'Bloomberg HT',
-        time: now,
-        url: 'https://www.bloomberght.com',
-        category: 'Borsa',
-      ),
-      _BorsaNewsItem(
-        title: 'Merkez Bankası faiz beklentileri piyasaları yönlendiriyor',
-        summary: 'Enflasyon verileri ve politika adımları önümüzdeki süreçte belirleyici kalmaya devam ediyor.',
-        source: 'BBC Türkçe Ekonomi',
-        time: now,
-        url: 'https://www.bbc.com/turkce',
-        category: 'Borsa',
-      ),
-    ];
+    } catch (_) {
+      if (mounted) setState(() => _loadingBorsa = false);
+    }
   }
 
   @override
@@ -601,7 +369,7 @@ class _KapNewsCard extends StatelessWidget {
 }
 
 class _BorsaNewsCard extends StatelessWidget {
-  final _BorsaNewsItem item;
+  final BorsaNewsItem item;
   const _BorsaNewsCard({required this.item});
 
   @override

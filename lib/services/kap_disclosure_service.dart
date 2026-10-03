@@ -57,7 +57,7 @@ class KapDisclosureService {
           .timeout(const Duration(seconds: 8));
 
       final items = snapshot.docs
-          .map((doc) => _docToNewsItem(doc.data()))
+          .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
           .where((item) => item.title.isNotEmpty)
           .toList();
 
@@ -94,7 +94,7 @@ class KapDisclosureService {
           .timeout(const Duration(seconds: 8));
 
       final items = snapshot.docs
-          .map((doc) => _docToNewsItem(doc.data()))
+          .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
           .where((item) => item.title.isNotEmpty)
           .toList();
 
@@ -121,7 +121,7 @@ class KapDisclosureService {
 
   // ── Firestore belgesini KapNewsItem'a dönüştür ───────────────────────────
 
-  static KapNewsItem _docToNewsItem(Map<String, dynamic> d) {
+  static KapNewsItem _docToNewsItem(Map<String, dynamic> d, {String? docId}) {
     final publishDate = d['publish_date']?.toString() ?? '';
     final publishTime = d['publish_time']?.toString() ?? '';
     final time = [publishDate, publishTime]
@@ -149,12 +149,14 @@ class KapDisclosureService {
     }
 
     return KapNewsItem(
-      title:       d['company_title']?.toString() ?? d['subject']?.toString() ?? 'KAP Bildirimi',
-      summary:     d['subject']?.toString() ?? d['summary']?.toString() ?? '',
-      source:      d['stock_code']?.toString() ?? 'KAP',
-      time:        timeDisplay,
-      url:         d['detail_url']?.toString() ?? '',
-      isWithin72h: isWithin72h,
+      title:          d['subject']?.toString() ?? d['company_title']?.toString() ?? 'KAP Bildirimi',
+      summary:        d['summary']?.toString() ?? d['subject']?.toString() ?? '',
+      source:         d['stock_code']?.toString() ?? 'KAP',
+      time:           timeDisplay,
+      url:            d['detail_url']?.toString() ?? '',
+      isWithin72h:    isWithin72h,
+      disclosureIndex: docId,
+      disclosureType:  d['disclosure_type']?.toString(),
     );
   }
 }
