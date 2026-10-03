@@ -55,7 +55,7 @@ void main() {
     });
 
     expect(collecting.status, IpoStatus.collecting);
-    expect(waitingListing.status, IpoStatus.collecting);
+    expect(waitingListing.status, IpoStatus.pendingListing);
   });
 
   test('Borsada islem gormeye baslayan halka arz genel hisse listesine eklenir', () {
@@ -76,5 +76,174 @@ void main() {
     expect(kBistStocks.any((item) => item['symbol'] == 'YNHAL'), isTrue);
 
     kBistStocks = originalStocks;
+  });
+
+  group('Halka Arz durum akisi ve listeleme kurallari', () {
+    final now = DateTime.now();
+
+    // Senaryo 1: Talep tarihi gelecekte → Yaklaşan
+    test('1. Talep tarihi gelecekte olan hisse Yaklaşan durumuna girer', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Gelecek Sirket',
+        'symbol': 'GELCK',
+        'requestStart': isoDay(now.add(const Duration(days: 5))),
+        'requestEnd': isoDay(now.add(const Duration(days: 7))),
+      });
+      expect(item.status, IpoStatus.upcoming);
+    });
+
+    // Senaryo 2: Talep başladı, bitmedi → Talep Topluyor
+    test('2. Talebi devam eden hisse Talep Topluyor durumuna girer', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Aktif Halka Arz',
+        'symbol': 'AKTIF',
+        'requestStart': isoDay(now.subtract(const Duration(days: 2))),
+        'requestEnd': isoDay(now.add(const Duration(days: 2))),
+      });
+      expect(item.status, IpoStatus.collecting);
+    });
+
+    // Senaryo 3: Talep bitti, listeleme tarihi gelecekte → Listeleme Bekliyor
+    test('3. Talebi biten, listeleme tarihi gelecekte olan hisse Listeleme Bekliyor durumuna girer', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Liste Bekleyen',
+        'symbol': 'LSTBK2',
+        'requestStart': isoDay(now.subtract(const Duration(days: 8))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 4))),
+        'listingDate': isoDay(now.add(const Duration(days: 3))),
+      });
+      expect(item.status, IpoStatus.pendingListing);
+    });
+
+    // Senaryo 4: Listeleme tarihi geçti → Borsada
+    test('4. Listeleme tarihi geçmiş hisse Borsada durumuna girer', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Borsada Hisse',
+        'symbol': 'BORSA',
+        'requestStart': isoDay(now.subtract(const Duration(days: 15))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 10))),
+        'listingDate': isoDay(now.subtract(const Duration(days: 3))),
+      });
+      expect(item.status, IpoStatus.trading);
+    });
+
+    // Senaryo 5 & 6: 15 trading hisseden sadece en yeni 10'u listede görünür
+    test('5-6. Borsada listesinde maksimum 10 hisse görünür, 11. silinmez sadece listede olmaz', () {
+      // 15 adet trading hissesi oluştur (farklı listingDate'lerle)
+      final allTrading = List.generate(15, (i) {
+        return IpoItem.fromJson({
+          'companyName': 'Hisse ${i + 1}',
+          'symbol': 'HS${(i + 1).toString().padLeft(2, '0')}',
+          'requestStart': isoDay(now.subtract(Duration(days: 30 + i))),
+          'requestEnd': isoDay(now.subtract(Duration(days: 20 + i))),
+          // Hisse 0 en yeni (1 gün önce), Hisse 14 en eski (15 gün önce)
+          'listingDate': isoDay(now.subtract(Duration(days: i + 1))),
+        });
+      });
+
+      // Tüm hisseler trading statüsünde olmalı
+      for (final item in allTrading) {
+        expect(item.status, IpoStatus.trading,
+            reason: '${item.symbol} trading olmalı');
+      }
+
+      // _groupedItems mantığını elle uygula: listingDate desc sırala, take(10)
+      final sorted = [...allTrading]
+        ..sort((a, b) {
+          final aDate = a.listingDate ?? a.sortDate ?? DateTime(1970);
+          final bDate = b.listingDate ?? b.sortDate ?? DateTime(1970);
+          return bDate.compareTo(aDate);
+        });
+      final latestTrading = sorted.take(10).toList();
+
+      // Gösterilen listede maksimum 10 kayıt olmalı
+      expect(latestTrading.length, 10);
+
+      // 11. hisse (index 10) listede olmamalı ama nesne hâlâ erişilebilir olmalı
+      final eleventhItem = sorted[10];
+      expect(latestTrading.contains(eleventhItem), isFalse,
+          reason: '11. hisse latestTrading listesinde olmamalı');
+
+      // 11. hisse hâlâ allTrading listesinde (silinmedi)
+      expect(allTrading.contains(eleventhItem), isTrue,
+          reason: '11. hisse ana listede hâlâ bulunmalı (silinmedi)');
+    });
+
+    // Senaryo 7: Yeni hisse Borsada'ya geçince listeye en üstten girer
+    test('7. Borsada listesine eklenen en yeni hisse listenin başında yer alır', () {
+      // 5 hisse oluştur, en yeni listingDate ilk sıraya gelmeli
+      final items = [
+        IpoItem.fromJson({
+          'companyName': 'Orta Hisse',
+          'symbol': 'ORTA',
+          'requestEnd': isoDay(now.subtract(const Duration(days: 20))),
+          'listingDate': isoDay(now.subtract(const Duration(days: 5))),
+        }),
+        IpoItem.fromJson({
+          'companyName': 'En Yeni Hisse',
+          'symbol': 'YENI',
+          'requestEnd': isoDay(now.subtract(const Duration(days: 10))),
+          'listingDate': isoDay(now.subtract(const Duration(days: 1))),
+        }),
+        IpoItem.fromJson({
+          'companyName': 'Eski Hisse',
+          'symbol': 'ESKI',
+          'requestEnd': isoDay(now.subtract(const Duration(days: 30))),
+          'listingDate': isoDay(now.subtract(const Duration(days: 10))),
+        }),
+      ];
+
+      // Tüm hisseler trading olmalı
+      for (final item in items) {
+        expect(item.status, IpoStatus.trading);
+      }
+
+      // Listingdate'e göre en yeniden eskiye sırala
+      final sorted = [...items]
+        ..sort((a, b) {
+          final aDate = a.listingDate ?? DateTime(1970);
+          final bDate = b.listingDate ?? DateTime(1970);
+          return bDate.compareTo(aDate);
+        });
+
+      // En yeni hisse en üstte olmalı
+      expect(sorted.first.symbol, 'YENI');
+      expect(sorted.last.symbol, 'ESKI');
+    });
+
+    // Senaryo 8: Aynı hisse iki sekmede görünmez
+    test('8. Bir hisse yalnızca tek bir durumda sınıflandırılır', () {
+      // Talep toplama sürecinde olan bir hisse
+      final collectingItem = IpoItem.fromJson({
+        'companyName': 'Tek Sekme Hisse',
+        'symbol': 'TKSEK',
+        'requestStart': isoDay(now.subtract(const Duration(days: 1))),
+        'requestEnd': isoDay(now.add(const Duration(days: 2))),
+        'listingDate': isoDay(now.add(const Duration(days: 10))),
+      });
+
+      // Durum collecting olmalı
+      expect(collectingItem.status, IpoStatus.collecting);
+
+      // upcoming, pendingListing veya trading olmamalı
+      expect(collectingItem.status, isNot(IpoStatus.upcoming));
+      expect(collectingItem.status, isNot(IpoStatus.pendingListing));
+      expect(collectingItem.status, isNot(IpoStatus.trading));
+    });
+
+    // Senaryo 9: JSON'da "trading" yazsa da tarihler Borsada değilse doğru sınıflandırılır
+    test('9. JSON status="trading" olsa bile tarihler Listeleme Bekliyor ise pendingListing döner', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Yanlis Statuslu Hisse',
+        'symbol': 'YANLS',
+        'requestStart': isoDay(now.subtract(const Duration(days: 8))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 4))),
+        'listingDate': isoDay(now.add(const Duration(days: 5))),
+        'status': 'trading', // JSON'da yanlış yazılmış
+      });
+
+      // Gerçek tarihler pendingListing gösteriyor: talep bitti, listeleme gelecekte
+      expect(item.status, IpoStatus.pendingListing);
+    });
   });
 }

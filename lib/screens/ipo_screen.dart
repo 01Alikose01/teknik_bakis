@@ -237,7 +237,7 @@ class _IpoScreenState extends State<IpoScreen>
               _summaryChip(
                 icon: Icons.candlestick_chart,
                 label: 'Borsada',
-                value: grouped.trading.length.toString(),
+                value: grouped.latestTrading.length.toString(),
                 color: const Color(0xFF34C759),
               ),
             ],
@@ -559,7 +559,13 @@ class _IpoScreenState extends State<IpoScreen>
       });
 
     final upcoming = all
-        .where((item) => item.status == IpoStatus.upcoming)
+        .where((item) {
+          if (item.status != IpoStatus.upcoming) return false;
+          // Ertelendi etiketi taşıyanları çıkar
+          final rd = item.requestDates.toLowerCase();
+          if (rd.contains('ertelendi') || rd.contains('postponed')) return false;
+          return true;
+        })
         .toList()
       ..sort((a, b) {
         final aDate = a.requestStart ?? a.sortDate ?? DateTime(2099);
@@ -573,7 +579,8 @@ class _IpoScreenState extends State<IpoScreen>
       ..sort((a, b) {
         final aDate = a.requestStart ?? a.sortDate ?? DateTime(2099);
         final bDate = b.requestStart ?? b.sortDate ?? DateTime(2099);
-        return aDate.compareTo(bDate);
+        // En yeniden eskiye (descending)
+        return bDate.compareTo(aDate);
       });
 
     final pendingListing = all
@@ -629,6 +636,8 @@ class _IpoScreenState extends State<IpoScreen>
         return const Color(0xFF9B59B6);
       case IpoStatus.trading:
         return const Color(0xFF34C759);
+      case IpoStatus.postponed:
+        return const Color(0xFF8E8E93);
     }
   }
 

@@ -1,4 +1,4 @@
-enum IpoStatus { upcoming, collecting, pendingListing, trading }
+enum IpoStatus { upcoming, collecting, pendingListing, trading, postponed }
 
 class IpoItem {
   final String companyName;
@@ -37,10 +37,24 @@ class IpoItem {
     final listingDate = _parseFlexibleDate(json['listingDate']);
     final publishedAt = _parseFlexibleDate(json['publishedAt']);
 
+    // requestDates alanında "Ertelendi" yazıyorsa status'u postponed yap
+    final requestDatesRaw = (json['requestDates'] ?? '').toString().trim();
+    final isPostponedByLabel = requestDatesRaw.toLowerCase().contains('ertelendi') ||
+        requestDatesRaw.toLowerCase().contains('postponed');
+
+    final parsedStatus = isPostponedByLabel
+        ? IpoStatus.postponed
+        : _parseStatus(
+            json['status']?.toString(),
+            requestStart: requestStart,
+            requestEnd: requestEnd,
+            listingDate: listingDate,
+          );
+
     return IpoItem(
       companyName: (json['companyName'] ?? '').toString().trim(),
       requestDates: _resolveRequestDatesLabel(
-        explicitValue: json['requestDates']?.toString(),
+        explicitValue: requestDatesRaw.isNotEmpty ? requestDatesRaw : null,
         requestStart: requestStart,
         requestEnd: requestEnd,
       ),
@@ -48,12 +62,7 @@ class IpoItem {
       lot: (json['lot'] ?? '').toString().trim(),
       distributionType: (json['distributionType'] ?? '').toString().trim(),
       symbol: (json['symbol'] ?? '').toString().trim().toUpperCase(),
-      status: _parseStatus(
-        json['status']?.toString(),
-        requestStart: requestStart,
-        requestEnd: requestEnd,
-        listingDate: listingDate,
-      ),
+      status: parsedStatus,
       requestStart: requestStart,
       requestEnd: requestEnd,
       listingDate: listingDate,
@@ -118,6 +127,9 @@ class IpoItem {
   }
 
   IpoStatus get status {
+    // Ertelenmiş kayıtlar hiçbir zaman başka statüye geçmez
+    if (_status == IpoStatus.postponed) return IpoStatus.postponed;
+
     if (_hasTimelineData) {
       return _deriveStatus(
         requestStart: requestStart,
@@ -143,6 +155,8 @@ class IpoItem {
         return 'Listeleme Bekliyor';
       case IpoStatus.trading:
         return 'Borsada İşlem Görüyor';
+      case IpoStatus.postponed:
+        return 'Ertelendi';
     }
   }
 
@@ -191,9 +205,18 @@ class IpoItem {
       case 'trading':
       case 'completed':
         return IpoStatus.trading;
+      case 'ertelendi':
+      case 'postponed':
+      case 'ertelenmiş':
+        return IpoStatus.postponed;
       default:
         return null;
     }
+  }
+
+  /// Türkiye saat dilimi (UTC+3) ile şimdiki zamanı döndürür.
+  static DateTime _nowInTurkey() {
+    return DateTime.now().toUtc().add(const Duration(hours: 3));
   }
 
   static IpoStatus _deriveStatus({
@@ -202,7 +225,7 @@ class IpoItem {
     required DateTime? listingDate,
     required IpoStatus fallbackStatus,
   }) {
-    final now = DateTime.now();
+    final now = _nowInTurkey();
 
     // listingDate geldi veya bugün → borsada işlem görüyor
     if (listingDate != null && !listingDate.isAfter(now)) {

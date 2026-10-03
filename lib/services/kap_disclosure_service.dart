@@ -58,7 +58,7 @@ class KapDisclosureService {
           .timeout(const Duration(seconds: 8));
 
       final rawItems = snapshot.docs
-          .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
+          .map((doc) => _docToNewsItem(doc.data()))
           .where((item) => item.title.isNotEmpty)
           .toList();
 
@@ -97,7 +97,7 @@ class KapDisclosureService {
           .timeout(const Duration(seconds: 8));
 
       final rawItems = snapshot.docs
-          .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
+          .map((doc) => _docToNewsItem(doc.data()))
           .where((item) => item.title.isNotEmpty)
           .toList();
 
@@ -126,7 +126,7 @@ class KapDisclosureService {
 
   // ── Firestore belgesini KapNewsItem'a dönüştür ───────────────────────────
 
-  static KapNewsItem _docToNewsItem(Map<String, dynamic> d, {String? docId}) {
+  static KapNewsItem _docToNewsItem(Map<String, dynamic> d) {
     final publishDate = d['publish_date']?.toString() ?? '';
     final publishTime = d['publish_time']?.toString() ?? '';
     final time = [publishDate, publishTime]
@@ -153,14 +153,22 @@ class KapDisclosureService {
       isWithin72h = DateTime.now().difference(dt).inHours < 72;
     }
 
+    // disclosureIndex: KAP'ın kendi disclosure_id'si önceliklidir.
+    // Firestore doc ID (docId) burada kullanılmaz — aynı KAP bildirimi
+    // farklı Firestore doc ID'leriyle depolansa bile, gerçek KAP ID veya
+    // URL üzerinden deduplication çalışır.
+    final disclosureId = d['disclosure_id']?.toString();
+    final effectiveDisclosureIndex =
+        (disclosureId != null && disclosureId.isNotEmpty) ? disclosureId : null;
+
     return KapNewsItem(
-      title:          d['subject']?.toString() ?? d['company_title']?.toString() ?? 'KAP Bildirimi',
-      summary:        d['summary']?.toString() ?? d['subject']?.toString() ?? '',
-      source:         d['stock_code']?.toString() ?? 'KAP',
-      time:           timeDisplay,
-      url:            d['detail_url']?.toString() ?? '',
-      isWithin72h:    isWithin72h,
-      disclosureIndex: d['disclosure_id']?.toString() ?? docId,
+      title:           d['subject']?.toString() ?? d['company_title']?.toString() ?? 'KAP Bildirimi',
+      summary:         d['summary']?.toString() ?? d['subject']?.toString() ?? '',
+      source:          d['stock_code']?.toString() ?? 'KAP',
+      time:            timeDisplay,
+      url:             d['detail_url']?.toString() ?? '',
+      isWithin72h:     isWithin72h,
+      disclosureIndex: effectiveDisclosureIndex,
       disclosureType:  d['disclosure_type']?.toString(),
     );
   }
