@@ -55,18 +55,19 @@ class _NewsScreenState extends State<NewsScreen>
       if (items.isEmpty) {
         items = await KapNewsService.fetch();
       }
+      final deduped = KapNewsService.dedupe(items);
       if (mounted) {
         setState(() {
-          _kapNews = items;
+          _kapNews = deduped;
           _loadingKap = false;
         });
       }
     } catch (_) {
       try {
-        final items = await KapNewsService.fetch();
+        final deduped = KapNewsService.dedupe(await KapNewsService.fetch());
         if (mounted) {
           setState(() {
-            _kapNews = items;
+            _kapNews = deduped;
             _loadingKap = false;
           });
         }

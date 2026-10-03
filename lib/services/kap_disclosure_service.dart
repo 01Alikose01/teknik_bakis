@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/kap_news_item.dart';
+import 'kap_news_service.dart';
 
 /// KAP bildirimlerini Firestore'dan okur.
 ///
@@ -56,10 +57,12 @@ class KapDisclosureService {
           .get()
           .timeout(const Duration(seconds: 8));
 
-      final items = snapshot.docs
+      final rawItems = snapshot.docs
           .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
           .where((item) => item.title.isNotEmpty)
           .toList();
+
+      final items = KapNewsService.dedupe(rawItems);
 
       _cache[cacheKey] = _CachedDisclosures(
         items: items,
@@ -93,10 +96,12 @@ class KapDisclosureService {
           .get()
           .timeout(const Duration(seconds: 8));
 
-      final items = snapshot.docs
+      final rawItems = snapshot.docs
           .map((doc) => _docToNewsItem(doc.data(), docId: doc.id))
           .where((item) => item.title.isNotEmpty)
           .toList();
+
+      final items = KapNewsService.dedupe(rawItems);
 
       _cache[key] = _CachedDisclosures(
         items: items,
@@ -155,7 +160,7 @@ class KapDisclosureService {
       time:           timeDisplay,
       url:            d['detail_url']?.toString() ?? '',
       isWithin72h:    isWithin72h,
-      disclosureIndex: docId,
+      disclosureIndex: d['disclosure_id']?.toString() ?? docId,
       disclosureType:  d['disclosure_type']?.toString(),
     );
   }
