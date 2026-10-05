@@ -166,22 +166,25 @@ class IpoItem {
     required DateTime? requestEnd,
     required DateTime? listingDate,
   }) {
-    final value = raw?.trim().toLowerCase() ?? '';
-    final explicit = _parseRawStatus(value);
-    if (explicit != null) {
-      return explicit;
-    }
+    final hasTimeline =
+        requestStart != null || requestEnd != null || listingDate != null;
 
-    if (requestStart != null || requestEnd != null || listingDate != null) {
+    if (hasTimeline) {
+      // Tarih alanları mevcutsa her zaman gerçek tarihlerden türet.
+      // Firestore status değeri sadece fallback olarak kullanılır.
+      final fallback = _parseRawStatus(raw?.trim().toLowerCase() ?? '') ??
+          IpoStatus.upcoming;
       return _deriveStatus(
         requestStart: requestStart,
         requestEnd: requestEnd,
         listingDate: listingDate,
-        fallbackStatus: IpoStatus.upcoming,
+        fallbackStatus: fallback,
       );
     }
 
-    return IpoStatus.upcoming;
+    // Tarih alanı hiç yoksa Firestore status değerini son çare olarak kullan.
+    final explicit = _parseRawStatus(raw?.trim().toLowerCase() ?? '');
+    return explicit ?? IpoStatus.upcoming;
   }
 
   static IpoStatus? _parseRawStatus(String value) {

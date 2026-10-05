@@ -564,6 +564,10 @@ class _IpoScreenState extends State<IpoScreen>
           // Ertelendi etiketi taşıyanları çıkar
           final rd = item.requestDates.toLowerCase();
           if (rd.contains('ertelendi') || rd.contains('postponed')) return false;
+          // Ek güvenlik: requestStart geçmişse kesinlikle Yaklaşan olamaz
+          final rs = item.requestStart;
+          final now = DateTime.now().toUtc().add(const Duration(hours: 3));
+          if (rs != null && rs.isBefore(now)) return false;
           return true;
         })
         .toList()

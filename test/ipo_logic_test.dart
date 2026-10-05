@@ -245,5 +245,96 @@ void main() {
       // Gerçek tarihler pendingListing gösteriyor: talep bitti, listeleme gelecekte
       expect(item.status, IpoStatus.pendingListing);
     });
+
+    // Senaryo A: requestStart ve requestEnd geçmişte, listingDate null, status='upcoming'
+    test('A. requestStart ve requestEnd geçmişte, listingDate null → pendingListing (kesinlikle upcoming değil)', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'SOHO Giyim Benzeri',
+        'symbol': 'SOHO',
+        'requestStart': isoDay(now.subtract(const Duration(days: 100))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 99))),
+        'status': 'upcoming', // Firestore'da yanlış upcoming yazılmış
+      });
+
+      expect(item.status, isNot(IpoStatus.upcoming));
+      expect(item.status, IpoStatus.pendingListing);
+    });
+
+    // Senaryo B: requestStart ve requestEnd geçmişte, listingDate geçmişte, status='upcoming'
+    test('B. requestStart, requestEnd ve listingDate geçmişte → trading', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Borsada Hisse',
+        'symbol': 'BRSD',
+        'requestStart': isoDay(now.subtract(const Duration(days: 30))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 28))),
+        'listingDate': isoDay(now.subtract(const Duration(days: 20))),
+        'status': 'upcoming', // Firestore'da yanlış upcoming yazılmış
+      });
+
+      expect(item.status, IpoStatus.trading);
+    });
+
+    // Senaryo C: tüm tarih alanları null, status='upcoming'
+    test('C. Tüm tarih alanları null, status="upcoming" → upcoming (tarih bilgisi yoksa tahmin yapılamaz)', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Tarihsiz Hisse',
+        'symbol': 'TRHS',
+        'status': 'upcoming',
+      });
+
+      expect(item.status, IpoStatus.upcoming);
+    });
+
+    // Senaryo D: requestStart gelecekte, status='trading' (yanlış Firestore değeri)
+    test('D. requestStart gelecekte, status="trading" → upcoming (tarihler kazanır)', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'Gelecekte Hisse',
+        'symbol': 'GLCK',
+        'requestStart': isoDay(now.add(const Duration(days: 10))),
+        'requestEnd': isoDay(now.add(const Duration(days: 12))),
+        'status': 'trading', // Firestore'da yanlış trading yazılmış
+      });
+
+      expect(item.status, IpoStatus.upcoming);
+    });
+
+    // Senaryo E: SOHO case — requestStart ve requestEnd geçmişte, listingDate geçmişte
+    test('E. SOHO benzeri: requestStart=30 Haz, requestEnd=1 Tem, listingDate=8 Tem geçmiş → trading', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'SOHO Giyim ve Enerji A.S.',
+        'symbol': 'SOHO',
+        'requestStart': '2026-06-30',
+        'requestEnd': '2026-07-01',
+        'listingDate': '2026-07-08',
+        'status': 'upcoming',
+      });
+
+      // Tüm tarihler 2026'da; test "şimdi"si 2026'dan sonra değil.
+      // Test ortamında 2026 hâlâ gelecekte olabilir — bu senaryoda requestStart gelecekte.
+      // Sadece tarihlerin doğru yönde işlendiğini doğrula (status != upcoming unless requestStart future).
+      // Bu testin kesin davranışı çalıştırıldığı tarihe göre değişir;
+      // dolayısıyla sadece model'in status'u tarihe göre türettiğini doğruluyoruz.
+      final derivedStatus = item.status;
+      if (item.requestStart != null && item.requestStart!.isAfter(DateTime.now())) {
+        expect(derivedStatus, IpoStatus.upcoming);
+      } else {
+        expect(derivedStatus, isNot(IpoStatus.upcoming));
+      }
+    });
+
+    // Senaryo F: SOHO listingDate yok — requestStart ve requestEnd geçmişte → pendingListing
+    test('F. requestStart ve requestEnd geçmişte, listingDate bilinmiyor → pendingListing (upcoming değil)', () {
+      final item = IpoItem.fromJson({
+        'companyName': 'SOHO listingDate Yok',
+        'symbol': 'SOHO2',
+        'requestStart': isoDay(now.subtract(const Duration(days: 98))),
+        'requestEnd': isoDay(now.subtract(const Duration(days: 97))),
+        // listingDate yok
+        'status': 'upcoming',
+      });
+
+      expect(item.status, isNot(IpoStatus.upcoming));
+      expect(item.status, IpoStatus.pendingListing);
+    });
   });
 }

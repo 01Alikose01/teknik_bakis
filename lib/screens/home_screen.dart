@@ -1500,10 +1500,9 @@ class _QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWhite = color == Colors.white;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
           height: 90,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -1562,7 +1561,6 @@ class _QuickCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }
