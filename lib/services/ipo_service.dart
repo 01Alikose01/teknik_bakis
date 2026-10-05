@@ -251,6 +251,7 @@ class IpoService {
       IpoStatus.pendingListing: 3,
       IpoStatus.collecting: 2,
       IpoStatus.upcoming: 1,
+      IpoStatus.postponed: 0,
     };
 
     final deduped = <String, IpoItem>{};

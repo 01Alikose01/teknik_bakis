@@ -554,177 +554,474 @@ function fetchJson(url) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HALKA ARZ (IPO) SYNC — HalkArz.com → Firestore
-// Her 6 saatte bir çalışır. Uygulama artık GitHub yerine Firestore'a bakar.
+//
+// Değişiklikler (v2):
+//  - Tüm sayfa linkleri takip edilerek 50'ye kadar hisse çekilir (pagination)
+//  - HTML selector'ları daha esnek: birden fazla class/yapı desteklenir
+//  - Tarih ayrıştırma: "30 Haziran, 1 Temmuz" formatı da işlenir
+//  - Tarih sınırı geçmiş kayıtlar Firestore'da otomatik "trading" yapılır
+//  - Hata toleransı: tek hisse başarısız olursa diğerleri etkilenmez
 //
 // Firestore yapısı:
-//   ipo_items/{symbol}        — Her hisse bir belge
-//   ipo_meta/feed             — lastUpdated, itemCount, source
+//   ipo_items/{symbol}   — Her hisse bir belge (sembolsüzler companyName hash)
+//   ipo_meta/feed        — lastUpdated, itemCount, source
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HALKARZ_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
+const HALKARZ_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36';
+
+/** Türkçe ay adı → 0-bazlı ay indeksi */
 const TR_MONTHS = {
-  ocak:0, subat:1, mart:2, nisan:3, mayis:4, haziran:5,
-  temmuz:6, agustos:7, eylul:8, ekim:9, kasim:10, aralik:11,
+  ocak:0, subat:1, şubat:1, mart:2, nisan:3, mayis:4, mayıs:4, haziran:5,
+  temmuz:6, agustos:7, ağustos:7, eylul:8, eylül:8, ekim:9, kasim:10, kasım:10, aralik:11, aralık:11,
 };
 
+/** HTML tag'larını temizler ve boşlukları normalize eder */
 function cleanTxt(v) {
   return v == null ? '' : String(v).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
+
+/** Date → ISO 8601 string; geçersizse '' */
 function toIso(date) {
   return (date instanceof Date && !isNaN(date)) ? date.toISOString() : '';
 }
 
+/**
+ * Türkçe tarih metni → { start: Date|null, end: Date|null }
+ *
+ * Desteklenen formatlar:
+ *   "9-10-11 Eylül 2026"          → 9–11 Eylül
+ *   "31 Temmuz - 2 Ağustos 2026"  → 31 Tem – 2 Ağu
+ *   "30 Haziran, 1 Temmuz 2026"   → 30 Haz – 1 Tem
+ *   "6 Ağustos 2026"              → tek gün
+ *   "29.07.2026 - 31.07.2026"     → ISO-benzeri
+ *   "29-31 Temmuz 2026"           → aralık, aynı ay
+ */
 function parseTrDateRange(text) {
-  const norm = cleanTxt(text).toLowerCase()
+  const raw = cleanTxt(text);
+  if (!raw) return { start: null, end: null };
+
+  // Harfleri normalleştir (büyük/küçük, Türkçe özel)
+  const norm = raw.toLowerCase()
     .replace(/ğ/g,'g').replace(/ç/g,'c').replace(/ş/g,'s')
     .replace(/ü/g,'u').replace(/ö/g,'o').replace(/ı/g,'i');
 
-  // "9-10-11 eylul 2026"
-  const m1 = norm.match(/^(\d{1,2})[-\s]+(?:\d{1,2}[-\s]+)*(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+  // ── Format 1: "9-10-11 eylul 2026" veya "29-31 temmuz 2026" ──────────────
+  const m1 = norm.match(/^(\d{1,2})(?:[-,\s]+\d{1,2})*[-,\s]+(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
   if (m1) {
     const mo = TR_MONTHS[m1[3]];
     if (mo !== undefined) {
       const yr = parseInt(m1[4]);
-      return { start: new Date(yr, mo, parseInt(m1[1]), 12, 0, 0),
-               end:   new Date(yr, mo, parseInt(m1[2]), 12, 0, 0) };
+      // İlk sayıyı bul
+      const firstDay = parseInt(norm.match(/^(\d{1,2})/)[1]);
+      return {
+        start: new Date(yr, mo, firstDay, 12, 0, 0),
+        end:   new Date(yr, mo, parseInt(m1[2]), 12, 0, 0),
+      };
     }
   }
-  // "31 temmuz - 2 agustos 2026"
-  const m2 = norm.match(/^(\d{1,2})\s+([a-z]+)\s*-\s*(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+
+  // ── Format 2: "31 temmuz - 2 agustos 2026" ────────────────────────────────
+  const m2 = norm.match(/^(\d{1,2})\s+([a-z]+)\s*[-,]\s*(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
   if (m2) {
     const sm = TR_MONTHS[m2[2]], em = TR_MONTHS[m2[4]];
     if (sm !== undefined && em !== undefined) {
       const yr = parseInt(m2[5]);
-      return { start: new Date(yr, sm, parseInt(m2[1]), 12, 0, 0),
-               end:   new Date(yr, em, parseInt(m2[3]), 12, 0, 0) };
+      return {
+        start: new Date(yr, sm, parseInt(m2[1]), 12, 0, 0),
+        end:   new Date(yr, em, parseInt(m2[3]), 12, 0, 0),
+      };
     }
   }
-  // "6 agustos 2026"
-  const m3 = norm.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+
+  // ── Format 3: "30 haziran, 1 temmuz 2026" (virgüllü çapraz ay) ────────────
+  const m3 = norm.match(/^(\d{1,2})\s+([a-z]+)[,\s]+(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
   if (m3) {
-    const mo = TR_MONTHS[m3[2]];
+    const sm = TR_MONTHS[m3[2]], em = TR_MONTHS[m3[4]];
+    if (sm !== undefined && em !== undefined) {
+      const yr = parseInt(m3[5]);
+      return {
+        start: new Date(yr, sm, parseInt(m3[1]), 12, 0, 0),
+        end:   new Date(yr, em, parseInt(m3[3]), 12, 0, 0),
+      };
+    }
+  }
+
+  // ── Format 4: "6 agustos 2026" (tek gün) ─────────────────────────────────
+  const m4 = norm.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+  if (m4) {
+    const mo = TR_MONTHS[m4[2]];
     if (mo !== undefined) {
-      const d = new Date(parseInt(m3[3]), mo, parseInt(m3[1]), 12, 0, 0);
+      const d = new Date(parseInt(m4[3]), mo, parseInt(m4[1]), 12, 0, 0);
       return { start: d, end: d };
     }
   }
+
+  // ── Format 5: "29.07.2026 - 31.07.2026" veya "29.07.2026" ────────────────
+  const datePattern = /(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/g;
+  const dates = [];
+  let dm;
+  while ((dm = datePattern.exec(raw)) !== null) {
+    dates.push(new Date(parseInt(dm[3]), parseInt(dm[2]) - 1, parseInt(dm[1]), 12, 0, 0));
+  }
+  if (dates.length >= 2) return { start: dates[0], end: dates[dates.length - 1] };
+  if (dates.length === 1) return { start: dates[0], end: dates[0] };
+
   return { start: null, end: null };
 }
 
+/**
+ * Tarih bilgisine göre IPO statüsü türetir.
+ * Açık statü ('trading') zorla override edilemez — tarih mantığı önce gelir.
+ */
 function deriveIpoStatus({ requestStart, requestEnd, listingDate }) {
   const now = new Date();
+
+  // Listeleme tarihi geçtiyse → borsada işlem görüyor
   if (listingDate && listingDate <= now) return 'trading';
+
   if (requestEnd) {
-    const endOfDay = new Date(requestEnd.getFullYear(), requestEnd.getMonth(), requestEnd.getDate(), 23, 59, 59);
+    const endOfDay = new Date(
+      requestEnd.getFullYear(), requestEnd.getMonth(), requestEnd.getDate(), 23, 59, 59,
+    );
     if (now > endOfDay) {
-      if (listingDate && listingDate <= now) return 'trading';
+      // Talep bitti; listeleme bekleniyor veya zaten işlem görüyor
       if (listingDate && listingDate > now) return 'pending_listing';
+      // Listeleme tarihi bilinmiyor ama talep bitti → pending_listing (güvenli default)
       return 'pending_listing';
     }
   }
+
   if (requestStart) {
-    const startOfDay = new Date(requestStart.getFullYear(), requestStart.getMonth(), requestStart.getDate());
+    const startOfDay = new Date(
+      requestStart.getFullYear(), requestStart.getMonth(), requestStart.getDate(),
+    );
     return now < startOfDay ? 'upcoming' : 'collecting';
   }
+
   if (listingDate) {
-    const lStart = new Date(listingDate.getFullYear(), listingDate.getMonth(), listingDate.getDate());
+    const lStart = new Date(
+      listingDate.getFullYear(), listingDate.getMonth(), listingDate.getDate(),
+    );
     return now < lStart ? 'upcoming' : 'trading';
   }
+
   return 'upcoming';
 }
 
-async function fetchHalkArzItems() {
-  const homeRes = await fetch('https://halkarz.com/', {
-    headers: { 'User-Agent': HALKARZ_UA },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!homeRes.ok) throw new Error(`HalkArz ana sayfa: HTTP ${homeRes.status}`);
+/**
+ * HalkArz.com ana sayfasından hisse URL'lerini toplar.
+ * "Daha Fazla Göster" butonu yerine /sayfa/N formatındaki linkleri takip eder.
+ * Maksimum maxPages × 10 hisse (varsayılan 5 sayfa = 50 hisse).
+ */
+async function collectHalkArzUrls(maxPages = 5) {
+  const seen   = new Set();
+  const items  = [];
 
-  const html = await homeRes.text();
-  const articles = html.split('<article class="index-list');
-  const pageItems = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const url  = page === 1 ? 'https://halkarz.com/' : `https://halkarz.com/page/${page}/`;
+    let html;
 
-  for (let i = 1; i < Math.min(articles.length, 21); i++) {
-    const chunk = articles[i].split('</article>')[0];
-    const nm = chunk.match(/class="il-halka-arz-sirket"[^>]*>.*?<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/s);
-    if (!nm) continue;
-    const cm = chunk.match(/class="il-bist-kod"\s*>([^<]+)/s);
-    const dm = chunk.match(/<time datetime="([^"]+)"/);
-    pageItems.push({
-      companyName: cleanTxt(nm[2]),
-      symbol: cm ? cleanTxt(cm[1]).toUpperCase() : '',
-      url: nm[1],
-      requestDates: dm ? cleanTxt(dm[1]) : '',
-    });
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': HALKARZ_UA },
+        signal:  AbortSignal.timeout(20000),
+      });
+      if (!res.ok) {
+        // 404 → son sayfa geçildi
+        if (res.status === 404) break;
+        console.warn(`HalkArz sayfa ${page}: HTTP ${res.status}`);
+        break;
+      }
+      html = await res.text();
+    } catch (err) {
+      console.warn(`HalkArz sayfa ${page} fetch hatası:`, err.message);
+      break;
+    }
+
+    // ── Makale bloklarını ayır ─────────────────────────────────────────────
+    // Farklı class isimlerini destekle: "index-list", "entry-list", "post-"
+    const articleBlocks = [];
+    const splitPatterns = [
+      '<article class="index-list',
+      '<article class="entry-list',
+      '<article class="post ',
+      '<article id="post-',
+    ];
+
+    for (const pat of splitPatterns) {
+      const parts = html.split(pat);
+      if (parts.length > 1) {
+        for (let i = 1; i < parts.length; i++) {
+          articleBlocks.push(parts[i].split('</article>')[0]);
+        }
+        break; // İlk eşleşen pattern yeterli
+      }
+    }
+
+    if (articleBlocks.length === 0) {
+      // Fallback: tüm <article> içeriklerini regex ile çek
+      const artRe = /<article[^>]*>([\s\S]*?)<\/article>/gi;
+      let am;
+      while ((am = artRe.exec(html)) !== null) articleBlocks.push(am[1]);
+    }
+
+    let foundOnPage = 0;
+    for (const chunk of articleBlocks) {
+      // Şirket adı + URL — birden fazla selector desteği
+      const linkPatterns = [
+        /class="il-halka-arz-sirket"[^>]*>.*?<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/s,
+        /class="[^"]*halka-arz[^"]*"[^>]*>.*?<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/s,
+        /<h2[^>]*class="[^"]*entry-title[^"]*"[^>]*>.*?<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/s,
+        /<a\s+href="(https?:\/\/halkarz\.com\/[^"]+)"[^>]*>(.*?)<\/a>/s,
+      ];
+      let companyName = '', detailUrl = '';
+      for (const pat of linkPatterns) {
+        const m = chunk.match(pat);
+        if (m && m[1].includes('halkarz.com')) {
+          detailUrl   = m[1];
+          companyName = cleanTxt(m[2]);
+          break;
+        }
+      }
+      if (!detailUrl || seen.has(detailUrl)) continue;
+
+      // Borsa kodu
+      const codeM = chunk.match(/class="(?:il-bist-kod|bist-kod|ticker)[^"]*"\s*>([^<]+)/s)
+                 || chunk.match(/\b([A-Z]{4,6})\b/);
+      const symbol = codeM ? cleanTxt(codeM[1]).toUpperCase().replace(/[^A-Z]/g, '') : '';
+
+      // Talep tarihleri — <time> veya metin içinde
+      const timeM   = chunk.match(/<time[^>]*datetime="([^"]+)"/);
+      const dateM   = chunk.match(/class="[^"]*date[^"]*"[^>]*>([^<]+)/s);
+      const reqDates = timeM ? cleanTxt(timeM[1]) : (dateM ? cleanTxt(dateM[1]) : '');
+
+      seen.add(detailUrl);
+      items.push({ companyName, symbol, url: detailUrl, requestDates: reqDates });
+      foundOnPage++;
+    }
+
+    console.log(`HalkArz sayfa ${page}: ${foundOnPage} hisse bulundu`);
+    if (foundOnPage === 0) break; // Boş sayfa → dur
   }
 
-  console.log(`HalkArz: ${pageItems.length} hisse, detaylar çekiliyor...`);
-  const results = [];
+  return items;
+}
 
+/**
+ * Detay sayfasından fiyat, lot, dağıtım tipi, listeleme tarihi ve KAP URL'ini çeker.
+ * Her selector için birden fazla pattern denenir.
+ */
+async function fetchIpoDetail(item) {
+  const res = await fetch(item.url, {
+    headers: { 'User-Agent': HALKARZ_UA },
+    signal:  AbortSignal.timeout(18000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+
+  /** Tablo satırından değer çeker: etiket içeren <td>'nin yanındaki <td> */
+  function tableVal(labelRe) {
+    const m = html.match(
+      new RegExp(labelRe.source + '[^<]*<\\/td>\\s*<td[^>]*>(?:<[^>]+>)*(.*?)(?:<\\/[^>]+>)*\\s*<\\/td>', 'is'),
+    );
+    return m ? cleanTxt(m[1]) : '';
+  }
+
+  // ── Fiyat ─────────────────────────────────────────────────────────────────
+  const pricePatterns = [
+    /Halka\s+Arz\s+Fiyat/i,
+    /Fiyat\s*(?:Aral[iı][gğ][iı])?/i,
+    /Teklif\s+Fiyat/i,
+  ];
+  let price = '';
+  for (const p of pricePatterns) { price = tableVal(p); if (price && price !== '-') break; }
+
+  // ── Lot / Pay adedi ───────────────────────────────────────────────────────
+  const lotPatterns = [
+    /(?:Toplam\s+)?Pay\s+(?:Adedi|Miktar)/i,
+    /(?:Toplam\s+)?Lot\s+(?:Say[iı]s[iı]|Adedi)/i,
+    /Pay\s*:/i,
+  ];
+  let lot = '';
+  for (const p of lotPatterns) { lot = tableVal(p); if (lot && lot !== '-') break; }
+
+  // ── Dağıtım yöntemi ───────────────────────────────────────────────────────
+  const distPatterns = [
+    /Da[gğ][iı]t[iı]m\s+Y[oö]ntemi/i,
+    /Da[gğ][iı]t[iı]m\s+[Tt]ipi/i,
+    /[Yy][oö]ntem/i,
+  ];
+  let distributionType = '';
+  for (const p of distPatterns) { distributionType = tableVal(p); if (distributionType && distributionType !== '-') break; }
+
+  // ── Talep tarihleri (sayfa başlığından veya tablodan) ─────────────────────
+  let requestDatesFromDetail = item.requestDates; // Ana sayfadan gelen fallback
+  const reqPatterns = [
+    /Talep\s+Toplama\s+Tarihleri?/i,
+    /Ba[şs]vuru\s+Tarihleri?/i,
+    /Talep\s+Tarihleri?/i,
+  ];
+  for (const p of reqPatterns) {
+    const v = tableVal(p);
+    if (v && v !== '-') { requestDatesFromDetail = v; break; }
+  }
+  // H1/H2 başlığındaki tarih bilgisi
+  const titleDateM = html.match(/<h[12][^>]*>.*?(\d{1,2}[-–]\d{1,2}[-–]\d{1,2}\s+\w+\s+\d{4}|[\d.]+\s*[-–]\s*[\d.]+\s+\w+\s+\d{4}).*?<\/h[12]>/si);
+  if (titleDateM && !requestDatesFromDetail) requestDatesFromDetail = cleanTxt(titleDateM[1]);
+
+  // ── Listeleme tarihi ──────────────────────────────────────────────────────
+  const listingPatterns = [
+    /Bist\s+[İI]lk\s+[İI][şs]lem\s+Tarihi/i,
+    /[İI]lk\s+[İI][şs]lem\s+Tarihi/i,
+    /Borsada\s+[İI][şs]lem\s+G[oö]r/i,
+    /Kotasyon\s+Tarihi/i,
+    /Halka\s+Arz\s+Sonras[iı]\s+[İI][şs]lem/i,
+  ];
+  let listingDateText = '';
+  for (const p of listingPatterns) {
+    const v = tableVal(p);
+    if (v && v !== '-' && v.length > 3) { listingDateText = v; break; }
+  }
+
+  // ── KAP URL ───────────────────────────────────────────────────────────────
+  const kapM = html.match(/https?:\/\/(?:www\.)?kap\.org\.tr\/[^\s"'>]+/i);
+
+  // ── Hesaplama ─────────────────────────────────────────────────────────────
+  const range       = parseTrDateRange(requestDatesFromDetail);
+  const listingDate = parseTrDateRange(listingDateText).start || null;
+  const status      = deriveIpoStatus({
+    requestStart: range.start,
+    requestEnd:   range.end,
+    listingDate,
+  });
+
+  return {
+    companyName:      item.companyName,
+    requestDates:     requestDatesFromDetail || '-',
+    requestStart:     toIso(range.start),
+    requestEnd:       toIso(range.end),
+    price:            price   || '-',
+    lot:              lot     || '-',
+    distributionType: distributionType || '-',
+    symbol:           item.symbol,
+    status,
+    listingDate:      toIso(listingDate),
+    kapUrl:           kapM ? kapM[0] : '',
+    source:           'HalkArz',
+    publishedAt:      new Date().toISOString(),
+  };
+}
+
+/**
+ * Tüm hisse listesini çeker ve detayları toplar.
+ * Her hisse arasında 400ms bekler (politeness delay).
+ */
+async function fetchHalkArzItems() {
+  const pageItems = await collectHalkArzUrls(5); // Maksimum 5 sayfa = ~50 hisse
+  console.log(`HalkArz: toplam ${pageItems.length} hisse URL'i, detaylar çekiliyor...`);
+
+  const results = [];
   for (const item of pageItems) {
     try {
-      await new Promise(r => setTimeout(r, 500));
-      const dRes = await fetch(item.url, {
-        headers: { 'User-Agent': HALKARZ_UA },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!dRes.ok) continue;
-      const dHtml = await dRes.text();
-
-      const priceM = dHtml.match(/Halka\s+Arz\s+Fiyat[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is);
-      const distM  = dHtml.match(/Da[gğ][iı]t[iı]m\s+Y[oö]ntemi[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is);
-      const lotM   = dHtml.match(/Pay\s*:?[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is);
-
-      let listingDateText = '';
-      for (const pat of [
-        /Bist\s+[İI]lk\s+[İI]şlem\s+Tarihi[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is,
-        /[İI]lk\s+[İI]şlem\s+Tarihi[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is,
-        /Borsada\s+[İI]şlem[^<]*<\/td>\s*<td[^>]*>(?:<strong[^>]*>)?(.*?)(?:<\/strong>)?<\/td>/is,
-      ]) {
-        const m = dHtml.match(pat);
-        if (m) { listingDateText = cleanTxt(m[1]); break; }
-      }
-
-      const listingDate = parseTrDateRange(listingDateText).start || null;
-      const kapM = dHtml.match(/https?:\/\/(?:www\.)?kap\.org\.tr\/[^\s"'>]+/i);
-      const range = parseTrDateRange(item.requestDates);
-      const status = deriveIpoStatus({ requestStart: range.start, requestEnd: range.end, listingDate });
-
+      await new Promise(r => setTimeout(r, 400));
+      const detail = await fetchIpoDetail(item);
+      results.push(detail);
+    } catch (err) {
+      console.warn(`HalkArz detay hatası (${item.symbol || item.companyName}):`, err.message);
+      // Hata durumunda bile temel bilgilerle kayıt oluştur
+      const range  = parseTrDateRange(item.requestDates);
+      const status = deriveIpoStatus({ requestStart: range.start, requestEnd: range.end, listingDate: null });
       results.push({
         companyName:      item.companyName,
         requestDates:     item.requestDates || '-',
         requestStart:     toIso(range.start),
         requestEnd:       toIso(range.end),
-        price:            priceM ? cleanTxt(priceM[1]) : '-',
-        lot:              lotM   ? cleanTxt(lotM[1])   : '-',
-        distributionType: distM  ? cleanTxt(distM[1])  : '-',
+        price:            '-',
+        lot:              '-',
+        distributionType: '-',
         symbol:           item.symbol,
         status,
-        listingDate:      toIso(listingDate),
-        kapUrl:           kapM ? kapM[0] : '',
+        listingDate:      '',
+        kapUrl:           '',
         source:           'HalkArz',
         publishedAt:      new Date().toISOString(),
       });
-    } catch (err) {
-      console.warn(`HalkArz detay hatası (${item.symbol || item.companyName}):`, err.message);
     }
   }
+
+  console.log(`HalkArz: ${results.length} hisse işlendi`);
   return results;
 }
 
+/**
+ * Firestore'daki tüm mevcut kayıtları okur ve tarihi geçmiş olanların
+ * statüsünü "trading" olarak günceller (scraper'ın kaçırdığı geçişler).
+ */
+async function reconcileStaleIpoStatuses() {
+  const now = new Date();
+  const snapshot = await db.collection('ipo_items').get();
+  if (snapshot.empty) return 0;
+
+  const stale = [];
+  for (const doc of snapshot.docs) {
+    const d = doc.data();
+    if (d.status === 'trading') continue; // Zaten doğru
+
+    // listingDate geçtiyse → trading
+    if (d.listingDate) {
+      const ld = new Date(d.listingDate);
+      if (!isNaN(ld) && ld <= now) {
+        stale.push({ ref: doc.ref, status: 'trading' });
+        continue;
+      }
+    }
+
+    // requestEnd geçtiyse ve listingDate yoksa → pending_listing
+    if (d.requestEnd && !d.listingDate && d.status !== 'pending_listing') {
+      const re = new Date(d.requestEnd);
+      if (!isNaN(re)) {
+        const endOfDay = new Date(re.getFullYear(), re.getMonth(), re.getDate(), 23, 59, 59);
+        if (now > endOfDay) stale.push({ ref: doc.ref, status: 'pending_listing' });
+      }
+    }
+  }
+
+  if (!stale.length) return 0;
+
+  // Batch güncelle
+  let updated = 0;
+  for (let i = 0; i < stale.length; i += 400) {
+    const batch = db.batch();
+    for (const { ref, status } of stale.slice(i, i + 400)) {
+      batch.update(ref, { status, updatedAt: FieldValue.serverTimestamp() });
+    }
+    await batch.commit();
+    updated += Math.min(400, stale.length - i);
+  }
+
+  console.log(`IPO reconcile: ${updated} kaydın statüsü güncellendi`);
+  return updated;
+}
+
+/**
+ * Yeni çekilen kayıtları Firestore'a yazar.
+ * Öncelik sırası: trading > pending_listing > collecting > upcoming
+ * Aynı sembol için daha yüksek öncelikli statü kazanır.
+ */
 async function writeIpoToFirestore(items) {
   if (!items.length) return 0;
-  const PRI = { trading:4, pending_listing:3, collecting:2, upcoming:1 };
+  const PRI = { trading: 4, pending_listing: 3, collecting: 2, upcoming: 1 };
   const deduped = new Map();
 
   for (const item of items) {
     const key = item.symbol
       ? item.symbol.toUpperCase()
-      : `NO_SYMBOL_${item.companyName.replace(/\s+/g,'_').substring(0,30)}`;
+      : `NO_SYMBOL_${item.companyName.replace(/\s+/g, '_').substring(0, 30)}`;
     const ex = deduped.get(key);
     if (!ex) { deduped.set(key, item); continue; }
-    const ep = PRI[ex.status] || 0, np = PRI[item.status] || 0;
-    if (np > ep || (np === ep && (item.publishedAt||'') > (ex.publishedAt||''))) {
+    const ep = PRI[ex.status]   || 0;
+    const np = PRI[item.status] || 0;
+    if (np > ep || (np === ep && (item.publishedAt || '') > (ex.publishedAt || ''))) {
       deduped.set(key, item);
     }
   }
@@ -734,8 +1031,11 @@ async function writeIpoToFirestore(items) {
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db.batch();
     for (const [docId, item] of entries.slice(i, i + 400)) {
-      batch.set(db.collection('ipo_items').doc(docId),
-        { ...item, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      batch.set(
+        db.collection('ipo_items').doc(docId),
+        { ...item, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
     }
     await batch.commit();
     written += Math.min(400, entries.length - i);
@@ -747,6 +1047,7 @@ async function writeIpoToFirestore(items) {
     source:       'HalkArz',
     lastSyncedAt: new Date().toISOString(),
   });
+
   return written;
 }
 
@@ -760,6 +1061,9 @@ exports.syncIpoFeed = onSchedule({
 }, async () => {
   console.log('IPO sync başladı:', new Date().toISOString());
   try {
+    // 1. Eski kayıtların statüsünü tarih bazlı güncelle
+    await reconcileStaleIpoStatuses();
+    // 2. HalkArz'dan taze veriyi çek ve yaz
     const items = await fetchHalkArzItems();
     if (!items.length) { console.warn('HalkArz: kayıt bulunamadı'); return; }
     const count = await writeIpoToFirestore(items);
@@ -781,9 +1085,10 @@ exports.syncIpoManual = onRequest({
   const given  = (req.headers['x-admin-secret'] || req.query.secret || '').trim();
   if (!secret || given !== secret) { res.status(403).json({ error: 'Unauthorized' }); return; }
   try {
-    const items = await fetchHalkArzItems();
-    const count = await writeIpoToFirestore(items);
-    res.json({ success: true, count });
+    const reconciled = await reconcileStaleIpoStatuses();
+    const items  = await fetchHalkArzItems();
+    const count  = await writeIpoToFirestore(items);
+    res.json({ success: true, count, reconciled });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -424,7 +424,9 @@ function deriveStatus({ requestStart, requestEnd, listingDate }) {
   if (requestStart && requestEnd) {
     if (now < startOfDay(requestStart)) return 'upcoming';
     if (now <= endOfDay(requestEnd)) return 'collecting';
-    return 'trading';
+    // Talep toplama bitti ama listingDate yok veya henüz gelmedi → listeleme bekliyor
+    if (listingDate && listingDate > now) return 'pending_listing';
+    return listingDate ? 'trading' : 'pending_listing';
   }
 
   if (requestStart) {
