@@ -1,0 +1,7 @@
+{
+  "task_id": "task-kap-dedup-fix",
+  "task_description": "KAP Haber deduplication kök neden düzeltmesi: aynı KAP bildirimi 4 kez ve 2 kez görünüyor. Firestore'da aynı KAP bildirimi farklı doc.id'lerle durduğunda disclosure_id alanı yerine docId kullanılıyor ve fetchLatest() hiç dedupe() çağırmıyor. Düzeltme: kap_disclosure_service.dart'ta disclosure_id öncelikli + dedupe() + news_screen.dart'ta savunma katmanı. Sonra flutter analyze ve AAB build.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

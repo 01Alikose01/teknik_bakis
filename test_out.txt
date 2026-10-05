@@ -1,0 +1,13 @@
+00:00 +0: loading d:/k/wink/teknik_bakis/test/ipo_logic_test.dart
+00:00 +0: IpoItem durumunu tarihlere gore belirler
+00:00 +1: Sabit status olsa bile halka arz durumu tarihe gore guncellenir
+00:00 +2: Borsada islem gormeye baslayan halka arz genel hisse listesine eklenir
+00:00 +3: Halka Arz durum akisi ve listeleme kurallari 1. Talep tarihi gelecekte olan hisse Yaklaşan durumuna girer
+00:00 +4: Halka Arz durum akisi ve listeleme kurallari 2. Talebi devam eden hisse Talep Topluyor durumuna girer
+00:00 +5: Halka Arz durum akisi ve listeleme kurallari 3. Talebi biten, listeleme tarihi gelecekte olan hisse Listeleme Bekliyor durumuna girer
+00:00 +6: Halka Arz durum akisi ve listeleme kurallari 4. Listeleme tarihi geçmiş hisse Borsada durumuna girer
+00:00 +7: Halka Arz durum akisi ve listeleme kurallari 5-6. Borsada listesinde maksimum 10 hisse görünür, 11. silinmez sadece listede olmaz
+00:00 +8: Halka Arz durum akisi ve listeleme kurallari 7. Borsada listesine eklenen en yeni hisse listenin başında yer alır
+00:00 +9: Halka Arz durum akisi ve listeleme kurallari 8. Bir hisse yalnızca tek bir durumda sınıflandırılır
+00:00 +10: Halka Arz durum akisi ve listeleme kurallari 9. JSON status="trading" olsa bile tarihler Listeleme Bekliyor ise pendingListing döner
+00:00 +11: All tests passed!

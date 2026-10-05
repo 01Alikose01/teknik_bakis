@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "KAP dedup kök neden düzeltmesi: kap_disclosure_service.dart'ta disclosure_id alanını disclosureIndex olarak kullan ve fetchLatest()/fetchByStockCode() sonuçlarına KapNewsService.dedupe() uygula. news_screen.dart'ta _loadKap() içine ikinci savunma katmanı olarak dedupe() ekle.",
+  "status": "completed",
+  "steps": [
+    "1. lib/services/kap_disclosure_service.dart dosyasını oku. Dosyanın başındaki import bloğuna 'import kap_news_service.dart' ekle.",
+    "2. _docToNewsItem metodunda disclosureIndex satırını değiştir: 'disclosureIndex: docId' yerine 'disclosureIndex: d[\"disclosure_id\"]?.toString() ?? docId' yap. Bu, Cloud Function'ın yazdığı gerçek KAP bildirim ID'sini kullanır; Firestore doc.id'ye yalnızca fallback olarak düşer.",
+    "3. fetchLatest() metodunda snapshot.docs.map().where().toList() sonucunu rawItems olarak al. Sonra 'final items = KapNewsService.dedupe(rawItems);' satırı ekle. cache'e items (deduped) yaz. Metodun try bloğunu bu şekilde güncelle.",
+    "4. fetchByStockCode() metodunda aynı pattern'i uygula: map().where().toList() → rawItems, KapNewsService.dedupe(rawItems) → items, cache'e items yaz.",
+    "5. lib/screens/news_screen.dart dosyasını oku. _loadKap() metodunu güncelle: 'var items = await KapDisclosureService.fetchLatest()' satırından sonra ve 'if (items.isEmpty)' bloğundan SONRA, setState çağrısından önce 'final deduped = KapNewsService.dedupe(items);' ekle. setState içinde '_kapNews = deduped' kullan. catch bloğundaki fallback'te de 'KapNewsService.dedupe(await KapNewsService.fetch())' kullan.",
+    "6. Değişiklik yapılan dosyaların import'larını kontrol et. news_screen.dart zaten her iki servisi de import ediyor (kap_disclosure_service.dart ve kap_news_service.dart). kap_disclosure_service.dart'a kap_news_service.dart import'u eklendi. Circular dependency kontrolü: KapNewsService → KapDisclosureService referansı yok, KapDisclosureService → KapNewsService (yeni) — tek yönlü, güvenli."
+  ],
+  "acceptance_criteria": [
+    "flutter analyze lib/services/kap_disclosure_service.dart sıfır hata döndürür",
+    "flutter analyze lib/screens/news_screen.dart sıfır hata döndürür",
+    "flutter test test/kap_news_service_test.dart tüm testler geçer",
+    "kap_disclosure_service.dart içindeki _docToNewsItem metodunda disclosureIndex değeri d['disclosure_id'] öncelikli",
+    "fetchLatest() ve fetchByStockCode() her ikisi de KapNewsService.dedupe() çağırıyor",
+    "_loadKap() içinde setState'ten önce KapNewsService.dedupe() çağrılıyor",
+    "Borsa ile ilgili hiçbir dosyaya (BorsaNewsService, borsa_news_item.dart) dokunulmadı",
+    "Trial/Premium/Billing/AI sistemlerine dokunulmadı"
+  ],
+  "verification": [
+    "flutter analyze lib/services/kap_disclosure_service.dart",
+    "flutter analyze lib/screens/news_screen.dart",
+    "flutter test test/kap_news_service_test.dart"
+  ],
+  "blocked_reason": null,
+  "findings": "Tüm kod değişiklikleri tamamlandı. Shell ortamı (execute_pwsh) bu oturumda çalışmıyor — her komut exit code -1 dönüyor. flutter analyze, flutter test ve git commit manuel olarak çalıştırılmalı. Kod değişikliklerinin doğruluğu dosya okuma ile teyit edildi."
+}

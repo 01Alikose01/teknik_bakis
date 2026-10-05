@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix IPO screen status flow, sort orders, timezone handling, counter bug, and test expectation. All changes are in 3 files: lib/models/ipo_item.dart, lib/screens/ipo_screen.dart, test/ipo_logic_test.dart. The JS scraper tools/update_ipo_feed.mjs already has the correct pendingListing logic — do NOT touch it.",
+  "status": "completed",
+  "steps": [
+    "Step 1 — Fix wrong test expectation in test/ipo_logic_test.dart line ~61. Change `expect(waitingListing.status, IpoStatus.collecting)` to `expect(waitingListing.status, IpoStatus.pendingListing)`. This test has requestEnd 4 days in the past and listingDate 3 days in the future, so the correct status is pendingListing.",
+
+    "Step 2 — Add UTC+3 helper to lib/models/ipo_item.dart. Add a static method `static DateTime _nowInTurkey() => DateTime.now().toUtc().add(const Duration(hours: 3));` to the IpoItem class. In `_deriveStatus()`, replace `final now = DateTime.now();` with `final now = _nowInTurkey();`.",
+
+    "Step 3 — Fix UTC+3 in lib/screens/ipo_screen.dart inside `_groupedItems()`. Replace `final now = DateTime.now();` with `final now = DateTime.now().toUtc().add(const Duration(hours: 3));`. The `today` local variable (used for the upcoming guard) will automatically use this corrected now.",
+
+    "Step 4 — Fix 'Talep Topluyor' sort order in lib/screens/ipo_screen.dart `_groupedItems()`. The collecting sort comparator currently reads `return aDate.compareTo(bDate);` (ascending). Change to `return bDate.compareTo(aDate);` (descending = newest first). This is the ONLY sort that is wrong; upcoming (ascending by requestStart = nearest first) and pendingListing (ascending by listingDate = nearest first) are already correct.",
+
+    "Step 5 — Remove the redundant `requestStart.isBefore(today)` guard from the upcoming filter in lib/screens/ipo_screen.dart `_groupedItems()`. The guard `if (item.requestStart != null && item.requestStart!.isBefore(today)) return false;` is both redundant (items with past requestStart are already classified as collecting or trading by _deriveStatus, so they won't have status==upcoming) and harmful (it could hide items where requestStart is exactly today). Remove that block. After removal, check if the `today` variable is still used anywhere in `_groupedItems()` — if not, remove the `final today = ...` line too.",
+
+    "Step 6 — Fix Borsada chip counter in lib/screens/ipo_screen.dart `_buildHeader()`. Change `value: grouped.trading.length.toString()` to `value: grouped.latestTrading.length.toString()`. The trading tab shows latestTrading (max 10), so the counter must match what is displayed.",
+
+    "Step 7 — Add comprehensive tests covering all 9 required scenarios in test/ipo_logic_test.dart. Add a new test group named 'Halka Arz durum akisi ve listeleme kurallari' with these test cases:\n  (1) requestStart in future → IpoStatus.upcoming\n  (2) requestStart in past, requestEnd in future → IpoStatus.collecting\n  (3) requestEnd in past, listingDate in future → IpoStatus.pendingListing\n  (4) listingDate in past → IpoStatus.trading\n  (5-6) Build 15 IpoItem objects with status==trading and different listingDates; filter/sort/take(10) manually; verify 11th item is not in the top-10 list but the IpoItem object still exists (not deleted)\n  (7) Newest trading item has the most recent listingDate and appears first after sort\n  (8) An item can only appear in one status group at a time (verify that an item classified as collecting does NOT appear in upcoming, pendingListing, or trading)\n  (9) An item with JSON status='trading' but listingDate in the future and requestEnd in the past is classified as pendingListing (not trading), because _hasTimelineData=true and _deriveStatus overrides the stored status"
+  ],
+  "acceptance_criteria": [
+    "`flutter test test/ipo_logic_test.dart` passes all tests including the previously-failing 'waitingListing' test",
+    "The existing test at line ~61 now expects IpoStatus.pendingListing and passes",
+    "All 9 new scenario tests pass",
+    "`flutter analyze` reports zero errors",
+    "Collecting tab items are sorted newest requestStart first (descending)",
+    "Borsada chip counter shows at most 10 (matching latestTrading.length)",
+    "tools/update_ipo_feed.mjs is NOT modified",
+    "lib/services/ipo_service.dart is NOT modified",
+    "No new fields added to IpoItem"
+  ],
+  "verification": [
+    "flutter test test/ipo_logic_test.dart",
+    "flutter analyze"
+  ],
+  "blocked_reason": null,
+  "findings": "All 11 tests passed (3 original + 9 new scenario tests). flutter analyze reported 'No issues found!' for the 3 changed files. Commit: fix: halka arz IPO ekrani durum ve listeleme duzeltmesi (HEAD -> main). Changed files: lib/models/ipo_item.dart (added _nowInTurkey() UTC+3 helper, used in _deriveStatus), lib/screens/ipo_screen.dart (removed today guard from upcoming filter, collecting sort changed to descending, Borsada counter changed to latestTrading.length), test/ipo_logic_test.dart (9 new scenario tests added in group 'Halka Arz durum akisi ve listeleme kurallari')."
+}

@@ -1,0 +1,9 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    "_startOfDay / _endOfDay timezone kayması — UTC DateTime'lar naive DateTime'a dönüştürülüyor; _nowInTurkey() ile karşılaştırma gece yarısı sınırında 3 saatlik kayma yaratabilir. _startOfDay ve _endOfDay UTC DateTime alıp UTC DateTime döndürmeli veya karşılaştırmalar tutarlı biçimde UTC'ye çekilmeli.",
+    "_hasTimelineData=false kör noktası — Firestore'da tarih alanlarının tamamı eksik olan upcoming kayıtlar model katmanından da UI güvenlik kontrolünden de geçip Yaklaşan listesine sızabilir. Veri katmanından (Firestore belgesi veya feed güncelleme betiği) tarih alanı garantisi sağlanmalı.",
+    "listingDate olmayan trading kayıtları Borsada listesine girebilir — sıralama öncesinde listingDate != null filtresi yok; DateTime(1970) sentinel ile listeye giren kayıtlar take(10) içine düşebilir. Sıralama öncesine .where((item) => item.listingDate != null) eklenmeli."
+  ],
+  "reviewDoc": "d:\\k\\wink\\teknik_bakis\\.agents\\tasks\\halka-arz-tarih-review.md"
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-halka-arz-ipo-fix",
+  "task_description": "Flutter projesinde Halka Arz (IPO) ekranının durum hesaplama ve listeleme mantığını düzelt: test beklentisi, UTC+3 timezone, Talep Topluyor sıralama yönü, Yaklaşan extra guard, Borsada chip sayacı.",
+  "status": "pending",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

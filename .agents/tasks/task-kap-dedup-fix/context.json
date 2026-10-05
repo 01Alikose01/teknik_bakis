@@ -1,0 +1,22 @@
+{
+  "project_type": "Flutter Android/iOS app — Türk borsa haberleri ve KAP bildirimleri",
+  "language": "Dart (Flutter 3.x, SDK ^3.11.0)",
+  "build_system": "Flutter build system, pubspec.yaml, no monorepo",
+  "test_framework": "flutter_test (dart test). Test dosyaları: test/kap_news_service_test.dart",
+  "build_command": "flutter build appbundle --release",
+  "test_command": "flutter test",
+  "verification_instructions": "1. flutter analyze — sıfır yeni hata/warning bekle. 2. flutter test — mevcut testler geçmeli. 3. flutter build appbundle --release — build/app/outputs/bundle/release/app-release.aab oluşmalı.",
+  "snapshot_or_generated_files": "build/app/outputs/bundle/release/app-release.aab — flutter build appbundle --release ile üretilir, commit edilmez.",
+  "environment_constraints": "Windows ortamı. Flutter PATH'te kurulu. Firebase bağlantısı gerektiren testler cihaz/emülatör olmadan çalışmaz — yalnızca unit testler (flutter test) çalıştır. AAB build için keystore gerekmez (debug keystore yeterli) ama release keystore varsa kullan.",
+  "contribution_requirements": "Borsa deduplication koduna (BorsaNewsService) dokunma. Trial/Premium/Billing sistemlerine dokunma. Back button (PopScope), UpdateService, AI (kap_ai/) sistemlerine dokunma. news_screen.dart görsel tasarımına dokunma.",
+  "key_patterns": "Static service sınıfları (KapDisclosureService, KapNewsService, BorsaNewsService) — tüm metodlar static. KapNewsService.dedupe() mevcut — liste alan, tekilleştirilmiş liste döndürür. _buildDeduplicationKey() öncelik sırası: IDX:{disclosureIndex} > URL:{url} > company|title|type|time fallback. Firestore kap_disclosures koleksiyonu: doc.id = KAP disclosureIndex, ama disclosure_id alanı da var (aynı değer).",
+  "relevant_files": [
+    "lib/services/kap_disclosure_service.dart",
+    "lib/screens/news_screen.dart",
+    "lib/services/kap_news_service.dart",
+    "lib/models/kap_news_item.dart",
+    "functions/index.js",
+    "test/kap_news_service_test.dart"
+  ],
+  "directory_structure": "lib/models/ — veri modelleri. lib/services/ — servis sınıfları (static). lib/screens/ — ekranlar. lib/kap_ai/ — AI sistemi (dokunma). functions/index.js — Cloud Functions. .agents/tasks/ — plan ve artifact dosyaları."
+}

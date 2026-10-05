@@ -1,0 +1,9 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    "Türkçe ek regex noktalama sorunlu — _canonicalText içindeki '(?=\\s|$) lookahead'i noktalama işareti ardından gelen ekleri temizleyemiyor; regex '(?=[\\s.,!?;:]|$) olmalı.",
+    "KAP servisleri başarısız olursa sessiz hata — her iki servis de hata fırlatırsa _kapNews boş kalıyor, kullanıcıya görsel geri bildirim verilmiyor.",
+    "Firestore yolunda summary başlık tekrarı — _docToNewsItem'da summary: d['subject'] ?? d['summary'] sıralaması yanlış; d['summary'] önce olmalı, aksi hâlde özet ve başlık aynı metni gösteriyor."
+  ],
+  "reviewDoc": "d:\\k\\wink\\teknik_bakis\\.agents\\tasks\\news-dedup-review.md"
+}

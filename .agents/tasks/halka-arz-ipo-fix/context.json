@@ -1,0 +1,22 @@
+{
+  "project_type": "Flutter mobile app (Android/iOS)",
+  "language": "Dart (Flutter 3.x, SDK ^3.11.0)",
+  "build_system": "Flutter / pub — standard `flutter build` / `flutter test`",
+  "test_framework": "flutter_test (package:flutter_test/flutter_test.dart)",
+  "build_command": "flutter analyze",
+  "test_command": "flutter test test/ipo_logic_test.dart",
+  "verification_instructions": "1. Run `flutter analyze` from repo root — expect zero errors. 2. Run `flutter test test/ipo_logic_test.dart` — all tests must pass. Do NOT build AAB.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "Do NOT build AAB. Do NOT touch: KAP Haberleri, Borsa Haberleri, Trial, Premium, Billing, AI, UpdateService, back button systems. Do NOT add new data fields to IpoItem — use only existing fields.",
+  "contribution_requirements": "Work in the main worktree at the absolute path below. All commits stay local, never push.",
+  "key_patterns": "IpoItem.status getter calls _deriveStatus() on every access when _hasTimelineData==true. _groupedItems() in ipo_screen.dart filters and sorts _items into 4 groups. The _IpoGroups class holds: upcoming, collecting, pendingListing, trading (all), latestTrading (trading.take(10)). Summary chips use grouped.X.length. Tab body uses grouped.latestTrading for Borsada tab.",
+  "relevant_files": [
+    "lib/models/ipo_item.dart",
+    "lib/screens/ipo_screen.dart",
+    "test/ipo_logic_test.dart",
+    "lib/services/ipo_service.dart",
+    "tools/update_ipo_feed.mjs"
+  ],
+  "directory_structure": "lib/models/ — data models; lib/screens/ — UI screens; lib/services/ — business logic / data fetching; test/ — flutter_test tests; tools/ — Node.js scraper; data/ — ipo_feed.json (gitignored runtime data); assets/data/ — ipo_seed.json (bundled seed data)",
+  "worktree_root": "d:/k/wink/teknik_bakis"
+}
