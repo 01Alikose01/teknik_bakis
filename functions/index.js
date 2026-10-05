@@ -670,27 +670,38 @@ function parseTrDateRange(text) {
 }
 
 /**
- * Tarih bilgisine göre IPO statüsü türetir.
- * Açık statü ('trading') zorla override edilemez — tarih mantığı önce gelir.
+ * IPO statüsünü BIST varlığı ve tarih bilgisine göre hesaplar.
+ *
+ * Öncelik sırası:
+ *   1. BIST'te listelenmiş sembol → 'trading'
+ *   2. listingDate < now          → 'trading'
+ *   3. requestEnd < endOfDay      → 'pending_listing'
+ *   4. requestStart <= now        → 'collecting'
+ *   5. Aksi hâlde                 → 'upcoming'
+ *
+ * @param {{ requestStart, requestEnd, listingDate, symbol, bistSymbols }} params
+ * @param {Set<string>} [params.bistSymbols] — Firestore bist_stocks koleksiyonundan çekilmiş sembol kümesi
  */
-function deriveIpoStatus({ requestStart, requestEnd, listingDate }) {
+function computeIpoStatus({ requestStart, requestEnd, listingDate, symbol, bistSymbols }) {
   const now = new Date();
 
-  // Listeleme tarihi geçtiyse → borsada işlem görüyor
+  // 1. BIST'te aktif sembol → kesinlikle işlem görüyor
+  if (symbol && bistSymbols instanceof Set && bistSymbols.has(symbol.toUpperCase())) {
+    return 'trading';
+  }
+
+  // 2. Listeleme tarihi geçtiyse → borsada işlem görüyor
   if (listingDate && listingDate <= now) return 'trading';
 
+  // 3. Talep süresi bittiyse → listeleme bekleniyor
   if (requestEnd) {
     const endOfDay = new Date(
       requestEnd.getFullYear(), requestEnd.getMonth(), requestEnd.getDate(), 23, 59, 59,
     );
-    if (now > endOfDay) {
-      // Talep bitti; listeleme bekleniyor veya zaten işlem görüyor
-      if (listingDate && listingDate > now) return 'pending_listing';
-      // Listeleme tarihi bilinmiyor ama talep bitti → pending_listing (güvenli default)
-      return 'pending_listing';
-    }
+    if (now > endOfDay) return 'pending_listing';
   }
 
+  // 4. Talep devam ediyor → toplama aşaması
   if (requestStart) {
     const startOfDay = new Date(
       requestStart.getFullYear(), requestStart.getMonth(), requestStart.getDate(),
@@ -698,6 +709,7 @@ function deriveIpoStatus({ requestStart, requestEnd, listingDate }) {
     return now < startOfDay ? 'upcoming' : 'collecting';
   }
 
+  // 5. Listeleme tarihi henüz gelmemiş ama talep tarihi yok
   if (listingDate) {
     const lStart = new Date(
       listingDate.getFullYear(), listingDate.getMonth(), listingDate.getDate(),
@@ -706,6 +718,22 @@ function deriveIpoStatus({ requestStart, requestEnd, listingDate }) {
   }
 
   return 'upcoming';
+}
+
+/**
+ * Firestore bist_stocks koleksiyonundan tüm sembol ID'lerini bir Set olarak döndürür.
+ * Hata durumunda boş Set döner — diğer durum mantığı çalışmaya devam eder.
+ */
+async function loadBistSymbols() {
+  try {
+    const refs = await db.collection('bist_stocks').listDocuments();
+    const symbolSet = new Set(refs.map(r => r.id.toUpperCase()));
+    console.log(`loadBistSymbols: ${symbolSet.size} sembol yüklendi`);
+    return symbolSet;
+  } catch (err) {
+    console.warn('loadBistSymbols hatası (boş Set ile devam):', err.message);
+    return new Set();
+  }
 }
 
 /**
@@ -811,7 +839,7 @@ async function collectHalkArzUrls(maxPages = 5) {
  * Detay sayfasından fiyat, lot, dağıtım tipi, listeleme tarihi ve KAP URL'ini çeker.
  * Her selector için birden fazla pattern denenir.
  */
-async function fetchIpoDetail(item) {
+async function fetchIpoDetail(item, bistSymbols) {
   const res = await fetch(item.url, {
     headers: { 'User-Agent': HALKARZ_UA },
     signal:  AbortSignal.timeout(18000),
@@ -889,10 +917,12 @@ async function fetchIpoDetail(item) {
   // ── Hesaplama ─────────────────────────────────────────────────────────────
   const range       = parseTrDateRange(requestDatesFromDetail);
   const listingDate = parseTrDateRange(listingDateText).start || null;
-  const status      = deriveIpoStatus({
+  const status      = computeIpoStatus({
     requestStart: range.start,
     requestEnd:   range.end,
     listingDate,
+    symbol:       item.symbol,
+    bistSymbols,
   });
 
   return {
@@ -916,7 +946,7 @@ async function fetchIpoDetail(item) {
  * Tüm hisse listesini çeker ve detayları toplar.
  * Her hisse arasında 400ms bekler (politeness delay).
  */
-async function fetchHalkArzItems() {
+async function fetchHalkArzItems(bistSymbols) {
   const pageItems = await collectHalkArzUrls(5); // Maksimum 5 sayfa = ~50 hisse
   console.log(`HalkArz: toplam ${pageItems.length} hisse URL'i, detaylar çekiliyor...`);
 
@@ -924,13 +954,19 @@ async function fetchHalkArzItems() {
   for (const item of pageItems) {
     try {
       await new Promise(r => setTimeout(r, 400));
-      const detail = await fetchIpoDetail(item);
+      const detail = await fetchIpoDetail(item, bistSymbols);
       results.push(detail);
     } catch (err) {
       console.warn(`HalkArz detay hatası (${item.symbol || item.companyName}):`, err.message);
       // Hata durumunda bile temel bilgilerle kayıt oluştur
       const range  = parseTrDateRange(item.requestDates);
-      const status = deriveIpoStatus({ requestStart: range.start, requestEnd: range.end, listingDate: null });
+      const status = computeIpoStatus({
+        requestStart: range.start,
+        requestEnd:   range.end,
+        listingDate:  null,
+        symbol:       item.symbol,
+        bistSymbols,
+      });
       results.push({
         companyName:      item.companyName,
         requestDates:     item.requestDates || '-',
@@ -956,8 +992,9 @@ async function fetchHalkArzItems() {
 /**
  * Firestore'daki tüm mevcut kayıtları okur ve tarihi geçmiş olanların
  * statüsünü "trading" olarak günceller (scraper'ın kaçırdığı geçişler).
+ * bistSymbols: BIST'te aktif olan semboller; bunlar her zaman trading yapılır.
  */
-async function reconcileStaleIpoStatuses() {
+async function reconcileStaleIpoStatuses(bistSymbols) {
   const now = new Date();
   const snapshot = await db.collection('ipo_items').get();
   if (snapshot.empty) return 0;
@@ -966,6 +1003,12 @@ async function reconcileStaleIpoStatuses() {
   for (const doc of snapshot.docs) {
     const d = doc.data();
     if (d.status === 'trading') continue; // Zaten doğru
+
+    // BIST'te listelenmiş hisse → trading
+    if (d.symbol && bistSymbols instanceof Set && bistSymbols.has(d.symbol.toUpperCase())) {
+      stale.push({ ref: doc.ref, status: 'trading' });
+      continue;
+    }
 
     // listingDate geçtiyse → trading
     if (d.listingDate) {
@@ -1007,8 +1050,9 @@ async function reconcileStaleIpoStatuses() {
  * Yeni çekilen kayıtları Firestore'a yazar.
  * Öncelik sırası: trading > pending_listing > collecting > upcoming
  * Aynı sembol için daha yüksek öncelikli statü kazanır.
+ * Mevcut Firestore'da 'trading' olan kayıt, HalkArz'dan daha düşük statü gelse bile korunur.
  */
-async function writeIpoToFirestore(items) {
+async function writeIpoToFirestore(items, bistSymbols) {
   if (!items.length) return 0;
   const PRI = { trading: 4, pending_listing: 3, collecting: 2, upcoming: 1 };
   const deduped = new Map();
@@ -1027,13 +1071,45 @@ async function writeIpoToFirestore(items) {
   }
 
   const entries = [...deduped.entries()];
+
+  // Mevcut Firestore durumlarını oku (trading koruması için)
+  let existingStatuses = new Map();
+  try {
+    const refs = entries.map(([docId]) => db.collection('ipo_items').doc(docId));
+    if (refs.length > 0) {
+      // db.getAll 500 limit — chunk'a böl
+      for (let i = 0; i < refs.length; i += 400) {
+        const chunk = refs.slice(i, i + 400);
+        const snaps = await db.getAll(...chunk);
+        for (const snap of snaps) {
+          if (snap.exists) {
+            existingStatuses.set(snap.id, snap.data().status || null);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('writeIpoToFirestore: mevcut statüler okunamadı, trading koruması devre dışı:', err.message);
+  }
+
   let written = 0;
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db.batch();
     for (const [docId, item] of entries.slice(i, i + 400)) {
+      let finalStatus = item.status;
+
+      // Kural 1: Firestore'da zaten trading varsa koru
+      if (existingStatuses.get(docId) === 'trading') {
+        finalStatus = 'trading';
+      }
+      // Kural 2: BIST'te aktif sembol → trading
+      if (item.symbol && bistSymbols instanceof Set && bistSymbols.has(item.symbol.toUpperCase())) {
+        finalStatus = 'trading';
+      }
+
       batch.set(
         db.collection('ipo_items').doc(docId),
-        { ...item, updatedAt: FieldValue.serverTimestamp() },
+        { ...item, status: finalStatus, updatedAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
     }
@@ -1061,13 +1137,16 @@ exports.syncIpoFeed = onSchedule({
 }, async () => {
   console.log('IPO sync başladı:', new Date().toISOString());
   try {
-    // 1. Eski kayıtların statüsünü tarih bazlı güncelle
-    await reconcileStaleIpoStatuses();
-    // 2. HalkArz'dan taze veriyi çek ve yaz
-    const items = await fetchHalkArzItems();
+    // 1. BIST sembol kümesini çek (durum hesaplamalarında kullanılır)
+    const bistSymbols = await loadBistSymbols();
+    // 2. HalkArz'dan taze veriyi çek (BIST kontrolüyle)
+    const items = await fetchHalkArzItems(bistSymbols);
     if (!items.length) { console.warn('HalkArz: kayıt bulunamadı'); return; }
-    const count = await writeIpoToFirestore(items);
-    console.log(`IPO sync tamamlandı: ${count} kayıt`);
+    // 3. Yaz (mevcut trading korumalı)
+    const count = await writeIpoToFirestore(items, bistSymbols);
+    // 4. Reconcile — HalkArz'ın üzerine yazmasından sonra uygula (kalıcı olur)
+    const reconciled = await reconcileStaleIpoStatuses(bistSymbols);
+    console.log(`IPO sync tamamlandı: ${count} kayıt, ${reconciled} reconcile`);
   } catch (err) {
     console.error('IPO sync hatası:', err.message);
     throw err;
@@ -1085,9 +1164,14 @@ exports.syncIpoManual = onRequest({
   const given  = (req.headers['x-admin-secret'] || req.query.secret || '').trim();
   if (!secret || given !== secret) { res.status(403).json({ error: 'Unauthorized' }); return; }
   try {
-    const reconciled = await reconcileStaleIpoStatuses();
-    const items  = await fetchHalkArzItems();
-    const count  = await writeIpoToFirestore(items);
+    // 1. BIST sembol kümesini çek
+    const bistSymbols = await loadBistSymbols();
+    // 2. HalkArz'dan veriyi çek (BIST kontrolüyle)
+    const items  = await fetchHalkArzItems(bistSymbols);
+    // 3. Yaz (mevcut trading korumalı)
+    const count  = await writeIpoToFirestore(items, bistSymbols);
+    // 4. Reconcile — yazmadan sonra uygula
+    const reconciled = await reconcileStaleIpoStatuses(bistSymbols);
     res.json({ success: true, count, reconciled });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1538,19 +1622,29 @@ const PACKAGE_NAME = 'com.teknikbakis.teknik_bakis';
  * Öncelik 2: Application Default Credentials (GCP Service Account)
  */
 async function getPlayAuthClient(secretJsonStr) {
+  console.log(`[PlayAuth] secretJsonStr boş mu: ${!secretJsonStr}`);
+  console.log(`[PlayAuth] startsWith('{') sonucu: ${!!(secretJsonStr && secretJsonStr.trim().startsWith('{'))}`);
+
   if (secretJsonStr && secretJsonStr.trim().startsWith('{')) {
     try {
       const creds = JSON.parse(secretJsonStr);
+
+      console.log(`[PlayAuth] client_email: ${creds.client_email}`);
+      console.log(`[PlayAuth] private_key mevcut mu: ${!!creds.private_key}`);
+      console.log(`[PlayAuth] project_id: ${creds.project_id}`);
+
       return new google.auth.JWT({
         email: creds.client_email,
         key: creds.private_key,
         scopes: ['https://www.googleapis.com/auth/androidpublisher'],
       });
     } catch (e) {
-      console.warn('PLAY_SERVICE_ACCOUNT_KEY parse hatası, ADC deneniyor:', e.message);
+      console.warn(`[PlayAuth] JSON parse hatası: ${e.message}`);
+      console.warn('[PlayAuth] ADC fallback kullanılıyor');
     }
   }
 
+  console.log('[PlayAuth] ADC fallback kullanılıyor');
   const auth = new google.auth.GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   });
