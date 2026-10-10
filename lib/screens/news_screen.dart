@@ -48,6 +48,24 @@ class _NewsScreenState extends State<NewsScreen>
     if (mounted) setState(() => _lastUpdated = DateTime.now());
   }
 
+  /// GitHub veya yerel saati Türkiye saatiyle (UTC+3) "Güncelleme HH:mm" olarak döndürür.
+  String _formatUpdateTime() {
+    if (KapNewsService.lastUpdated.isNotEmpty) {
+      try {
+        // KapNewsService.lastUpdated → "2026-10-10T14:15:50.000Z" formatında UTC
+        final utc = DateTime.parse(KapNewsService.lastUpdated).toUtc();
+        final tr = utc.add(const Duration(hours: 3));
+        return 'Güncelleme ${tr.hour.toString().padLeft(2, '0')}:${tr.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+    if (_lastUpdated != null) {
+      // Cihaz saati zaten yerel — Türkiye'de çalışan kullanıcılar için doğrudan kullan
+      final tr = _lastUpdated!;
+      return 'Güncelleme ${tr.hour.toString().padLeft(2, '0')}:${tr.minute.toString().padLeft(2, '0')}';
+    }
+    return '';
+  }
+
   Future<void> _loadKap() async {
     if (mounted) setState(() => _loadingKap = true);
     try {
@@ -118,9 +136,7 @@ class _NewsScreenState extends State<NewsScreen>
                   const Spacer(),
                   if (_lastUpdated != null)
                     Text(
-                      KapNewsService.lastUpdated.isNotEmpty
-                          ? 'GitHub: ${KapNewsService.lastUpdated.substring(11, 16)} UTC'
-                          : 'Son: ${_lastUpdated!.hour.toString().padLeft(2, '0')}:${_lastUpdated!.minute.toString().padLeft(2, '0')}',
+                      _formatUpdateTime(),
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withOpacity(0.65), fontSize: 11),
                     ),

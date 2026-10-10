@@ -55,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: onSurface)),
                   ),
                   Center(
-                    child: Text('v1.0.0',
+                    child: Text('v1.1.0',
                         style: TextStyle(color: onSurfaceSecondary, fontSize: 13)),
                   ),
                   const SizedBox(height: 16),

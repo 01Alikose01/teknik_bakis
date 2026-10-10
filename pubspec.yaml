@@ -1,7 +1,7 @@
 name: teknik_bakis
 description: "Teknik Bakış - Hisse Senedi Takip Uygulaması"
 publish_to: 'none'
-version: 1.0.0+36432
+version: 1.1.0+36433
 
 environment:
   sdk: ^3.11.0

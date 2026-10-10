@@ -37,6 +37,10 @@ class IpoService {
   /// Daha önce bildirim gönderilmiş IPO sembollerini saklayan Hive anahtarı.
   static const String _notifiedSymbolsKey = 'notified_ipo_symbols';
 
+  /// Cache şema versiyonu — bu değer değişince eski cache otomatik temizlenir.
+  static const String _cacheVersionKey = 'cache_version';
+  static const int _cacheVersion = 3; // GitHub merge ile eksik price/lot/distributionType tamamlama
+
   // ── GitHub fallback (Firestore çalışmazsa) ─────────────────────────────────
   static const String _defaultFeedUrl =
       'https://raw.githubusercontent.com/01Alikose01/teknik_bakis/main/data/ipo_feed.json';
@@ -53,6 +57,16 @@ class IpoService {
   // ── Önce cache/seed yükle, arka planda refresh ────────────────────────────
   static Future<IpoFeedData> loadCachedOrSeed() async {
     final box = await _openBox();
+
+    // Cache versiyonunu kontrol et — eski versiyon varsa temizle
+    final storedVersion = box.get(_cacheVersionKey) as int? ?? 0;
+    if (storedVersion < _cacheVersion) {
+      await box.delete(_cacheItemsKey);
+      await box.delete(_cacheLastSyncedAtKey);
+      await box.put(_cacheVersionKey, _cacheVersion);
+      debugPrint('IPO cache temizlendi (versiyon $storedVersion → $_cacheVersion)');
+    }
+
     final cachedJson = box.get(_cacheItemsKey)?.toString() ?? '';
     if (cachedJson.isNotEmpty) {
       final items = _decodeItems(cachedJson);
@@ -111,7 +125,11 @@ class IpoService {
       return _convertFirestoreDoc(data);
     }).toList();
 
-    final items = _mapItems(rawItems);
+    // Firestore'da price/lot/distributionType eksik/"-" olan kayıtlar için
+    // GitHub feed'den tamamlayıcı veri çek ve merge et.
+    final mergedItems = await _mergeWithGithubFallback(rawItems);
+
+    final items = _mapItems(mergedItems);
     if (items.isEmpty) return null;
 
     // Meta belgeden lastUpdated al
@@ -129,7 +147,7 @@ class IpoService {
     lastUpdated ??= DateTime.now();
 
     // Cache'e kaydet (Firestore çalışmazsa bir sonraki açılışta kullanılır)
-    await _saveToCache(rawItems, lastUpdated, source);
+    await _saveToCache(mergedItems, lastUpdated, source);
 
     syncBistStocksWithIpoItems(items);
 
@@ -139,6 +157,86 @@ class IpoService {
       source: source,
       isFromCache: false,
     );
+  }
+
+  /// Firestore'dan gelen kayıtlarda price/lot/distributionType eksikse
+  /// GitHub feed'den tamamlar. Ağ hatası olursa sessizce devam eder.
+  static Future<List<Map<String, dynamic>>> _mergeWithGithubFallback(
+    List<Map<String, dynamic>> firestoreItems,
+  ) async {
+    // Eksik alan var mı kontrol et
+    bool hasMissing = firestoreItems.any((item) =>
+        _isMissingField(item['price']) ||
+        _isMissingField(item['lot']) ||
+        _isMissingField(item['distributionType']));
+
+    if (!hasMissing) return firestoreItems;
+
+    // GitHub feed'i çek
+    Map<String, Map<String, dynamic>> githubMap = {};
+    try {
+      for (final url in _candidateUrls()) {
+        try {
+          final response = await http
+              .get(Uri.parse(url), headers: const {'Accept': 'application/json'})
+              .timeout(const Duration(seconds: 10));
+          if (response.statusCode == 200) {
+            final payload = jsonDecode(response.body) as Map<String, dynamic>;
+            final ghItems = payload['items'] as List? ?? [];
+            for (final ghItem in ghItems) {
+              if (ghItem is Map) {
+                final sym = (ghItem['symbol'] ?? '').toString().toUpperCase();
+                if (sym.isNotEmpty) {
+                  githubMap[sym] = Map<String, dynamic>.from(ghItem);
+                }
+              }
+            }
+            break;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    if (githubMap.isEmpty) return firestoreItems;
+
+    // Merge: Firestore'da eksik olan alanları GitHub'dan tamamla
+    return firestoreItems.map((item) {
+      final sym = (item['symbol'] ?? '').toString().toUpperCase();
+      final ghItem = githubMap[sym];
+      if (ghItem == null) return item;
+
+      final merged = Map<String, dynamic>.from(item);
+
+      if (_isMissingField(item['price']) && !_isMissingField(ghItem['price'])) {
+        merged['price'] = ghItem['price'];
+      }
+      if (_isMissingField(item['lot']) && !_isMissingField(ghItem['lot'])) {
+        merged['lot'] = ghItem['lot'];
+      }
+      if (_isMissingField(item['distributionType']) &&
+          !_isMissingField(ghItem['distributionType'])) {
+        merged['distributionType'] = ghItem['distributionType'];
+      }
+      // listingDate eksikse GitHub'dan al
+      if (_isMissingField(item['listingDate']) &&
+          !_isMissingField(ghItem['listingDate'])) {
+        merged['listingDate'] = ghItem['listingDate'];
+      }
+      // requestDates eksikse GitHub'dan al
+      if (_isMissingField(item['requestDates']) &&
+          !_isMissingField(ghItem['requestDates'])) {
+        merged['requestDates'] = ghItem['requestDates'];
+      }
+
+      return merged;
+    }).toList();
+  }
+
+  /// Bir alanın boş veya "-" olup olmadığını kontrol eder.
+  static bool _isMissingField(dynamic value) {
+    if (value == null) return true;
+    final s = value.toString().trim();
+    return s.isEmpty || s == '-';
   }
 
   // ── GitHub fallback ────────────────────────────────────────────────────────
@@ -203,6 +301,13 @@ class IpoService {
         result[entry.key] = value;
       }
     }
+    // publishedAt yoksa createdAt'i fallback olarak kullan
+    if (!result.containsKey('publishedAt') || result['publishedAt'] == null) {
+      final createdAt = result['createdAt'];
+      if (createdAt != null) {
+        result['publishedAt'] = createdAt;
+      }
+    }
     return result;
   }
 
@@ -221,6 +326,7 @@ class IpoService {
       await box.put(_cacheItemsKey, payload);
       await box.put(_cacheLastSyncedAtKey, lastUpdated.toIso8601String());
       await box.put(_cacheSourceKey, source);
+      await box.put(_cacheVersionKey, _cacheVersion);
     } catch (_) {}
   }
 
