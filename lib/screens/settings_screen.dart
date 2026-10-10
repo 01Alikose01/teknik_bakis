@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../main.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
@@ -17,6 +18,25 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  String _version = '';
+  String _buildNumber = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = info.version;
+        _buildNumber = info.buildNumber;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -55,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: onSurface)),
                   ),
                   Center(
-                    child: Text('v1.1.0',
+                    child: Text('v$_version+$_buildNumber',
                         style: TextStyle(color: onSurfaceSecondary, fontSize: 13)),
                   ),
                   const SizedBox(height: 16),
@@ -105,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _SettingsItem(
                       title: 'Sürüm',
-                      trailing: const Text('1.1.0', style: TextStyle(color: Colors.grey)),
+                      trailing: Text('$_version+$_buildNumber', style: const TextStyle(color: Colors.grey)),
                     ),
                     _SettingsItem(
                       title: 'Uygulamayı Değerlendir',
@@ -247,9 +267,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Teknik Bakış Hakkında'),
-        content: const Text(
+        content: Text(
             'Teknik Bakış, BIST hisselerini teknik analiz göstergeleriyle tarayan ve yatırım kararlarınızı destekleyen bir mobil uygulamadır.\n\n'
-            'Sürüm: 1.1.0\n'
+            'Sürüm: $_version+$_buildNumber\n'
             'Bu uygulama yatırım tavsiyesi niteliği taşımaz.'),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Kapat'))],
       ),
