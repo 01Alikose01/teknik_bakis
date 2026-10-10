@@ -78,7 +78,7 @@ function kapGet(path, apiKey, token, queryParams = {}) {
       path: url.pathname + url.search,
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': sanitizeToken(token),
         'X-Api-Key':     apiKey,
         'Accept':        'application/json',
         'Content-Type':  'application/json',
@@ -122,6 +122,17 @@ function fetchJson(url) {
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
   });
+}
+
+/**
+ * KAP_TOKEN'ı Authorization header'ı için hazırlar:
+ *  1. Yazdırılamayan karakterleri siler (Secret Manager bazen \n ekler)
+ *  2. Baştaki/sondaki boşlukları kırpar
+ *  3. Zaten "Bearer " ile başlıyorsa prefix'i tekrar eklemez
+ */
+function sanitizeToken(raw) {
+  const cleaned = raw.replace(/[^\x20-\x7E]/g, '').trim();
+  return cleaned.startsWith('Bearer ') ? cleaned : `Bearer ${cleaned}`;
 }
 
 /** Retry wrapper — otomatik yeniden deneme. */
@@ -387,8 +398,8 @@ exports.syncKapOpeningPre = onSchedule({
   timeoutSeconds: 300,
   secrets:        [KAP_API_KEY, KAP_TOKEN],
 }, async () => {
-  const apiKey = KAP_API_KEY.value();
-  const token  = KAP_TOKEN.value();
+  const apiKey = KAP_API_KEY.value().trim();
+  const token  = KAP_TOKEN.value().trim();
   await runKapSync(apiKey, token, 'opening-pre');
 });
 
@@ -401,8 +412,8 @@ exports.syncKapOpeningWindow = onSchedule({
   timeoutSeconds: 300,
   secrets:        [KAP_API_KEY, KAP_TOKEN],
 }, async () => {
-  const apiKey = KAP_API_KEY.value();
-  const token  = KAP_TOKEN.value();
+  const apiKey = KAP_API_KEY.value().trim();
+  const token  = KAP_TOKEN.value().trim();
   await runKapSync(apiKey, token, 'opening-window');
 });
 
@@ -422,8 +433,8 @@ exports.syncKapDisclosures = onSchedule({
   timeoutSeconds: 300,
   secrets:        [KAP_API_KEY, KAP_TOKEN],
 }, async () => {
-  const apiKey = KAP_API_KEY.value();
-  const token  = KAP_TOKEN.value();
+  const apiKey = KAP_API_KEY.value().trim();
+  const token  = KAP_TOKEN.value().trim();
   await runKapSync(apiKey, token, 'scheduled');
 });
 
@@ -446,8 +457,8 @@ exports.syncKapManual = onRequest({
   }
 
   try {
-    const apiKey = KAP_API_KEY.value();
-    const token  = KAP_TOKEN.value();
+    const apiKey = KAP_API_KEY.value().trim();
+    const token  = KAP_TOKEN.value().trim();
     const result = await runKapSync(apiKey, token, 'manual');
     res.json({ success: true, ...result });
   } catch (err) {
@@ -684,24 +695,37 @@ function parseTrDateRange(text) {
  */
 function computeIpoStatus({ requestStart, requestEnd, listingDate, symbol, bistSymbols }) {
   const now = new Date();
+  const IPO_PENDING_MAX_DAYS = 14;
 
-  // 1. BIST'te aktif sembol → kesinlikle işlem görüyor
-  if (symbol && bistSymbols instanceof Set && bistSymbols.has(symbol.toUpperCase())) {
-    return 'trading';
-  }
-
-  // 2. Listeleme tarihi geçtiyse → borsada işlem görüyor
-  if (listingDate && listingDate <= now) return 'trading';
-
-  // 3. Talep süresi bittiyse → listeleme bekleniyor
+  // Talep toplama tarihi çok eskiyse bu artık aktif IPO değildir.
+  // Bu kontrol BIST kontrolünden önce yapılır; böylece ORZAX gibi aylar önce
+  // halka arzı tamamlanmış hisseler tekrar "Borsada" altında görünmez.
   if (requestEnd) {
     const endOfDay = new Date(
       requestEnd.getFullYear(), requestEnd.getMonth(), requestEnd.getDate(), 23, 59, 59,
     );
-    if (now > endOfDay) return 'pending_listing';
+    if (now > endOfDay) {
+      const ageDays = (now.getTime() - endOfDay.getTime()) / 86400000;
+      if (ageDays > IPO_PENDING_MAX_DAYS) return 'archived';
+
+      // Son 14 gün içindeki tamamlanmış talep toplama: listeleme bekleniyor.
+      if (symbol && bistSymbols instanceof Set && bistSymbols.has(symbol.toUpperCase())) {
+        return 'trading';
+      }
+      if (listingDate && listingDate <= now) return 'trading';
+      return 'pending_listing';
+    }
   }
 
-  // 4. Talep devam ediyor → toplama aşaması
+  // Aktif BIST sembolü yalnızca güncel IPO dönemindeyse "Borsada" kabul edilir.
+  if (symbol && bistSymbols instanceof Set && bistSymbols.has(symbol.toUpperCase())) {
+    return 'trading';
+  }
+
+  // Listeleme tarihi biliniyor ve geçmişse işlem görüyor.
+  if (listingDate && listingDate <= now) return 'trading';
+
+  // Talep toplama devam ediyor / henüz başlamadı.
   if (requestStart) {
     const startOfDay = new Date(
       requestStart.getFullYear(), requestStart.getMonth(), requestStart.getDate(),
@@ -709,7 +733,7 @@ function computeIpoStatus({ requestStart, requestEnd, listingDate, symbol, bistS
     return now < startOfDay ? 'upcoming' : 'collecting';
   }
 
-  // 5. Listeleme tarihi henüz gelmemiş ama talep tarihi yok
+  // Listeleme tarihi gelecekteyse yaklaşan olarak göster.
   if (listingDate) {
     const lStart = new Date(
       listingDate.getFullYear(), listingDate.getMonth(), listingDate.getDate(),
@@ -717,6 +741,8 @@ function computeIpoStatus({ requestStart, requestEnd, listingDate, symbol, bistS
     return now < lStart ? 'upcoming' : 'trading';
   }
 
+  // Tarihsiz kayıtlar yalnızca taze kaynaktan geldiklerinde writeIpoToFirestore
+  // tarafından korunur. Eski/tarihsiz Firestore kayıtları prune aşamasında arşivlenir.
   return 'upcoming';
 }
 
@@ -726,9 +752,16 @@ function computeIpoStatus({ requestStart, requestEnd, listingDate, symbol, bistS
  */
 async function loadBistSymbols() {
   try {
-    const refs = await db.collection('bist_stocks').listDocuments();
-    const symbolSet = new Set(refs.map(r => r.id.toUpperCase()));
-    console.log(`loadBistSymbols: ${symbolSet.size} sembol yüklendi`);
+    const snapshot = await db.collection('bist_stocks').get();
+    const symbolSet = new Set();
+    for (const doc of snapshot.docs) {
+      const d = doc.data() || {};
+      // active:false olan eski/pasif kayıtlar BIST'te işlem görüyor kabul edilmez.
+      if (d.active === false) continue;
+      const symbol = String(d.symbol || doc.id || '').trim().toUpperCase();
+      if (symbol) symbolSet.add(symbol);
+    }
+    console.log(`loadBistSymbols: ${symbolSet.size} aktif sembol yüklendi`);
     return symbolSet;
   } catch (err) {
     console.warn('loadBistSymbols hatası (boş Set ile devam):', err.message);
@@ -995,75 +1028,117 @@ async function fetchHalkArzItems(bistSymbols) {
  * bistSymbols: BIST'te aktif olan semboller; bunlar her zaman trading yapılır.
  */
 async function reconcileStaleIpoStatuses(bistSymbols) {
-  const now = new Date();
   const snapshot = await db.collection('ipo_items').get();
   if (snapshot.empty) return 0;
 
-  const stale = [];
+  const updates = [];
   for (const doc of snapshot.docs) {
-    const d = doc.data();
-    if (d.status === 'trading') continue; // Zaten doğru
+    const d = doc.data() || {};
+    if (d.status === 'archived') continue;
 
-    // BIST'te listelenmiş hisse → trading
-    if (d.symbol && bistSymbols instanceof Set && bistSymbols.has(d.symbol.toUpperCase())) {
-      stale.push({ ref: doc.ref, status: 'trading' });
-      continue;
-    }
+    const requestStart = d.requestStart ? new Date(d.requestStart) : null;
+    const requestEnd   = d.requestEnd   ? new Date(d.requestEnd)   : null;
+    const listingDate  = d.listingDate  ? new Date(d.listingDate)  : null;
+    const validStart   = requestStart && !isNaN(requestStart) ? requestStart : null;
+    const validEnd     = requestEnd   && !isNaN(requestEnd)   ? requestEnd   : null;
+    const validListing = listingDate  && !isNaN(listingDate)  ? listingDate  : null;
 
-    // listingDate geçtiyse → trading
-    if (d.listingDate) {
-      const ld = new Date(d.listingDate);
-      if (!isNaN(ld) && ld <= now) {
-        stale.push({ ref: doc.ref, status: 'trading' });
-        continue;
-      }
-    }
+    const status = computeIpoStatus({
+      requestStart: validStart,
+      requestEnd:   validEnd,
+      listingDate:  validListing,
+      symbol:       d.symbol || '',
+      bistSymbols,
+    });
 
-    // requestEnd geçtiyse ve listingDate yoksa → pending_listing
-    if (d.requestEnd && !d.listingDate && d.status !== 'pending_listing') {
-      const re = new Date(d.requestEnd);
-      if (!isNaN(re)) {
-        const endOfDay = new Date(re.getFullYear(), re.getMonth(), re.getDate(), 23, 59, 59);
-        if (now > endOfDay) stale.push({ ref: doc.ref, status: 'pending_listing' });
-      }
+    if (status !== d.status) {
+      updates.push({ ref: doc.ref, status });
     }
   }
 
-  if (!stale.length) return 0;
+  if (!updates.length) return 0;
 
-  // Batch güncelle
   let updated = 0;
-  for (let i = 0; i < stale.length; i += 400) {
+  for (let i = 0; i < updates.length; i += 400) {
     const batch = db.batch();
-    for (const { ref, status } of stale.slice(i, i + 400)) {
-      batch.update(ref, { status, updatedAt: FieldValue.serverTimestamp() });
+    const chunk = updates.slice(i, i + 400);
+    for (const { ref, status } of chunk) {
+      batch.update(ref, {
+        status,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
     await batch.commit();
-    updated += Math.min(400, stale.length - i);
+    updated += chunk.length;
   }
 
-  console.log(`IPO reconcile: ${updated} kaydın statüsü güncellendi`);
+  console.log(`IPO reconcile: ${updated} kayıt güncellendi`);
   return updated;
 }
 
 /**
+ * Başarılı bir HalkArz feed'inden sonra Firestore'da artık kaynakta bulunmayan
+ * eski IPO kayıtlarını arşivler. Silmez; veri kaybını önlemek için status=archived
+ * yapar. Flutter tarafındaki aktif IPO sorguları bu statüyü göstermemelidir.
+ */
+async function archiveIpoItemsNotInFeed(items) {
+  if (!items.length) return 0;
+
+  const liveKeys = new Set();
+  for (const item of items) {
+    const key = item.symbol
+      ? item.symbol.toUpperCase()
+      : `NO_SYMBOL_${String(item.companyName || '').replace(/\s+/g, '_').substring(0, 30)}`;
+    liveKeys.add(key);
+  }
+
+  const snapshot = await db.collection('ipo_items').get();
+  if (snapshot.empty) return 0;
+
+  const archive = [];
+  for (const doc of snapshot.docs) {
+    if (liveKeys.has(doc.id)) continue;
+    const d = doc.data() || {};
+    if (d.status === 'archived') continue;
+    archive.push(doc.ref);
+  }
+
+  let archived = 0;
+  for (let i = 0; i < archive.length; i += 400) {
+    const chunk = archive.slice(i, i + 400);
+    const batch = db.batch();
+    for (const ref of chunk) {
+      batch.update(ref, {
+        status: 'archived',
+        archivedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    archived += chunk.length;
+  }
+
+  if (archived) console.log(`IPO prune: ${archived} eski kayıt archived yapıldı`);
+  return archived;
+}
+
+/**
  * Yeni çekilen kayıtları Firestore'a yazar.
- * Öncelik sırası: trading > pending_listing > collecting > upcoming
- * Aynı sembol için daha yüksek öncelikli statü kazanır.
- * Mevcut Firestore'da 'trading' olan kayıt, HalkArz'dan daha düşük statü gelse bile korunur.
+ * Aynı sembol için tek kayıt tutulur. Eski Firestore status'u artık korunmaz;
+ * status her sync'te güncel tarih + aktif BIST listesine göre yeniden hesaplanır.
  */
 async function writeIpoToFirestore(items, bistSymbols) {
   if (!items.length) return 0;
-  const PRI = { trading: 4, pending_listing: 3, collecting: 2, upcoming: 1 };
+  const PRI = { trading: 4, pending_listing: 3, collecting: 2, upcoming: 1, archived: 0 };
   const deduped = new Map();
 
   for (const item of items) {
     const key = item.symbol
       ? item.symbol.toUpperCase()
-      : `NO_SYMBOL_${item.companyName.replace(/\s+/g, '_').substring(0, 30)}`;
+      : `NO_SYMBOL_${String(item.companyName || '').replace(/\s+/g, '_').substring(0, 30)}`;
     const ex = deduped.get(key);
     if (!ex) { deduped.set(key, item); continue; }
-    const ep = PRI[ex.status]   || 0;
+    const ep = PRI[ex.status] || 0;
     const np = PRI[item.status] || 0;
     if (np > ep || (np === ep && (item.publishedAt || '') > (ex.publishedAt || ''))) {
       deduped.set(key, item);
@@ -1071,58 +1146,54 @@ async function writeIpoToFirestore(items, bistSymbols) {
   }
 
   const entries = [...deduped.entries()];
-
-  // Mevcut Firestore durumlarını oku (trading koruması için)
-  let existingStatuses = new Map();
-  try {
-    const refs = entries.map(([docId]) => db.collection('ipo_items').doc(docId));
-    if (refs.length > 0) {
-      // db.getAll 500 limit — chunk'a böl
-      for (let i = 0; i < refs.length; i += 400) {
-        const chunk = refs.slice(i, i + 400);
-        const snaps = await db.getAll(...chunk);
-        for (const snap of snaps) {
-          if (snap.exists) {
-            existingStatuses.set(snap.id, snap.data().status || null);
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('writeIpoToFirestore: mevcut statüler okunamadı, trading koruması devre dışı:', err.message);
-  }
+  const feedSeenAt = new Date().toISOString();
 
   let written = 0;
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db.batch();
-    for (const [docId, item] of entries.slice(i, i + 400)) {
+    const chunk = entries.slice(i, i + 400);
+
+    for (const [docId, item] of chunk) {
       let finalStatus = item.status;
 
-      // Kural 1: Firestore'da zaten trading varsa koru
-      if (existingStatuses.get(docId) === 'trading') {
-        finalStatus = 'trading';
-      }
-      // Kural 2: BIST'te aktif sembol → trading
-      if (item.symbol && bistSymbols instanceof Set && bistSymbols.has(item.symbol.toUpperCase())) {
-        finalStatus = 'trading';
+      // BIST kontrolü yalnızca güncel IPO dönemi için computeIpoStatus'ta yapılır.
+      if (item.symbol && bistSymbols instanceof Set) {
+        const symbol = item.symbol.toUpperCase();
+        const requestEnd = item.requestEnd ? new Date(item.requestEnd) : null;
+        const listingDate = item.listingDate ? new Date(item.listingDate) : null;
+        if (requestEnd && !isNaN(requestEnd) && requestEnd <= new Date()) {
+          finalStatus = computeIpoStatus({
+            requestStart: item.requestStart ? new Date(item.requestStart) : null,
+            requestEnd,
+            listingDate: listingDate && !isNaN(listingDate) ? listingDate : null,
+            symbol,
+            bistSymbols,
+          });
+        }
       }
 
       batch.set(
         db.collection('ipo_items').doc(docId),
-        { ...item, status: finalStatus, updatedAt: FieldValue.serverTimestamp() },
+        {
+          ...item,
+          status: finalStatus,
+          feedSeenAt,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
         { merge: true },
       );
     }
+
     await batch.commit();
-    written += Math.min(400, entries.length - i);
+    written += chunk.length;
   }
 
   await db.collection('ipo_meta').doc('feed').set({
     lastUpdated:  FieldValue.serverTimestamp(),
     itemCount:    written,
     source:       'HalkArz',
-    lastSyncedAt: new Date().toISOString(),
-  });
+    lastSyncedAt: feedSeenAt,
+  }, { merge: true });
 
   return written;
 }
@@ -1142,11 +1213,14 @@ exports.syncIpoFeed = onSchedule({
     // 2. HalkArz'dan taze veriyi çek (BIST kontrolüyle)
     const items = await fetchHalkArzItems(bistSymbols);
     if (!items.length) { console.warn('HalkArz: kayıt bulunamadı'); return; }
-    // 3. Yaz (mevcut trading korumalı)
+    // 3. Yaz
     const count = await writeIpoToFirestore(items, bistSymbols);
-    // 4. Reconcile — HalkArz'ın üzerine yazmasından sonra uygula (kalıcı olur)
+    // 4. Tarihi geçmiş kayıtları yeniden sınıflandır
     const reconciled = await reconcileStaleIpoStatuses(bistSymbols);
-    console.log(`IPO sync tamamlandı: ${count} kayıt, ${reconciled} reconcile`);
+    // 5. Feed çok küçükse scraper hatası ihtimaline karşı eski kayıtları silme.
+    const archived = items.length >= 5 ? await archiveIpoItemsNotInFeed(items) : 0;
+    if (items.length < 5) console.warn(`IPO prune atlandı: yalnızca ${items.length} kaynak kaydı geldi.`);
+    console.log(`IPO sync tamamlandı: ${count} kayıt, ${reconciled} reconcile, ${archived} archived`);
   } catch (err) {
     console.error('IPO sync hatası:', err.message);
     throw err;
@@ -1168,11 +1242,18 @@ exports.syncIpoManual = onRequest({
     const bistSymbols = await loadBistSymbols();
     // 2. HalkArz'dan veriyi çek (BIST kontrolüyle)
     const items  = await fetchHalkArzItems(bistSymbols);
-    // 3. Yaz (mevcut trading korumalı)
+    if (!items.length) {
+      res.status(502).json({ success: false, error: 'HalkArz kaynağından kayıt alınamadı; Firestore temizliği yapılmadı.' });
+      return;
+    }
+    // 3. Yaz
     const count  = await writeIpoToFirestore(items, bistSymbols);
-    // 4. Reconcile — yazmadan sonra uygula
+    // 4. Tarihi geçmiş kayıtları yeniden sınıflandır
     const reconciled = await reconcileStaleIpoStatuses(bistSymbols);
-    res.json({ success: true, count, reconciled });
+    // 5. Feed çok küçükse scraper hatası ihtimaline karşı eski kayıtları silme.
+    const archived = items.length >= 5 ? await archiveIpoItemsNotInFeed(items) : 0;
+    if (items.length < 5) console.warn(`IPO prune atlandı: yalnızca ${items.length} kaynak kaydı geldi.`);
+    res.json({ success: true, count, reconciled, archived });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2499,6 +2580,180 @@ exports.syncBist100Manual = onRequest({
     const result = await runBist100Sync({ dryRun });
     res.json({ success: true, dryRun, ...result });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIST STOCKS TAM LİSTE SYNC — kap_members → bist_stocks
+//
+// Kaynak: kap_members koleksiyonu (syncMembers() tarafından güncellenir)
+// Amaç:   bist_stocks koleksiyonunu tüm aktif BIST sembollerinin ana listesi
+//         haline getirmek.
+//
+// Kurallar:
+//   - Sadece stockCode dolu olan kap_members kayıtları işlenir
+//   - bist100Member alanına DOKUNULMAZ
+//   - kap_members'ta olmayan mevcut bist_stocks kayıtları active:false yapılır
+//   - Semboller BÜYÜK HARF + trim ile normalize edilir
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.syncBistStocksFull = onRequest({
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [ADMIN_SECRET],
+}, async (req, res) => {
+  // ── Admin doğrulama ────────────────────────────────────────────────────────
+  const adminSecret = ADMIN_SECRET.value().trim();
+  const provided    = (
+    (req.headers['x-admin-secret'] || '') ||
+    (req.query.secret || '')
+  ).trim();
+
+  if (!adminSecret || provided !== adminSecret) {
+    res.status(403).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    // ── 1. kap_members'tan stockCode'u dolu kayıtları oku ──────────────────
+    console.log('syncBistStocksFull: kap_members okunuyor...');
+    const kapSnap = await db.collection('kap_members').get();
+    const totalKapMembers = kapSnap.size;
+    console.log(`syncBistStocksFull: ${totalKapMembers} kap_members kaydı bulundu`);
+
+    // stockCode dolu olanları normalize et; Map ile duplicate'leri temizle
+    // (aynı sembol birden fazla kayıtta olabilir — son title kazanır)
+    const kapSymbolMap = new Map(); // SYMBOL → { name }
+    for (const doc of kapSnap.docs) {
+      const d = doc.data();
+      const raw = d.stockCode;
+      if (!raw || typeof raw !== 'string' || raw.trim() === '') continue;
+      const symbol = raw.toUpperCase().trim();
+      if (!symbol) continue;
+      const name = (d.title || '').trim() || symbol;
+      kapSymbolMap.set(symbol, { name });
+    }
+    const validStockCodes = kapSymbolMap.size;
+    console.log(`syncBistStocksFull: ${validStockCodes} geçerli sembol (boş stockCode'lar hariç)`);
+
+    // ── 2. Mevcut bist_stocks koleksiyonunu oku ────────────────────────────
+    console.log('syncBistStocksFull: mevcut bist_stocks okunuyor...');
+    const bistSnap = await db.collection('bist_stocks').get();
+    const existingSymbols = new Map(); // SYMBOL (normalize) → docData
+    for (const doc of bistSnap.docs) {
+      // doc.id normalize edilerek Map'e ekleniyor; boşluk/büyük-küçük harf
+      // farkından kaynaklanan kaçan eşleşmeleri önler.
+      existingSymbols.set(doc.id.trim().toUpperCase(), doc.data());
+    }
+    console.log(`syncBistStocksFull: ${existingSymbols.size} mevcut bist_stocks kaydı`);
+
+    // ── 3. İşlemleri hesapla ───────────────────────────────────────────────
+    const toUpsert   = []; // { symbol, name, isNew }
+    const toDeactivate = []; // symbol
+
+    for (const [symbol, { name }] of kapSymbolMap) {
+      const existing = existingSymbols.get(symbol);
+      toUpsert.push({ symbol, name, isNew: !existing });
+    }
+
+    for (const [symbol, data] of existingSymbols) {
+      if (!kapSymbolMap.has(symbol)) {
+        // bist100Member === true olan kayıtlar KORUNUR — asla pasifleştirilmez.
+        // MKK listesinde görünmeseler bile BIST100 statüsü bu fonksiyonun
+        // yetkisi dışındadır.
+        if (data.bist100Member === true) continue;
+        toDeactivate.push(symbol);
+      }
+    }
+
+    const addedSymbols       = toUpsert.filter(x => x.isNew).map(x => x.symbol);
+    const updatedSymbols     = toUpsert.filter(x => !x.isNew).map(x => x.symbol);
+    const deactivatedSymbols = toDeactivate;
+
+    console.log(`syncBistStocksFull: eklenecek=${addedSymbols.length}, güncellenecek=${updatedSymbols.length}, pasifleştirilecek=${deactivatedSymbols.length}`);
+
+    // ── 4. Batch write ─────────────────────────────────────────────────────
+    const BATCH_SIZE = 400;
+
+    // 4a. Upsert (kap_members'ta olan tüm semboller)
+    for (let i = 0; i < toUpsert.length; i += BATCH_SIZE) {
+      const chunk = toUpsert.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      for (const { symbol, name } of chunk) {
+        const ref = db.collection('bist_stocks').doc(symbol);
+        // bist100Member alanına DOKUNMA — merge:true ile sadece aşağıdaki alanları yaz
+        batch.set(ref, {
+          symbol,
+          name,
+          active:       true,
+          updatedAt:    FieldValue.serverTimestamp(),
+          lastSeenAt:   FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+      console.log(`syncBistStocksFull: upsert batch ${Math.floor(i / BATCH_SIZE) + 1} tamamlandı (${chunk.length} kayıt)`);
+    }
+
+    // 4b. Pasifleştir (kap_members'ta olmayan mevcut semboller)
+    for (let i = 0; i < deactivatedSymbols.length; i += BATCH_SIZE) {
+      const chunk = deactivatedSymbols.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      for (const symbol of chunk) {
+        const ref = db.collection('bist_stocks').doc(symbol);
+        // Sadece active:false yaz — bist100Member ve diğer alanlara DOKUNMA
+        batch.set(ref, {
+          active:    false,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+      console.log(`syncBistStocksFull: deactivate batch ${Math.floor(i / BATCH_SIZE) + 1} tamamlandı (${chunk.length} kayıt)`);
+    }
+
+    // ── 5. Sonuç istatistikleri ────────────────────────────────────────────
+    // Aktif/pasif sayıyı hesapla (yaklaşık — batch commit sonrası okumak yerine
+    // hesaplayarak dön; daha hızlı ve yeterince güvenilir)
+    const existingActiveCount   = [...existingSymbols.values()].filter(d => d.active !== false).length;
+    const finalActiveCount      = validStockCodes; // kap_members'ta olan hepsi active:true
+    const finalInactiveCount    = existingSymbols.size - validStockCodes + deactivatedSymbols.length > 0
+      ? (existingSymbols.size > validStockCodes ? existingSymbols.size - validStockCodes : deactivatedSymbols.length)
+      : deactivatedSymbols.length;
+
+    // Cevap boyutunu kontrol et — fazla büyükse sembol listelerini kırp
+    const MAX_SYMBOLS_IN_RESPONSE = 20;
+
+    const result = {
+      success:          true,
+      source:           'kap_members',
+      totalKapMembers,
+      validStockCodes,
+      added:            addedSymbols.length,
+      updated:          updatedSymbols.length,
+      deactivated:      deactivatedSymbols.length,
+      activeCount:      finalActiveCount,
+      inactiveCount:    deactivatedSymbols.length,
+      addedSymbols:     addedSymbols.length <= MAX_SYMBOLS_IN_RESPONSE
+                          ? addedSymbols
+                          : [...addedSymbols.slice(0, MAX_SYMBOLS_IN_RESPONSE), `... (+${addedSymbols.length - MAX_SYMBOLS_IN_RESPONSE} more)`],
+      deactivatedSymbols: deactivatedSymbols.length <= MAX_SYMBOLS_IN_RESPONSE
+                          ? deactivatedSymbols
+                          : [...deactivatedSymbols.slice(0, MAX_SYMBOLS_IN_RESPONSE), `... (+${deactivatedSymbols.length - MAX_SYMBOLS_IN_RESPONSE} more)`],
+    };
+
+    console.log('syncBistStocksFull tamamlandı:', JSON.stringify({
+      totalKapMembers,
+      validStockCodes,
+      added:       addedSymbols.length,
+      updated:     updatedSymbols.length,
+      deactivated: deactivatedSymbols.length,
+    }));
+
+    res.json(result);
+
+  } catch (err) {
+    console.error('syncBistStocksFull hatası:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

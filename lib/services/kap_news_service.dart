@@ -389,15 +389,26 @@ class KapNewsService {
     if (item.url.isNotEmpty) {
       return 'URL:${item.url}';
     }
-    // 3. Fallback: şirket + temizlenmiş başlık + bildirim türü + zaman
+    // 3. Fallback: şirket + normalleştirilmiş başlık + bildirim türü
+    //    Başlıktan dinamik zaman ön ekini sil: "18 Saat Önce ...", "13 Dakika Önce ..."
+    //    Bu ön ek her snapshot'ta değiştiğinden aynı haber farklı anahtar üretirdi.
     final company = item.source.trim().toUpperCase();
-    final title = item.cleanTitle
+    final rawTitle = item.cleanTitle
         .toUpperCase()
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+    final normalizedTitle = rawTitle
+        .replaceFirst(
+          RegExp(
+            r'^\d+\s+(SAAT|DAKİKA|GÜN|HOUR|MINUTE|DAY|HOURS|MINUTES|DAYS)'
+            r'(\s+(ÖNCE|AGO))?\s*',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
     final type = (item.disclosureType ?? '').toUpperCase();
-    final time = _normalizeTime(item.time);
-    return '$company|$title|$type|$time';
+    return '$company|$normalizedTitle|$type';
   }
 
   static String _normalizeTime(String value) {
