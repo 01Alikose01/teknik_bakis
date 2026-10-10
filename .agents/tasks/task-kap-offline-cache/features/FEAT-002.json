@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "news_screen.dart'ı offline cache'den yükleme ve 'Çevrimdışı' etiket gösterimi için güncelle. FEAT-001'e bağımlıdır (KapNewsItem.fromJson ve KapDisclosureService.loadCached mevcut olmalı).",
+  "status": "completed",
+  "steps": [
+    "1. lib/screens/news_screen.dart dosyasında _NewsScreenState sınıfına iki yeni field ekle: 'bool _isOffline = false;' ve 'bool _loadedFromCache = false;'.",
+    "2. _loadKap() metodunu şu mantıkla yeniden yaz: (a) try bloğu aynı kalır — KapDisclosureService.fetchLatest() çağır, sonra KapNewsService.fetch() fallback'ı; (b) başarılı fetch sonrası setState'de _isOffline = false ve _loadedFromCache = false ata; (c) catch bloğunda (her türlü exception — SocketException, TimeoutException, FirebaseException dahil) KapDisclosureService.loadCached() çağır; boş değilse KapNewsService.dedupe() üzerinden geçirip setState ile _kapNews'e ata, _isOffline = true ve _loadedFromCache = true ata; boşsa mevcut _kapNews'i koru ve _isOffline = true ata (yani _loadingKap = false yap, listeyi değiştirme — kullanıcı boş liste görmek yerine bir önceki yüklemeyi görür); (d) _loadingKap = false her durumda ata.",
+    "3. _buildKapList() içindeki Column'a, _isOffline == true olduğunda Padding içinde 'Çevrimdışı • Önbellek' etiketini göster: mevcut bildirim sayısı satırının (history icon + 'Son X bildirimi gösteriliyor') hemen üstüne ekle. Widget: Row içinde Icon(Icons.wifi_off, size: 13, color: Colors.orange) ve Text('Çevrimdışı • Önbellek', style: bodySmall.copyWith(color: Colors.orange, fontSize: 11)). Padding: const EdgeInsets.fromLTRB(16, 0, 16, 4).",
+    "4. İnitState veya _loadAll() üzerinde herhangi bir değişiklik yapma — mevcut 90 saniye timer ve _loadAll() çağrısı olduğu gibi çalışmaya devam etmeli; internet gelince tekrar fetchLatest() başarılı olacak ve _isOffline false'a dönecek.",
+    "5. news_screen.dart başına 'import package:shared_preferences/shared_preferences.dart' EKLEme — KapDisclosureService.loadCached() zaten shared_preferences'ı içeride yönetir, screen seviyesinde import gerekmez."
+  ],
+  "acceptance_criteria": [
+    "İnternet varken _isOffline == false, Çevrimdışı etiketi görünmez.",
+    "Fetch başarısız olduğunda (exception) ve cache doluysa: _kapNews cache verisiyle dolar, _isOffline == true, ekranda turuncu 'Çevrimdışı • Önbellek' etiketi görünür.",
+    "Fetch başarısız olduğunda ve cache boşsa: _kapNews değişmez (önceki değer korunur), _isOffline == true.",
+    "Sonraki başarılı fetch'te _isOffline false'a döner ve etiket kaybolur.",
+    "_buildBorsaList() ve KapAiListScreen tamamen dokunulmadan kalır.",
+    "flutter analyze hata vermez."
+  ],
+  "verification": [
+    "flutter analyze — 0 hata",
+    "flutter build apk --debug — başarıyla tamamlanır"
+  ],
+  "blocked_reason": null,
+  "findings": "news_screen.dart'a _isOffline ve _loadedFromCache alanları eklendi. _loadKap() catch bloğu KapDisclosureService.loadCached() çağırır; cache doluysa dedupe'dan geçirir ve _isOffline=true ile setState yapar, boşsa mevcut listeyi korur. _buildKapList() içine turuncu wifi_off simgesi ile 'Çevrimdışı • Önbellek' etiketi eklendi. flutter analyze: news_screen.dart'ta hata yok (270 issue tümü pre-existing info/warning). flutter build apk --debug: BUILD_EXIT:0, APK üretildi."
+}

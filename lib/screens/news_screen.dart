@@ -24,6 +24,8 @@ class _NewsScreenState extends State<NewsScreen>
   List<BorsaNewsItem> _borsaNews = [];
   bool _loadingKap = false;
   bool _loadingBorsa = false;
+  bool _isOffline = false;
+  bool _loadedFromCache = false;
   Timer? _refreshTimer;
   DateTime? _lastUpdated;
 
@@ -77,20 +79,39 @@ class _NewsScreenState extends State<NewsScreen>
       if (mounted) {
         setState(() {
           _kapNews = deduped;
+          _isOffline = false;
+          _loadedFromCache = false;
           _loadingKap = false;
         });
       }
     } catch (_) {
+      // İnternet yoksa veya Firestore erişilemezse önbellekten yükle
       try {
-        final deduped = KapNewsService.dedupe(await KapNewsService.fetch());
+        final cached = await KapDisclosureService.loadCached();
+        if (mounted) {
+          if (cached.isNotEmpty) {
+            final deduped = KapNewsService.dedupe(cached);
+            setState(() {
+              _kapNews = deduped;
+              _isOffline = true;
+              _loadedFromCache = true;
+              _loadingKap = false;
+            });
+          } else {
+            // Önbellek boşsa mevcut listeyi koru, sadece offline işaretle
+            setState(() {
+              _isOffline = true;
+              _loadingKap = false;
+            });
+          }
+        }
+      } catch (_) {
         if (mounted) {
           setState(() {
-            _kapNews = deduped;
+            _isOffline = true;
             _loadingKap = false;
           });
         }
-      } catch (_) {
-        if (mounted) setState(() => _loadingKap = false);
       }
     }
   }
@@ -233,6 +254,21 @@ class _NewsScreenState extends State<NewsScreen>
       onRefresh: _loadKap,
       child: Column(
         children: [
+          if (_isOffline)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off, size: 13, color: Colors.orange),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Çevrimdışı • Önbellek',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.orange, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
           if (_kapNews.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
