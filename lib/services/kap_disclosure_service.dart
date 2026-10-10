@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/kap_news_item.dart';
 import 'kap_news_service.dart';
 
@@ -15,6 +19,9 @@ import 'kap_news_service.dart';
 class KapDisclosureService {
   static final _db = FirebaseFirestore.instance;
 
+  // Persistent cache key (shared_preferences)
+  static const String _kPrefKey = 'kap_disclosures_cache';
+
   // In-memory cache — aynı seansta Firestore'u tekrar yüklemeyi önler
   // TTL: 3 dakika — Cloud Function 15dk'da bir sync yaptığı için
   // kullanıcı en fazla 3dk gecikmeli veri görür (açılışta 5dk sync = maks 8dk)
@@ -22,6 +29,29 @@ class KapDisclosureService {
   static const Duration _cacheTtl = Duration(minutes: 3);
 
   static DateTime? _lastSyncTime;
+
+  // ── Persistent cache (shared_preferences) ───────────────────────────────
+
+  static Future<void> _persistCache(List<KapNewsItem> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = items.map((e) => jsonEncode(e.toJson())).toList();
+      await prefs.setStringList(_kPrefKey, encoded);
+    } catch (_) {}
+  }
+
+  static Future<List<KapNewsItem>> loadCached() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_kPrefKey);
+      if (raw == null || raw.isEmpty) return [];
+      return raw
+          .map((s) => KapNewsItem.fromJson(jsonDecode(s) as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
   // ── Son sync zamanını al ──────────────────────────────────────────────────
 
@@ -68,6 +98,7 @@ class KapDisclosureService {
         items: items,
         fetchedAt: DateTime.now(),
       );
+      unawaited(_persistCache(items));
       return items;
     } catch (_) {
       return cached?.items ?? [];
