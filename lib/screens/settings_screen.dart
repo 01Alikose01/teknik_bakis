@@ -105,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _SettingsItem(
                       title: 'Sürüm',
-                      trailing: const Text('1.0.0', style: TextStyle(color: Colors.grey)),
+                      trailing: const Text('1.1.0', style: TextStyle(color: Colors.grey)),
                     ),
                     _SettingsItem(
                       title: 'Uygulamayı Değerlendir',
@@ -249,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Teknik Bakış Hakkında'),
         content: const Text(
             'Teknik Bakış, BIST hisselerini teknik analiz göstergeleriyle tarayan ve yatırım kararlarınızı destekleyen bir mobil uygulamadır.\n\n'
-            'Sürüm: 1.0.0\n'
+            'Sürüm: 1.1.0\n'
             'Bu uygulama yatırım tavsiyesi niteliği taşımaz.'),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Kapat'))],
       ),
