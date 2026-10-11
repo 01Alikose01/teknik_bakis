@@ -2516,3 +2516,286 @@ exports.syncBist100Manual = onRequest({
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// =============================================================================
+// BİST STOCKS META SYNC
+// bist_stocks koleksiyonunu kap_members ile senkronize eder:
+//   - Yeni halka arzları ekler (active: true)
+//   - İsim değiştiren hisseleri günceller (sadece name, active dokunulmaz)
+//   - Borsa'dan silinen hisseleri işaretler (active: false)
+// =============================================================================
+
+/**
+ * Yahoo Finance v8 chart API üzerinden sembolün aktif işlem görüp görmediğini kontrol eder.
+ * @param {string} symbol — BİST sembolü (örn. 'GARAN')
+ * @returns {Promise<boolean|null>} true → aktif, false → delisted/bulunamadı, null → belirsiz hata
+ */
+async function fetchYahooStatus(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.IS`;
+  return new Promise((resolve) => {
+    const req = https.get(url, {
+      headers: { 'User-Agent': 'TeknikBakis-Backend/1.0', 'Accept': 'application/json' },
+      timeout: 10000,
+    }, (res) => {
+      if (res.statusCode === 404) {
+        res.resume(); // tüketmeden geç
+        return resolve(false);
+      }
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          const meta   = parsed &&
+                         parsed.chart &&
+                         parsed.chart.result &&
+                         parsed.chart.result[0] &&
+                         parsed.chart.result[0].meta;
+          if (!meta) return resolve(false);
+          const price = meta.regularMarketPrice;
+          resolve(price !== null && price !== undefined ? true : false);
+        } catch (_) {
+          resolve(null); // JSON parse hatası → belirsiz
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+/**
+ * kap_members koleksiyonundan stockCode → title haritası oluşturur.
+ * @returns {Promise<Map<string, string>>} stockCode (uppercase) → title
+ */
+async function buildKapSymbolMap() {
+  const snapshot = await db.collection('kap_members').get();
+  const map = new Map();
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    const stockCode = (data.stockCode || '').toUpperCase();
+    if (stockCode !== '') {
+      map.set(stockCode, data.title || '');
+    }
+  });
+  return map;
+}
+
+/**
+ * bist_stocks koleksiyonunu kap_members ile senkronize eder.
+ * @param {{ dryRun?: boolean }} options
+ * @returns {Promise<{ status: string, added: number, nameUpdated: number, delisted: number }>}
+ */
+async function runBistStocksMetaSync({ dryRun = false } = {}) {
+  console.log('BIST_STOCKS_SYNC_STARTED', new Date().toISOString());
+
+  // ── A. KAP sembol haritasını al ───────────────────────────────────────────
+  const kapMap = await buildKapSymbolMap();
+  console.log('BIST_STOCKS_KAP_MAP:', kapMap.size, 'sembol');
+
+  // ── B. Mevcut bist_stocks dokümanlarını al (active filtresi yok) ──────────
+  const snapshot = await db.collection('bist_stocks').get();
+
+  const existingSymbols = new Set(snapshot.docs.map(d => d.id.toUpperCase()));
+  const existingNames   = new Map(snapshot.docs.map(d => [d.id.toUpperCase(), d.data().name || '']));
+
+  // ── C. Üç değişim listesi ─────────────────────────────────────────────────
+
+  // Yeni eklenecekler: KAP'ta var, bist_stocks'ta yok
+  const toAdd = [];
+  for (const [symbol] of kapMap) {
+    if (!existingSymbols.has(symbol)) {
+      toAdd.push(symbol);
+    }
+  }
+
+  // İsim güncellenecekler: bist_stocks'ta var, KAP title farklı (boş title atla)
+  const toUpdateName = [];
+  for (const [symbol] of kapMap) {
+    if (existingSymbols.has(symbol)) {
+      const kapTitle  = kapMap.get(symbol);
+      const existing  = existingNames.get(symbol);
+      if (kapTitle && kapTitle !== existing) {
+        toUpdateName.push(symbol);
+      }
+    }
+  }
+
+  // Delisting adayları: bist_stocks'ta var (active:true), KAP'ta yok
+  const toCheckDelisted = [];
+  for (const [symbol, data] of snapshot.docs.map(d => [d.id.toUpperCase(), d.data()])) {
+    if (!kapMap.has(symbol) && data.active === true) {
+      toCheckDelisted.push(symbol);
+    }
+  }
+
+  // ── D. Yahoo Finance ile delisting doğrulama ──────────────────────────────
+  const toDelisted = [];
+  for (const symbol of toCheckDelisted) {
+    const status = await fetchYahooStatus(symbol);
+    if (status === false) {
+      toDelisted.push(symbol); // kesinlikle delisted
+    }
+    // true veya null → atla (aktif veya belirsiz)
+  }
+
+  // ── E. Dry-run ise Firestore'a yazma ─────────────────────────────────────
+  if (dryRun) {
+    return {
+      status:    'dry_run',
+      toAdd:     toAdd.length,
+      nameUpdated: toUpdateName.length,
+      delisted:  toDelisted.length,
+      symbols:   { toAdd, toUpdateName, toDelisted },
+    };
+  }
+
+  // ── F. Gerçek yazma — 400 ops limitli batch'ler ──────────────────────────
+  const OPS_LIMIT = 400;
+  let batch    = db.batch();
+  let opsCount = 0;
+
+  async function flushBatch() {
+    if (opsCount > 0) {
+      await batch.commit();
+      batch    = db.batch();
+      opsCount = 0;
+    }
+  }
+
+  // Yeni semboller: active: true ile oluştur
+  for (const symbol of toAdd) {
+    const ref = db.collection('bist_stocks').doc(symbol);
+    batch.set(ref, { symbol, name: kapMap.get(symbol), active: true }, { merge: false });
+    opsCount++;
+    if (opsCount >= OPS_LIMIT) await flushBatch();
+  }
+
+  // İsim güncellemeleri: sadece name — active alanına DOKUNMA
+  for (const symbol of toUpdateName) {
+    const ref = db.collection('bist_stocks').doc(symbol);
+    batch.set(ref, { name: kapMap.get(symbol) }, { merge: true });
+    opsCount++;
+    if (opsCount >= OPS_LIMIT) await flushBatch();
+  }
+
+  // Delisted: active: false + meta
+  for (const symbol of toDelisted) {
+    const ref = db.collection('bist_stocks').doc(symbol);
+    batch.set(ref, {
+      active:        false,
+      delistedAt:    FieldValue.serverTimestamp(),
+      delistReason:  'kap_not_found',
+    }, { merge: true });
+    opsCount++;
+    if (opsCount >= OPS_LIMIT) await flushBatch();
+  }
+
+  await flushBatch();
+
+  console.log('BIST_STOCKS_SYNC:', { added: toAdd.length, nameUpdated: toUpdateName.length, delisted: toDelisted.length });
+  return { status: 'completed', added: toAdd.length, nameUpdated: toUpdateName.length, delisted: toDelisted.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULED — Her Çarşamba 03:00 UTC
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.syncBistStocksMeta = onSchedule({
+  schedule:       '0 3 * * 3',
+  timeZone:       'UTC',
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+}, async (_context) => {
+  try {
+    await runBistStocksMetaSync({ dryRun: false });
+  } catch (err) {
+    console.error('syncBistStocksMeta hatası:', err.message);
+    throw err;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MANUEL — Admin korumalı, ?dryRun ve ?bootstrap destekli
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.syncBistStocksManual = onRequest({
+  region:         'europe-west1',
+  memory:         '512MiB',
+  timeoutSeconds: 300,
+  secrets:        [ADMIN_SECRET],
+}, async (req, res) => {
+  // Admin doğrulama
+  const adminSecret = ADMIN_SECRET.value().trim();
+  const provided    = (
+    (req.headers['x-admin-secret'] || '') ||
+    (req.query.secret || '')
+  ).trim();
+
+  if (!adminSecret || provided !== adminSecret) {
+    res.status(403).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const dryRun        = req.query.dryRun    === 'true' || req.query.dryRun    === '1';
+  const bootstrapMode = req.query.bootstrap === 'true' || req.query.bootstrap === '1';
+
+  // ── Bootstrap modu: bist_stocks koleksiyonu boşken tüm KAP sembollerini yükler
+  if (bootstrapMode) {
+    try {
+      // Mevcut doküman sayısını kontrol et
+      const existing = await db.collection('bist_stocks').listDocuments();
+      if (existing.length >= 500) {
+        res.status(409).json({
+          error: 'Bootstrap reddedildi: bist_stocks koleksiyonunda zaten ≥500 kayıt var.',
+          existingCount: existing.length,
+        });
+        return;
+      }
+
+      const kapMap = await buildKapSymbolMap();
+      const n      = kapMap.size;
+
+      if (dryRun) {
+        res.json({ success: true, mode: 'bootstrap', dryRun: true, symbolCount: n });
+        return;
+      }
+
+      // Tüm sembolleri batch ile yaz (merge: true — mevcut alanları koru)
+      const OPS_LIMIT = 400;
+      let batch    = db.batch();
+      let opsCount = 0;
+
+      async function flushBootstrapBatch() {
+        if (opsCount > 0) {
+          await batch.commit();
+          batch    = db.batch();
+          opsCount = 0;
+        }
+      }
+
+      for (const [symbol, name] of kapMap) {
+        const ref = db.collection('bist_stocks').doc(symbol);
+        batch.set(ref, { symbol, name, active: true }, { merge: true });
+        opsCount++;
+        if (opsCount >= OPS_LIMIT) await flushBootstrapBatch();
+      }
+      await flushBootstrapBatch();
+
+      console.log('BIST_STOCKS_BOOTSTRAP_COMPLETE:', n, 'symbols');
+      res.json({ success: true, mode: 'bootstrap', symbolCount: n });
+    } catch (err) {
+      res.status(500).json({ success: false, mode: 'bootstrap', error: err.message });
+    }
+    return;
+  }
+
+  // ── Normal senkronizasyon modu ────────────────────────────────────────────
+  try {
+    const result = await runBistStocksMetaSync({ dryRun });
+    res.json({ success: true, dryRun, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
