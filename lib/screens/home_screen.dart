@@ -929,15 +929,16 @@ class _HomeScreenState extends State<HomeScreen> {
         child: RefreshIndicator(
           color: const Color(0xFF34C759),
           onRefresh: () async {
-            await Future.wait([
+            // Yenileme başlat ama bekletme — arka planda devam eder
+            Future.wait([
               _loadQuickPrices(),
               _loadMarketList(),
               PriceSyncService.forceSync(),
-            ]).timeout(
-              const Duration(seconds: 25),
-              onTimeout: () => [],
-            );
-            _loadFavoritePricesFromCache();
+            ]).then((_) {
+              if (mounted) _loadFavoritePricesFromCache();
+            }).ignore();
+            // Spinner 3 saniye görünür, sonra kapanır
+            await Future.delayed(const Duration(seconds: 3));
           },
           child: CustomScrollView(
             controller: _mainScrollCtrl,

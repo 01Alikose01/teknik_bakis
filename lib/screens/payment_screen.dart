@@ -336,24 +336,35 @@ class _PlanSummaryCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                isYearly ? PurchaseService.yearlyRawPriceText : PurchaseService.monthlyRawPriceText,
-                style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: accent),
-              ),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  isYearly ? '/yıl' : '/ay',
-                  style: TextStyle(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      fontSize: 14)),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        isYearly ? PurchaseService.yearlyRawPriceText : PurchaseService.monthlyRawPriceText,
+                        style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: accent),
+                      ),
+                      const SizedBox(width: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          isYearly ? '/yıl' : '/ay',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               if (isYearly) ...[
-                const Spacer(),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [

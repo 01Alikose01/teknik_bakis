@@ -8,6 +8,7 @@ import '../services/price_sync_service.dart';
 import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import '../widgets/stock_quote_panel.dart';
+import '../widgets/sparkline_chart.dart';
 import 'premium_gate_screen.dart';
 
 class WatchlistScreen extends StatefulWidget {
@@ -120,10 +121,24 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           await PortfolioService.addToWatchlist(
             WatchlistItem(symbol: sym, name: name),
           );
-          _loadWatchlist();
+          // Listeyi güncelle, ardından yeni hissenin fiyatını anında çek
+          await _loadWatchlist();
+          _fetchPriceForSymbol(sym);
         },
       ),
     );
+  }
+
+  /// Belirli bir sembol için doğrudan API'den fiyat çeker (cache bypass).
+  /// Yeni eklenen hissenin anlık fiyatının hemen görünmesi için kullanılır.
+  Future<void> _fetchPriceForSymbol(String symbol) async {
+    final asset = await StockService.fetchStock(symbol, period: '5d');
+    if (asset == null || !mounted) return;
+    _checkAlertsForSymbol(
+      _items.firstWhere((i) => i.symbol == symbol, orElse: () => WatchlistItem(symbol: symbol, name: symbol)),
+      asset.price,
+    );
+    setState(() => _assets[symbol] = asset);
   }
 
   void _showAlarmLimitSheet() {
@@ -704,9 +719,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // ── Üst satır: rozet + isim + değişim rozeti ──
+                                // ── Üst satır: rozet + isim + sparkline + fiyat ──
                                 Row(
                                   children: [
+                                    // Sol: sembol rozeti
                                     Container(
                                       width: 48,
                                       height: 48,
@@ -728,7 +744,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 10),
+                                    // Orta: isim + alarm sayacı
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -773,7 +790,23 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                         ],
                                       ),
                                     ),
-                                    // Değişim rozeti + alarm ikonu
+                                    // Orta: Sparkline grafik
+                                    if (asset != null &&
+                                        asset.prices.length >= 2)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: SparklineChart(
+                                          prices: asset.prices,
+                                          color: SparklineChart.colorFor(
+                                            asset.changePercent,
+                                          ),
+                                          width: 80,
+                                          height: 40,
+                                        ),
+                                      ),
+                                    // Sağ: fiyat + alarm ikonu
                                     Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.end,

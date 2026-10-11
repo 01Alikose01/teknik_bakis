@@ -343,15 +343,21 @@ class _MiniPlanCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.onSurface)),
             const SizedBox(height: 3),
-            Text(price,
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(price,
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface)),
+            ),
             Text(sub,
                 style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 11)),
             const SizedBox(height: 2),
             Text(note,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
                 style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 11)),
             const SizedBox(height: 10),
             Center(

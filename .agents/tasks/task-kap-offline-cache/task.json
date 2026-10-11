@@ -1,0 +1,14 @@
+{
+  "task_id": "task-kap-offline-cache",
+  "task_description": "Flutter uygulamasına KAP Bildirimleri offline cache özelliği ekle. İnternet kesildiğinde son başarılı fetch verisi shared_preferences'tan yüklenir ve ekranda 'Çevrimdışı' etiketi gösterilir.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "summary": "KAP offline cache özelliği iki commit ile tamamlandı. KapNewsItem modeline toJson/fromJson eklendi, KapDisclosureService'e shared_preferences tabanlı _persistCache/_loadCached cache katmanı eklendi, news_screen.dart catch bloğu cache fallback'i kullanacak şekilde yeniden yazıldı ve çevrimdışı durumda turuncu 'Çevrimdışı • Önbellek' banner'ı gösterildi. flutter analyze ve flutter build apk --debug başarılı. Kod incelemesi APPROVED (1 minor dead field: _loadedFromCache, non-blocking).",
+  "commits": [
+    "97af3e4 feat: KapNewsItem toJson/fromJson + KapDisclosureService offline cache layer",
+    "c42517a feat: KAP Bildirimleri offline cache UI — çevrimdışı etiketi ve cache yükleme"
+  ],
+  "review_verdict": "APPROVED",
+  "review_doc": ".agents/tasks/task-kap-offline-cache/2026-10-10-234433-review.md"
+}
