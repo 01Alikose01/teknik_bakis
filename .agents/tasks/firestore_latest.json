@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-10-05T20:21:55.285Z",
+  "errors": [],
+  "status": 200,
+  "latest_docs": [
+    {
+      "id": "1Simv3FD8vfTz74gwHob",
+      "createTime": "2026-10-05T20:17:33.266316Z",
+      "updateTime": "2026-10-05T20:17:33.266316Z",
+      "started_at": "2026-10-05T20:15:03.102Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-10-05T20:17:33.238Z"
+    },
+    {
+      "id": "k0dvnXl6Wabp43nM4VNy",
+      "createTime": "2026-10-05T20:02:33.549827Z",
+      "updateTime": "2026-10-05T20:02:33.549827Z",
+      "started_at": "2026-10-05T20:00:03.437Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-10-05T20:02:33.523Z"
+    },
+    {
+      "id": "4C0AUDKaDG3flTF8F1ez",
+      "createTime": "2026-10-05T19:47:45.334149Z",
+      "updateTime": "2026-10-05T19:47:45.334149Z",
+      "started_at": "2026-10-05T19:45:15.172Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-10-05T19:47:45.300Z"
+    }
+  ],
+  "status2": 200,
+  "latest_by_started_at": {
+    "id": "1Simv3FD8vfTz74gwHob",
+    "createTime": "2026-10-05T20:17:33.266316Z",
+    "started_at": "2026-10-05T20:15:03.102Z",
+    "status": "failed",
+    "records_added": 0,
+    "records_updated": 0,
+    "error_message": "Invalid character in header content [\"Authorization\"]",
+    "trigger": "scheduled",
+    "finished_at": "2026-10-05T20:17:33.238Z"
+  }
+}

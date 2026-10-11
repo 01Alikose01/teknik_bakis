@@ -1,0 +1,120 @@
+{
+  "timestamp": "2026-10-10T14:53:30.328Z",
+  "totalDocs": 222,
+  "statusCounts": {
+    "upcoming": 204,
+    "archived": 18
+  },
+  "toUpdateCount": 17,
+  "toUpdateSamples": [
+    {
+      "id": "ALBTN",
+      "status": "archived",
+      "requestStart": "2026-07-22T12:00:00.000Z",
+      "requestEnd": "2026-07-23T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:13.673Z",
+      "symbol": "ALBTN"
+    },
+    {
+      "id": "BKRGY",
+      "status": "archived",
+      "requestStart": "2026-08-24T12:00:00.000Z",
+      "requestEnd": "2026-08-26T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:09.542Z",
+      "symbol": "BKRGY"
+    },
+    {
+      "id": "CITAS",
+      "status": "archived",
+      "requestStart": "2026-08-10T12:00:00.000Z",
+      "requestEnd": "2026-08-12T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:11.386Z",
+      "symbol": "CITAS"
+    },
+    {
+      "id": "EKIM",
+      "status": "archived",
+      "requestStart": "2026-07-01T12:00:00.000Z",
+      "requestEnd": "2026-07-03T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:15.955Z",
+      "symbol": "EKIM"
+    },
+    {
+      "id": "GOLDA",
+      "status": "archived",
+      "requestStart": "2026-07-01T12:00:00.000Z",
+      "requestEnd": "2026-07-02T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:16.412Z",
+      "symbol": "GOLDA"
+    },
+    {
+      "id": "INTET",
+      "status": "archived",
+      "requestStart": "2026-08-26T12:00:00.000Z",
+      "requestEnd": "2026-08-27T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:09.083Z",
+      "symbol": "INTET"
+    },
+    {
+      "id": "ISVEA",
+      "status": "archived",
+      "requestStart": "2026-07-01T12:00:00.000Z",
+      "requestEnd": "2026-07-03T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:15.498Z",
+      "symbol": "ISVEA"
+    },
+    {
+      "id": "KARCL",
+      "status": "archived",
+      "requestStart": "2026-07-22T12:00:00.000Z",
+      "requestEnd": "2026-07-24T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:12.758Z",
+      "symbol": "KARCL"
+    },
+    {
+      "id": "KPEKS",
+      "status": "archived",
+      "requestStart": "2026-08-12T12:00:00.000Z",
+      "requestEnd": "2026-08-14T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:10.465Z",
+      "symbol": "KPEKS"
+    },
+    {
+      "id": "MASFN",
+      "status": "archived",
+      "requestStart": "2026-07-22T12:00:00.000Z",
+      "requestEnd": "2026-07-24T12:00:00.000Z",
+      "listingDate": "",
+      "publishedAt": "2026-10-10T14:14:13.213Z",
+      "symbol": "MASFN"
+    }
+  ],
+  "netgl": {
+    "_name": "projects/teknik-bakis/databases/(default)/documents/ipo_items/NETGL",
+    "_id": "NETGL",
+    "requestStart": "2026-09-09T12:00:00.000Z",
+    "lot": "-",
+    "feedSeenAt": "2026-10-10T14:15:50.180Z",
+    "companyName": "Net Global Endüstriyel Yatırımlar A.Ş.",
+    "status": "archived",
+    "price": "-",
+    "publishedAt": "2026-10-10T14:14:08.621Z",
+    "requestDates": "9-10-11 Eylül 2026",
+    "updatedAt": "2026-10-10T14:15:50.400Z",
+    "listingDate": "",
+    "symbol": "NETGL",
+    "distributionType": "-",
+    "kapUrl": "https://www.kap.org.tr/tr/api/file/download/4028328d9f52dddc01a06d16f5885572",
+    "requestEnd": "2026-09-11T12:00:00.000Z",
+    "source": "HalkArz"
+  }
+}

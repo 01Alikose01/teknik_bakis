@@ -130,7 +130,8 @@ class PriceSyncService {
       }
 
       // 2. Tek seferde çek
-      final results = await StockService.fetchMultiple(symbols, period: '5d')
+      final results = await StockService.fetchMultiple(
+              symbols, period: '5d', interval: '15m')
           .timeout(const Duration(seconds: 25), onTimeout: () => []);
 
       if (results.isEmpty) return;

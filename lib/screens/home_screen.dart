@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/asset_model.dart';
+import '../widgets/sparkline_chart.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
 import '../services/home_price_cache.dart';
@@ -1957,6 +1958,17 @@ class _FavoriteListCard extends StatelessWidget {
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(width: 4),
+                                  (asset != null && asset.prices.length >= 2)
+                                      ? SparklineChart(
+                                          prices: asset.prices,
+                                          color: SparklineChart.colorFor(
+                                              asset.changePercent),
+                                          width: 72,
+                                          height: 36,
+                                        )
+                                      : const SizedBox(width: 72),
+                                  const SizedBox(width: 8),
                                   if (asset != null) ...[
                                     Column(
                                       crossAxisAlignment:

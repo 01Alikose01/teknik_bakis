@@ -1,0 +1,259 @@
+{
+  "timestamp": "2026-10-05T20:21:30.124Z",
+  "errors": [],
+  "meta_kap_status": 200,
+  "meta_kap_all_fields": {
+    "lastSyncError": "Invalid character in header content [\"Authorization\"]",
+    "lastSyncStatus": "failed"
+  },
+  "meta_kap_field_names": [
+    "lastSyncError",
+    "lastSyncStatus"
+  ],
+  "kap_sync_logs_count_status": 200,
+  "kap_sync_logs_any": [
+    {
+      "document": {
+        "name": "projects/teknik-bakis/databases/(default)/documents/kap_sync_logs/05lsIRgDDxB6pshog1YO",
+        "fields": {
+          "started_at": {
+            "timestampValue": "2026-09-21T18:15:11.975Z"
+          },
+          "status": {
+            "stringValue": "failed"
+          },
+          "records_added": {
+            "integerValue": "0"
+          },
+          "records_updated": {
+            "integerValue": "0"
+          },
+          "error_message": {
+            "stringValue": "Invalid character in header content [\"Authorization\"]"
+          },
+          "trigger": {
+            "stringValue": "scheduled"
+          },
+          "finished_at": {
+            "timestampValue": "2026-09-21T18:17:42.127Z"
+          }
+        },
+        "createTime": "2026-09-21T18:17:42.191257Z",
+        "updateTime": "2026-09-21T18:17:42.191257Z"
+      },
+      "readTime": "2026-10-05T20:21:30.862098Z"
+    },
+    {
+      "document": {
+        "name": "projects/teknik-bakis/databases/(default)/documents/kap_sync_logs/07N17Vuwcgl9vjl7UFYf",
+        "fields": {
+          "started_at": {
+            "timestampValue": "2026-09-08T11:00:04.774Z"
+          },
+          "status": {
+            "stringValue": "failed"
+          },
+          "records_added": {
+            "integerValue": "0"
+          },
+          "records_updated": {
+            "integerValue": "0"
+          },
+          "error_message": {
+            "stringValue": "Invalid character in header content [\"Authorization\"]"
+          },
+          "trigger": {
+            "stringValue": "scheduled"
+          },
+          "finished_at": {
+            "timestampValue": "2026-09-08T11:02:35.709Z"
+          }
+        },
+        "createTime": "2026-09-08T11:02:35.754594Z",
+        "updateTime": "2026-09-08T11:02:35.754594Z"
+      },
+      "readTime": "2026-10-05T20:21:30.862098Z"
+    },
+    {
+      "document": {
+        "name": "projects/teknik-bakis/databases/(default)/documents/kap_sync_logs/08FPgoYvVOK646RPBn9b",
+        "fields": {
+          "started_at": {
+            "timestampValue": "2026-09-30T09:30:13.814Z"
+          },
+          "status": {
+            "stringValue": "failed"
+          },
+          "records_added": {
+            "integerValue": "0"
+          },
+          "records_updated": {
+            "integerValue": "0"
+          },
+          "error_message": {
+            "stringValue": "Invalid character in header content [\"Authorization\"]"
+          },
+          "trigger": {
+            "stringValue": "scheduled"
+          },
+          "finished_at": {
+            "timestampValue": "2026-09-30T09:32:43.980Z"
+          }
+        },
+        "createTime": "2026-09-30T09:32:44.001799Z",
+        "updateTime": "2026-09-30T09:32:44.001799Z"
+      },
+      "readTime": "2026-10-05T20:21:30.862098Z"
+    },
+    {
+      "document": {
+        "name": "projects/teknik-bakis/databases/(default)/documents/kap_sync_logs/0GqCJRquBCewgnjm3mOU",
+        "fields": {
+          "started_at": {
+            "timestampValue": "2026-09-23T19:45:02.607Z"
+          },
+          "status": {
+            "stringValue": "failed"
+          },
+          "records_added": {
+            "integerValue": "0"
+          },
+          "records_updated": {
+            "integerValue": "0"
+          },
+          "error_message": {
+            "stringValue": "Invalid character in header content [\"Authorization\"]"
+          },
+          "trigger": {
+            "stringValue": "scheduled"
+          },
+          "finished_at": {
+            "timestampValue": "2026-09-23T19:47:32.731Z"
+          }
+        },
+        "createTime": "2026-09-23T19:47:32.769981Z",
+        "updateTime": "2026-09-23T19:47:32.769981Z"
+      },
+      "readTime": "2026-10-05T20:21:30.862098Z"
+    },
+    {
+      "document": {
+        "name": "projects/teknik-bakis/databases/(default)/documents/kap_sync_logs/0HrOqFHFZ5OHVmmt51P4",
+        "fields": {
+          "started_at": {
+            "timestampValue": "2026-10-01T06:55:10.454Z"
+          },
+          "status": {
+            "stringValue": "failed"
+          },
+          "records_added": {
+            "integerValue": "0"
+          },
+          "records_updated": {
+            "integerValue": "0"
+          },
+          "error_message": {
+            "stringValue": "Invalid character in header content [\"Authorization\"]"
+          },
+          "trigger": {
+            "stringValue": "opening-pre"
+          },
+          "finished_at": {
+            "timestampValue": "2026-10-01T06:57:41.672Z"
+          }
+        },
+        "createTime": "2026-10-01T06:57:41.702819Z",
+        "updateTime": "2026-10-01T06:57:41.702819Z"
+      },
+      "readTime": "2026-10-05T20:21:30.862098Z"
+    }
+  ],
+  "kap_sync_logs_result_count": 5,
+  "kap_sync_logs_docs_found": 5,
+  "kap_sync_logs_sample": [
+    {
+      "id": "05lsIRgDDxB6pshog1YO",
+      "started_at": "2026-09-21T18:15:11.975Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-09-21T18:17:42.127Z"
+    },
+    {
+      "id": "07N17Vuwcgl9vjl7UFYf",
+      "started_at": "2026-09-08T11:00:04.774Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-09-08T11:02:35.709Z"
+    },
+    {
+      "id": "08FPgoYvVOK646RPBn9b",
+      "started_at": "2026-09-30T09:30:13.814Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-09-30T09:32:43.980Z"
+    },
+    {
+      "id": "0GqCJRquBCewgnjm3mOU",
+      "started_at": "2026-09-23T19:45:02.607Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "scheduled",
+      "finished_at": "2026-09-23T19:47:32.731Z"
+    },
+    {
+      "id": "0HrOqFHFZ5OHVmmt51P4",
+      "started_at": "2026-10-01T06:55:10.454Z",
+      "status": "failed",
+      "records_added": 0,
+      "records_updated": 0,
+      "error_message": "Invalid character in header content [\"Authorization\"]",
+      "trigger": "opening-pre",
+      "finished_at": "2026-10-01T06:57:41.672Z"
+    }
+  ],
+  "meta_collection_status": 200,
+  "meta_collection_docs": [
+    {
+      "id": "fundamentals",
+      "fields": [
+        "tickerCount",
+        "source",
+        "lastUpdatedAt"
+      ]
+    },
+    {
+      "id": "kap",
+      "fields": [
+        "lastSyncError",
+        "lastSyncStatus"
+      ]
+    }
+  ],
+  "collections_status": 200,
+  "collections": {
+    "collectionIds": [
+      "ai_cache",
+      "bist_index_meta",
+      "entitlements",
+      "fundamentals",
+      "ipo_items",
+      "ipo_meta",
+      "kap_sync_logs",
+      "meta",
+      "purchases",
+      "subscription_tokens",
+      "trials"
+    ]
+  }
+}

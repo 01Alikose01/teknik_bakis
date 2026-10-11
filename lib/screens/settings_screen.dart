@@ -1171,21 +1171,27 @@ class _PlanDetailCard extends StatelessWidget {
                   ],
                 ),
                 const Spacer(),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                          text: price,
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: accent)),
-                      TextSpan(
-                          text: period,
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: accent.withValues(alpha: 0.7))),
-                    ],
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                              text: price,
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: accent)),
+                          TextSpan(
+                              text: period,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: accent.withValues(alpha: 0.7))),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],

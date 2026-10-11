@@ -73,9 +73,9 @@ class _IpoScreenState extends State<IpoScreen>
       _loading = false;
     });
 
-    if (IpoService.shouldRefresh(localFeed.lastSyncedAt)) {
-      await _refresh(silent: _items.isNotEmpty);
-    }
+    // Her açılışta Firestore'dan yenile (silent = cache varsa spinner gösterme).
+    // Bu sayede tarihleri geçmiş/güncel olmayan kayıtlar hemen temizlenir.
+    await _refresh(silent: _items.isNotEmpty);
   }
   Future<void> _refresh({bool silent = false}) async {
     if (_refreshing) return;
@@ -562,12 +562,21 @@ class _IpoScreenState extends State<IpoScreen>
         .where((item) {
           if (item.status != IpoStatus.upcoming) return false;
           // Ertelendi etiketi taşıyanları çıkar
-          final rd = item.requestDates.toLowerCase();
+          final rd = item.requestDates.toLowerCase().trim();
           if (rd.contains('ertelendi') || rd.contains('postponed')) return false;
+          // Talep tarihi belirlenmemişse (sadece "-" olan) gösterme
+          if (rd == '-' || rd.isEmpty) return false;
           // Ek güvenlik: requestStart geçmişse kesinlikle Yaklaşan olamaz
           final rs = item.requestStart;
           final now = DateTime.now().toUtc().add(const Duration(hours: 3));
           if (rs != null && rs.isBefore(now)) return false;
+          // Hiç tarih verisi yoksa (requestStart null) ve publishedAt da 60 günden
+          // eskiyse veya null ise bu kayıt geçersiz kabul edilir
+          if (rs == null) {
+            final pub = item.publishedAt;
+            if (pub == null) return false; // tarih verisi hiç yok
+            if (now.difference(pub).inDays > 60) return false;
+          }
           return true;
         })
         .toList()
@@ -588,7 +597,17 @@ class _IpoScreenState extends State<IpoScreen>
       });
 
     final pendingListing = all
-        .where((item) => item.status == IpoStatus.pendingListing)
+        .where((item) {
+          if (item.status != IpoStatus.pendingListing) return false;
+          final now = DateTime.now().toUtc().add(const Duration(hours: 3));
+          // requestEnd yoksa ama publishedAt varsa, 90 günden eskiyse çıkar
+          if (item.requestEnd == null && item.listingDate == null) {
+            final pub = item.publishedAt;
+            if (pub == null) return false; // tarih verisi hiç yok
+            if (now.difference(pub).inDays > 90) return false;
+          }
+          return true;
+        })
         .toList()
       ..sort((a, b) {
         final aDate = a.listingDate ?? a.requestEnd ?? a.sortDate ?? DateTime(2099);

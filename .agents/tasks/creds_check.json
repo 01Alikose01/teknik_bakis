@@ -1,0 +1,25 @@
+{
+  "checks": {
+    "C:\\Users\\k\\AppData\\Roaming/gcloud/configstore/firebase-tools.json": "NOT FOUND",
+    "C:\\Users\\k/.config/configstore/firebase-tools.json": "EXISTS",
+    "C:\\Users\\k/.config/configstore/firebase-tools.json__keys": [
+      "motd",
+      "gemini",
+      "usage",
+      "analytics-uuid",
+      "user",
+      "tokens",
+      "apiEnablementCache"
+    ],
+    "C:/Users/k/AppData/Roaming/gcloud/configstore/firebase-tools.json": "NOT FOUND",
+    "C:\\Users\\k\\AppData\\Roaming/firebase": "NOT FOUND",
+    "C:/Users/k/AppData/Roaming/npm/node_modules/firebase-tools/package.json": "EXISTS",
+    "d:/k/wink/teknik_bakis/functions/node_modules/firebase-admin/package.json": "EXISTS"
+  },
+  "env_GOOGLE_APPLICATION_CREDENTIALS": "not set",
+  "env_FIREBASE_TOKEN": "not set",
+  "env_GCLOUD_PROJECT": "not set",
+  "env_FIREBASE_CONFIG": "not set",
+  "cwd": "D:\\k\\wink\\teknik_bakis",
+  "node_version": "v24.14.0"
+}

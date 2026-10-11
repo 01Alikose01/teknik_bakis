@@ -365,19 +365,21 @@ class _PlanSummaryCard extends StatelessWidget {
               ),
               if (isYearly) ...[
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('Ayda sadece',
-                        style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                            fontSize: 11)),
-                    Text(PurchaseService.yearlyPerMonthText,
-                        style: TextStyle(
-                            color: accent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
-                  ],
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Ayda sadece',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              fontSize: 11)),
+                      Text(PurchaseService.yearlyPerMonthText,
+                          style: TextStyle(
+                              color: accent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
+                    ],
+                  ),
                 ),
               ],
             ],

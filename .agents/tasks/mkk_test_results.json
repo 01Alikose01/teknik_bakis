@@ -1,0 +1,23 @@
+{
+  "testedAt": "2026-10-05T21:51:12.357Z",
+  "endpoint": "https://apigwdev.mkk.com.tr/api/vyk/members",
+  "request1": {
+    "format": "Authorization: TOKEN (no prefix)",
+    "label": "REQUEST 1 - Mevcut format (Authorization: TOKEN)",
+    "httpStatus": 401,
+    "wwwAuthenticate": "Basic",
+    "faultCode": null,
+    "faultString": null,
+    "bodySnippet": "{\n  \"fault\" :{ \n    \"correlationId\":\"b7a84fbd-9817-4b11-88d5-6854ed654449\",\n    \"faultCode\":\"OI001\",\n    \"faultString\":\"Authentication policy failed! API Key/Username or Password or Token is empty!\",\n    \"faultStatusCode\":\"401\",\n    \"responseFromApi\":\"\"\n  }\n}"
+  },
+  "request2": {
+    "format": "Authorization: Bearer TOKEN",
+    "label": "REQUEST 2 - Bearer format (Authorization: Bearer TOKEN)",
+    "httpStatus": 401,
+    "wwwAuthenticate": "Basic",
+    "faultCode": null,
+    "faultString": null,
+    "bodySnippet": "{\n  \"fault\" :{ \n    \"correlationId\":\"9097e64b-28ce-4404-abe1-93641d5eab2c\",\n    \"faultCode\":\"OI001\",\n    \"faultString\":\"Authentication policy failed! API Key/Username or Password or Token is empty!\",\n    \"faultStatusCode\":\"401\",\n    \"responseFromApi\":\"\"\n  }\n}"
+  },
+  "behaviorIdentical": true
+}

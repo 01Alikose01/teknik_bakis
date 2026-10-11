@@ -386,7 +386,11 @@ class KapNewsService {
       return 'IDX:${item.disclosureIndex}';
     }
     // 2. İkinci güvenilir: bildirim URL'i
-    if (item.url.isNotEmpty) {
+    //    Yalnızca tekil bir bildirimi işaret eden URL'leri anahtar olarak kabul et.
+    //    "https://www.getmidas.com/kap-haberleri/" gibi toplu liste URL'leri tüm
+    //    kayıtlar için aynı anahtarı üretir ve dedupe() 1 kayıt dışında hepsini siler.
+    if (item.url.isNotEmpty &&
+        (item.url.contains('/Bildirim/') || item.url.contains('?id='))) {
       return 'URL:${item.url}';
     }
     // 3. Fallback: şirket + normalleştirilmiş başlık + bildirim türü

@@ -1,0 +1,20 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "forbidden-ipo-functions",
+      "severity": "blocking",
+      "confidence": "confirmed",
+      "summary": "Forbidden IPO functions modified and added",
+      "detail": "The commit rewrote computeIpoStatus, loadBistSymbols, reconcileStaleIpoStatuses, writeIpoToFirestore, syncIpoFeed, and syncIpoManual, and added archiveIpoItemsNotInFeed and syncBistStocksFull to functions/index.js. None of these were permitted by the fix plan. These changes must be reverted or separated into a distinct commit that goes through its own review; they must not ship bundled with the KAP fix."
+    },
+    {
+      "id": "missing-flutter-analyze-evidence",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "summary": "No flutter analyze evidence recorded",
+      "detail": "The impl note file (.agents/tasks/kap-fix-impl-note.md) does not exist. Run flutter analyze lib/services/kap_news_service.dart and confirm clean output (unused-element warnings for _normalizeTime are acceptable; errors are not)."
+    }
+  ],
+  "reviewDoc": "d:\\k\\wink\\teknik_bakis\\.agents\\tasks\\kap-fix-review.md"
+}

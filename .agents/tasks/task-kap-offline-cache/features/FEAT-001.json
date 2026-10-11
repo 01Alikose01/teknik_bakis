@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "KapNewsItem modeline toJson/fromJson ekle ve KapDisclosureService'e shared_preferences ile kalıcı cache katmanı ekle. Bu feature UI'a dokunmaz; sadece veri katmanını değiştirir.",
+  "status": "completed",
+  "steps": [
+    "1. lib/models/kap_news_item.dart dosyasını düzenle: KapNewsItem sınıfına toJson() ve fromJson(Map<String,dynamic>) factory constructor ekle. Alanlar: title, summary, source, time, url, isWithin72h (bool), disclosureIndex (nullable String), disclosureType (nullable String). cleanTitle ve analysisText get-only oldukları için JSON'a dahil etme.",
+    "2. lib/services/kap_disclosure_service.dart dosyasına şu değişiklikleri yap: (a) 'import package:shared_preferences/shared_preferences.dart' ekle; (b) 'import ../models/kap_news_item.dart' zaten var, doğrula; (c) static const String _kPrefKey = 'kap_disclosures_cache'; sabiti ekle; (d) static Future<void> _persistCache(List<KapNewsItem> items) async metodu ekle — SharedPreferences.getInstance() çağır, items.map((e) => jsonEncode(e.toJson())).toList() ile JSON string listesi yap, prefs.setStringList(_kPrefKey, ...) ile kaydet; (e) static Future<List<KapNewsItem>> loadCached() async metodu ekle — SharedPreferences.getInstance() çağır, getStringList(_kPrefKey) oku, her string'i jsonDecode edip KapNewsItem.fromJson() ile dönüştür, boşsa [] döndür; hata durumunda [] döndür; (f) fetchLatest() içinde başarılı fetch sonrası (items listesi dolduğunda) _persistCache(items) çağır. dart:convert import'u zaten mevcut değilse ekle.",
+    "3. lib/services/kap_news_service.dart dosyasına dokunma — fetch() metodu offline durumda zaten [] veya _fallback() döndürür; _fallback() çağrısı FEAT-002'de news_screen.dart tarafından bypass edilecek."
+  ],
+  "acceptance_criteria": [
+    "KapNewsItem.toJson() tüm 8 alanı içeren Map<String,dynamic> döndürür.",
+    "KapNewsItem.fromJson() toJson() çıktısından aynı nesneyi geri oluşturur.",
+    "KapDisclosureService.loadCached() daha önce kayıt yoksa boş liste döndürür.",
+    "KapDisclosureService.fetchLatest() başarılı fetch sonrası shared_preferences'a yazar (çağrı zinciri doğrulanabilir).",
+    "flutter analyze hata vermez."
+  ],
+  "verification": [
+    "flutter analyze — 0 hata",
+    "flutter build apk --debug — başarıyla tamamlanır"
+  ],
+  "blocked_reason": null,
+  "findings": "dart:async was NOT previously imported in kap_disclosure_service.dart — added as new import. dart:convert was also NOT previously imported — added. shared_preferences package was already in pubspec.yaml at ^2.3.5 (resolved to 2.5.5), no pubspec change needed. unawaited() used directly (from dart:async). The flutter analyze run found 269 pre-existing info/warning/error issues across the codebase (including 1 error in the backup file analiz_screenyedekk.dart:682 - undefined_named_parameter) — zero issues in the two files changed by this task. KapNewsItem.const constructor was kept (toJson/fromJson methods added alongside it)."
+}

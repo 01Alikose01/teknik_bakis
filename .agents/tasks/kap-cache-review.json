@@ -1,0 +1,6 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Tüm 8 checklist maddesi doğrulandı: KapNewsItem toJson/fromJson 8 field ile tam, KapDisclosureService _persistCache/_kPrefKey/loadCached spec ile birebir, fetchLatest() başarılı fetch sonrası _persistCache çağırıyor, _loadKap() catch bloğu loadCached()+dedupe+_isOffline uygulıyor, offline banner _isOffline guard'ı arkasında ve spec widget'ıyla eşleşiyor, BorsaNews ve KapAiListScreen dokunulmamış, yeni paket eklenmedi, flutter analyze ve build APK başarılı. Tek minor bulgu: _loadedFromCache field'ı hiçbir yerde kullanılmıyor (dead field) — blocking değil.",
+  "changes_requested": [],
+  "reviewDoc": ".agents/tasks/task-kap-offline-cache/2026-10-10-234433-review.md"
+}

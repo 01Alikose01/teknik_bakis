@@ -1,0 +1,157 @@
+{
+  "total": 222,
+  "statusCounts": {
+    "upcoming": 204,
+    "trading": 18
+  },
+  "upcomingBreakdown": {
+    "total": 204,
+    "withFutureStart": 0,
+    "withPastStart": 0,
+    "withNoStart": 204
+  },
+  "futureStartSamples": [],
+  "pastStartList": [],
+  "noStartSamples": [
+    {
+      "id": "AKCEL",
+      "symbol": "AKCEL",
+      "publishedAt": "2026-10-10T14:15:40.600Z",
+      "requestDates": "-",
+      "companyName": "Akçelik Demir Çelik San. ve Tic. A.Ş."
+    },
+    {
+      "id": "ALNUS",
+      "symbol": "ALNUS",
+      "publishedAt": "2026-10-10T14:14:25.535Z",
+      "requestDates": "-",
+      "companyName": "Alnus Yatırım Menkul Değerler A.Ş."
+    },
+    {
+      "id": "BEWEN",
+      "symbol": "BEWEN",
+      "publishedAt": "2026-10-10T14:14:11.843Z",
+      "requestDates": "Ertelendi",
+      "companyName": "Bewen Enerji A.Ş."
+    },
+    {
+      "id": "BLSMD",
+      "symbol": "BLSMD",
+      "publishedAt": "2026-10-10T14:14:20.532Z",
+      "requestDates": "-",
+      "companyName": "Bulls Yatırım Menkul Değerler A.Ş."
+    },
+    {
+      "id": "CAVDC",
+      "symbol": "CAVDC",
+      "publishedAt": "2026-10-10T14:15:44.290Z",
+      "requestDates": "-",
+      "companyName": "Çavuşoğlu Demir Çelik Geri Dönüşüm San. Tic. A.Ş."
+    },
+    {
+      "id": "DNYVA",
+      "symbol": "DNYVA",
+      "publishedAt": "2026-10-10T14:15:12.617Z",
+      "requestDates": "22 – 24 Ocak 2025",
+      "companyName": "Dünya Varlık Yönetim A.Ş."
+    },
+    {
+      "id": "FIBAF",
+      "symbol": "FIBAF",
+      "publishedAt": "2026-10-10T14:15:28.267Z",
+      "requestDates": "-",
+      "companyName": "Fiba Faktoring A.Ş."
+    },
+    {
+      "id": "GLMND",
+      "symbol": "GLMND",
+      "publishedAt": "2026-10-10T14:14:43.868Z",
+      "requestDates": "-",
+      "companyName": "Güllük Mandalya Turizm Liman İşletmeleri A.Ş."
+    },
+    {
+      "id": "HDMCB",
+      "symbol": "HDMCB",
+      "publishedAt": "2026-10-10T14:15:43.833Z",
+      "requestDates": "-",
+      "companyName": "Hdm Çelik Boru San. ve Tic. A.Ş."
+    },
+    {
+      "id": "KAYMT",
+      "symbol": "KAYMT",
+      "publishedAt": "2026-10-10T14:15:45.205Z",
+      "requestDates": "-",
+      "companyName": "Kaymet Metal İmalat San. ve Tic. A.Ş."
+    },
+    {
+      "id": "KULE",
+      "symbol": "KULE",
+      "publishedAt": "2026-10-10T14:15:42.463Z",
+      "requestDates": "-",
+      "companyName": "(Global Tower) Kule Hizmet ve İşletmecilik A.Ş."
+    },
+    {
+      "id": "KZLYI",
+      "symbol": "KZLYI",
+      "publishedAt": "2026-10-10T14:15:41.990Z",
+      "requestDates": "-",
+      "companyName": "Kızılay İçecek San. ve Tic. A.Ş."
+    },
+    {
+      "id": "MRBAS",
+      "symbol": "MRBAS",
+      "publishedAt": "2026-10-10T14:14:27.379Z",
+      "requestDates": "-",
+      "companyName": "Marbaş Menkul Değerler A.Ş."
+    },
+    {
+      "id": "NARFE",
+      "symbol": "NARFE",
+      "publishedAt": "2026-10-10T14:15:36.925Z",
+      "requestDates": "-",
+      "companyName": "Narlı Feribot İşletmeciliği A.Ş."
+    },
+    {
+      "id": "NO_SYMBOL_(Ankara_Sigorta)_Ankara_Anonim",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:14:24.640Z",
+      "requestDates": "-",
+      "companyName": "(Ankara Sigorta) Ankara Anonim Türk Sigorta Şirketi"
+    },
+    {
+      "id": "NO_SYMBOL_(Doğtat)_Doğkar_Gıda_Maddeleri",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:14:37.911Z",
+      "requestDates": "-",
+      "companyName": "(Doğtat) Doğkar Gıda Maddeleri Üretim San. ve Tic. A.Ş."
+    },
+    {
+      "id": "NO_SYMBOL_(Pek_food)_Pek_Dondurulmuş_Gıd",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:14:38.367Z",
+      "requestDates": "-",
+      "companyName": "(Pek food) Pek Dondurulmuş Gıda San. ve Tic. A.Ş."
+    },
+    {
+      "id": "NO_SYMBOL_(Penti)_Penca_Tekstil_Çorap_Sa",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:15:39.683Z",
+      "requestDates": "-",
+      "companyName": "(Penti) Penca Tekstil Çorap San. ve Tic. A.Ş."
+    },
+    {
+      "id": "NO_SYMBOL_(Sedaş)_Sakarya_Elektrik_Dağıt",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:14:41.583Z",
+      "requestDates": "-",
+      "companyName": "(Sedaş) Sakarya Elektrik Dağıtım A.Ş."
+    },
+    {
+      "id": "NO_SYMBOL_(Tredaş)_Trakya_Elektrik_Dağıt",
+      "symbol": "",
+      "publishedAt": "2026-10-10T14:15:01.145Z",
+      "requestDates": "-",
+      "companyName": "(Tredaş) Trakya Elektrik Dağıtım A.Ş."
+    }
+  ]
+}

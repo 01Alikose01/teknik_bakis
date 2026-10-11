@@ -1,0 +1,7 @@
+{
+  "task_id": "task-bist-stocks-meta-sync",
+  "task_description": "İki Cloud Function ekle: (1) bist_stocks koleksiyonunu kap_members ile senkronize eden syncBistStocksMeta + syncBistStocksManual (kapanan/isim değişen şirket tespiti), (2) ilk bootstrap için kap_members → bist_stocks doldurma. syncBist100Index zaten mevcut ve çalışıyor — dokunulmaz. Flutter/Dart dosyalarına dokunulmaz.",
+  "status": "pending",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

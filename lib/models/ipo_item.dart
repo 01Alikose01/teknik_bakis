@@ -32,8 +32,8 @@ class IpoItem {
   }) : _status = status;
 
   factory IpoItem.fromJson(Map<String, dynamic> json) {
-    final requestStart = _parseFlexibleDate(json['requestStart']);
-    final requestEnd = _parseFlexibleDate(json['requestEnd']);
+    DateTime? requestStart = _parseFlexibleDate(json['requestStart']);
+    DateTime? requestEnd = _parseFlexibleDate(json['requestEnd']);
     final listingDate = _parseFlexibleDate(json['listingDate']);
     final publishedAt = _parseFlexibleDate(json['publishedAt']);
 
@@ -42,6 +42,18 @@ class IpoItem {
     final isPostponedByLabel = requestDatesRaw.toLowerCase().contains('ertelendi') ||
         requestDatesRaw.toLowerCase().contains('postponed');
 
+    // requestStart/requestEnd yoksa requestDates string'inden Türkçe tarih çıkarmayı dene
+    if (requestEnd == null && requestStart == null && requestDatesRaw.isNotEmpty && requestDatesRaw != '-') {
+      final parsedFromLabel = _parseTurkishDateString(requestDatesRaw);
+      if (parsedFromLabel != null) {
+        requestEnd = parsedFromLabel;
+        // requestStart'ı da yaklaşık olarak ayarla (requestEnd'den 3 gün önce)
+        if (requestStart == null) {
+          requestStart = parsedFromLabel.subtract(const Duration(days: 3));
+        }
+      }
+    }
+
     final parsedStatus = isPostponedByLabel
         ? IpoStatus.postponed
         : _parseStatus(
@@ -49,6 +61,7 @@ class IpoItem {
             requestStart: requestStart,
             requestEnd: requestEnd,
             listingDate: listingDate,
+            publishedAt: publishedAt,
           );
 
     return IpoItem(
@@ -136,9 +149,17 @@ class IpoItem {
         requestEnd: requestEnd,
         listingDate: listingDate,
         fallbackStatus: _status,
+        publishedAt: publishedAt,
       );
     }
-    return _status;
+    // Tarih verisi yok: publishedAt'e göre eski kayıtları türet
+    return _deriveStatus(
+      requestStart: null,
+      requestEnd: null,
+      listingDate: null,
+      fallbackStatus: _status,
+      publishedAt: publishedAt,
+    );
   }
 
   bool get _hasTimelineData {
@@ -165,6 +186,7 @@ class IpoItem {
     required DateTime? requestStart,
     required DateTime? requestEnd,
     required DateTime? listingDate,
+    DateTime? publishedAt,
   }) {
     final hasTimeline =
         requestStart != null || requestEnd != null || listingDate != null;
@@ -179,12 +201,20 @@ class IpoItem {
         requestEnd: requestEnd,
         listingDate: listingDate,
         fallbackStatus: fallback,
+        publishedAt: publishedAt,
       );
     }
 
-    // Tarih alanı hiç yoksa Firestore status değerini son çare olarak kullan.
+    // Tarih alanı hiç yoksa publishedAt ile yaşı kontrol et
     final explicit = _parseRawStatus(raw?.trim().toLowerCase() ?? '');
-    return explicit ?? IpoStatus.upcoming;
+    final status = explicit ?? IpoStatus.upcoming;
+    return _deriveStatus(
+      requestStart: null,
+      requestEnd: null,
+      listingDate: null,
+      fallbackStatus: status,
+      publishedAt: publishedAt,
+    );
   }
 
   static IpoStatus? _parseRawStatus(String value) {
@@ -207,6 +237,7 @@ class IpoItem {
       case 'borsada işlem görüyor':
       case 'trading':
       case 'completed':
+      case 'archived':
         return IpoStatus.trading;
       case 'ertelendi':
       case 'postponed':
@@ -227,6 +258,7 @@ class IpoItem {
     required DateTime? requestEnd,
     required DateTime? listingDate,
     required IpoStatus fallbackStatus,
+    DateTime? publishedAt,
   }) {
     final now = _nowInTurkey();
 
@@ -246,8 +278,12 @@ class IpoItem {
       }
       // Listeleme tarihi bilinmiyor:
       // JSON'da açıkça "trading" yazılıysa trading döndür,
-      // aksi hâlde listeleme bekliyor
+      // aksi hâlde listeleme bekliyor; fakat çok eski kayıtsa trading say
       if (fallbackStatus == IpoStatus.trading) {
+        return IpoStatus.trading;
+      }
+      // requestEnd geçeli 30 günü aşmışsa artık trading kabul et
+      if (now.difference(_endOfDay(requestEnd)).inDays > 30) {
         return IpoStatus.trading;
       }
       return IpoStatus.pendingListing;
@@ -262,6 +298,18 @@ class IpoItem {
       return now.isBefore(_startOfDay(listingDate))
           ? IpoStatus.upcoming
           : IpoStatus.trading;
+    }
+
+    // Hiç tarih verisi yok: publishedAt'e göre eski kayıtları trading'e düşür.
+    // 60 günden eski bir "upcoming" veya "pendingListing" artık geçersizdir.
+    if (publishedAt != null) {
+      final ageInDays = now.difference(publishedAt).inDays;
+      if (ageInDays > 60 &&
+          (fallbackStatus == IpoStatus.upcoming ||
+              fallbackStatus == IpoStatus.collecting ||
+              fallbackStatus == IpoStatus.pendingListing)) {
+        return IpoStatus.trading;
+      }
     }
 
     return fallbackStatus;
@@ -313,6 +361,46 @@ class IpoItem {
         final safeYear = year < 100 ? 2000 + year : year;
         return DateTime(safeYear, month, day);
       }
+    }
+
+    return null;
+  }
+
+  /// Türkçe ay adı içeren requestDates string'inden son tarihi çıkarmaya çalışır.
+  /// Örnek: "29-30 Haziran, 1 Temmuz 2026" → DateTime(2026, 7, 1)
+  static DateTime? _parseTurkishDateString(String raw) {
+    const months = {
+      'ocak': 1, 'şubat': 2, 'mart': 3, 'nisan': 4,
+      'mayıs': 5, 'haziran': 6, 'temmuz': 7, 'ağustos': 8,
+      'eylül': 9, 'ekim': 10, 'kasım': 11, 'aralık': 12,
+    };
+
+    final lower = raw.toLowerCase();
+    int? year;
+    int? month;
+
+    // Yılı bul (4 haneli)
+    final yearMatch = RegExp(r'\b(20\d{2})\b').firstMatch(raw);
+    if (yearMatch != null) year = int.tryParse(yearMatch.group(1)!);
+
+    // Son ay adını bul
+    for (final entry in months.entries) {
+      if (lower.contains(entry.key)) {
+        month = entry.value;
+        // Bu ay adından sonra gelen rakamı gün olarak al
+      }
+    }
+
+    if (year != null && month != null) {
+      // O ay/yılın son gününü döndür (muhafazakar taraf)
+      return DateTime(year, month + 1, 1).subtract(const Duration(days: 1));
+    }
+
+    // Yıl yoksa sadece ay varsa — yıl geçmişte olabilir
+    if (month != null) {
+      final now = _nowInTurkey();
+      // Eğer raw içinde "2025" gibi geçmiş yıl yoksa fallback
+      return null;
     }
 
     return null;

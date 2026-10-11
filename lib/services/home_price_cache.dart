@@ -31,9 +31,20 @@ class HomePriceCache {
         'o': a.open,
         'h': a.high,
         'l': a.low,
+        // Sparkline için fiyat geçmişini sakla (en fazla 60 değer)
+        'ps': a.prices.length > 60
+            ? a.prices.sublist(a.prices.length - 60)
+            : a.prices,
       };
 
-  static AssetModel _assetFromJson(Map<String, dynamic> j) => AssetModel(
+  static AssetModel _assetFromJson(Map<String, dynamic> j) {
+    final rawPrices = j['ps'];
+    final List<double> priceList = rawPrices != null
+        ? (rawPrices as List)
+            .map((e) => (e as num).toDouble())
+            .toList()
+        : [];
+    return AssetModel(
         symbol: j['s'] as String,
         name: j['n'] as String,
         price: (j['p'] as num).toDouble(),
@@ -42,9 +53,10 @@ class HomePriceCache {
         open: (j['o'] as num? ?? 0).toDouble(),
         high: (j['h'] as num? ?? 0).toDouble(),
         low: (j['l'] as num? ?? 0).toDouble(),
-        prices: [],
+        prices: priceList,
         volumes: [],
-      );
+    );
+  }
 
   // ─── Quick prices (BIST 100, Dolar, Altın vb.) ─────────────────────────────
 

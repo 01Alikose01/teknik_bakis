@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-10-05T20:20:59.811Z",
+  "kap_sync_logs_latest": {
+    "found": false,
+    "message": "Collection is empty",
+    "raw": {
+      "readTime": "2026-10-05T20:21:00.540866Z"
+    }
+  },
+  "meta_kap": {
+    "lastSyncStatus": "failed",
+    "lastSyncAt": null,
+    "lastError": null,
+    "all_fields": [
+      "lastSyncError",
+      "lastSyncStatus"
+    ]
+  },
+  "errors": [],
+  "method": "Firestore REST API with stored access_token",
+  "kap_sync_logs_http_status": 200,
+  "meta_kap_http_status": 200
+}

@@ -1,0 +1,27 @@
+{
+  "project_type": "Flutter mobile app + Firebase Cloud Functions (Node.js 22)",
+  "language": "JavaScript (Cloud Functions), Dart (Flutter — do NOT modify)",
+  "build_system": "Firebase CLI — no compile step for index.js (plain JS). Syntax check: `node --check functions/index.js`",
+  "test_framework": "No automated test framework for functions. Verification via `node --check` + manual HTTP calls to deployed endpoints.",
+  "build_command": "node --check functions/index.js",
+  "test_command": "node --check functions/index.js",
+  "verification_instructions": "1) Run `node --check functions/index.js` — must exit 0. 2) Run `firebase deploy --only functions:syncBistStocksMeta,functions:syncBistStocksManual` in the functions/ directory. 3) Call syncBistStocksManual?bootstrap=true&dryRun=true to verify dry-run output. 4) Call syncBistStocksManual?bootstrap=true for real bootstrap. 5) Confirm Firebase Console bist_stocks collection has ≥500 documents.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "Do NOT modify Flutter/Dart files. Do NOT modify existing exports (syncKapOpeningPre, syncKapOpeningWindow, syncKapDisclosures, syncKapManual, updateFundamentals, updateFundamentalsManual, syncIpoFeed, syncIpoManual, getTeknikAnaliz, cleanAiCache, verifySubscription, onPurchaseWritten, syncBist100Index, syncBist100Manual). Only append to functions/index.js. firebase deploy must be run in the functions/ directory.",
+  "contribution_requirements": "All new functions appended at END of functions/index.js. Mevcut fonksiyonlara ASLA dokunulmamalı. active alanı sadece yeni belgeler oluşturulurken veya delisting onayında yazılabilir.",
+  "key_patterns": "All scheduled functions use onSchedule({schedule, timeZone: 'UTC', region: 'europe-west1', memory: '512MiB', timeoutSeconds: 300}). All HTTP functions use onRequest({region, memory, timeoutSeconds, secrets: [ADMIN_SECRET]}). Admin auth: check (req.headers['x-admin-secret'] || req.query.secret) against ADMIN_SECRET.value().trim(). Batch writes use db.batch(), max 400 ops per batch. fetchJson() helper already exists (twice, do not redefine). db = admin Firestore instance. FieldValue imported. ADMIN_SECRET = defineSecret('ADMIN_SECRET').",
+  "relevant_files": [
+    "functions/index.js — the ONLY file to modify (append only)",
+    "functions/package.json — Node 22, firebase-admin ^12, firebase-functions ^6",
+    "lib/services/bist_stocks.dart — syncBistStocksFromFirestore() reads bist_stocks with .where('active', isNotEqualTo: false) — active field semantics",
+    "lib/services/bist100_service.dart — reads bist_index_meta/bist100 (NOT bist_stocks) for BIST100 list",
+    ".agents/tasks/otomatik-guncelleme-plan.md — the full implementation plan to follow"
+  ],
+  "directory_structure": "functions/ — Cloud Functions (index.js is the single source file, ~2500 lines). lib/services/ — Flutter Dart services (read-only reference). data/ — static seed data. .agents/tasks/ — agent task artifacts (do not commit).",
+  "firestore_collections": {
+    "bist_stocks": "{ symbol, name, active: bool, bist100Member: bool }. Flutter reads with .where('active', isNotEqualTo: false). Currently ~100 docs (only BIST100). Target: ~600 docs (all BIST).",
+    "bist_index_meta/bist100": "{ symbols: [], updatedAt, revision, added, removed, alternates, announcementId }. Updated by syncBist100Index (already implemented). Flutter reads via Bist100Service.",
+    "kap_members": "{ id, title, stockCode, memberType, kfifUrl, updatedAt }. Updated by syncMembers() every few hours. stockCode.toUpperCase() matches bist_stocks document IDs.",
+    "ipo_items": "{ symbol, companyName, status, requestStart, requestEnd, listingDate, ... }. Updated by syncIpoFeed every 6 hours."
+  }
+}

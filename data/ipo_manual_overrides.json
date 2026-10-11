@@ -142,30 +142,4 @@
     "status": "trading",
     "source": "Manual Override"
   },
-  {
-    "companyName": "Soho Giyim ve Enerji A.Ş.",
-    "requestDates": "30 Haziran, 1 Temmuz 2026",
-    "requestStart": "2026-06-30",
-    "requestEnd": "2026-07-01",
-    "listingDate": "2026-07-08",
-    "price": "15,00 TL",
-    "lot": "100.000.000 Lot",
-    "distributionType": "Eşit Dağıtım",
-    "symbol": "SOHOE",
-    "status": "trading",
-    "source": "Manual Override"
-  },
-  {
-    "companyName": "Orzaks İlaç ve Kimya Sanayi Tic. A.Ş.",
-    "requestDates": "29 Haziran - 1 Temmuz 2026",
-    "requestStart": "2026-06-29",
-    "requestEnd": "2026-07-01",
-    "listingDate": "2026-07-07",
-    "price": "69,00 TL",
-    "lot": "55.000.000 Lot",
-    "distributionType": "Oransal Dağıtım",
-    "symbol": "ORZAX",
-    "status": "trading",
-    "source": "Manual Override"
-  }
 ]
