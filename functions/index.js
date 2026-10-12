@@ -1703,7 +1703,17 @@ async function verifyAndSaveSubscription({ purchaseToken, productId, deviceId, p
     if (Array.isArray(subscriptionData.lineItems) && subscriptionData.lineItems.length > 0) {
       const item = subscriptionData.lineItems[0];
       expiryTime = item.expiryTime; // ISO8601 string
-      if (item.productId && item.productId.toLowerCase().includes('year')) {
+
+      // Google Play Subscriptions v2 API'de plan tespiti:
+      // - item.productId → subscription ID (örn: "teknik_bakis_premium") — 'year' içermez
+      // - item.offerDetails.basePlanId → base plan ID (örn: "yearly" / "monthly") — doğru kaynak
+      const basePlanId = (item.offerDetails?.basePlanId || '').toLowerCase();
+      if (basePlanId.includes('year')) {
+        resolvedPlan = 'yearly';
+      } else if (basePlanId.includes('month')) {
+        resolvedPlan = 'monthly';
+      } else if (item.productId && item.productId.toLowerCase().includes('year')) {
+        // Fallback: subscription ID üzerinde kontrol (eski yapı için)
         resolvedPlan = 'yearly';
       }
     }
@@ -1820,24 +1830,50 @@ exports.verifySubscription = onRequest({
 
 /**
  * Firestore Trigger: `purchases/{deviceId}` yazıldığında arka planda otomatik doğrular.
+ *
+ * Idempotency kuralı:
+ *   - Döküman silinmişse (after = null) → çık.
+ *   - purchaseToken yoksa → çık.
+ *   - before ve after'daki purchaseToken AYNI ise → token değişmedi, sadece
+ *     updatedAt gibi metadata güncellendi demektir; Google Play'e tekrar sorgu
+ *     atmak gereksizdir → çık.
+ *   - purchaseToken DEĞİŞTİYSE (yeni satın alma veya gerçek renewal) → doğrula.
+ *
+ * Bu kontrol; Flutter'ın _syncPurchaseWithBackend() her çağrısında
+ * updatedAt alanını güncellemesinden kaynaklanan gereksiz tetiklenmeleri engeller.
  */
 exports.onPurchaseWritten = onDocumentWritten({
   document: 'purchases/{deviceId}',
   region: 'europe-west1',
   secrets: [PLAY_SERVICE_ACCOUNT_KEY],
 }, async (event) => {
-  const data = event.data?.after?.data();
-  if (!data) return;
+  const after = event.data?.after?.data();
+  if (!after) return; // döküman silindi
 
   const deviceId = event.params.deviceId;
-  const purchaseToken = data.serverVerificationData || data.localVerificationData;
-  const productId = data.productId;
-  const plan = data.plan;
+  const purchaseToken = after.serverVerificationData || after.localVerificationData;
+  const productId = after.productId;
+  const plan = after.plan;
 
   if (!purchaseToken) {
     console.log(`[onPurchaseWritten] device ${deviceId} için purchaseToken bulunamadı.`);
     return;
   }
+
+  // ── Idempotency: token değişmemişse gereksiz API çağrısından kaçın ────────
+  const before = event.data?.before?.data();
+  const prevToken = before
+    ? (before.serverVerificationData || before.localVerificationData)
+    : null;
+
+  if (prevToken && prevToken === purchaseToken) {
+    // Token aynı — yalnızca updatedAt, status gibi metadata değişti.
+    // Aynı token için Google Play Developer API'ye tekrar sorgu atmaya gerek yok.
+    console.log(`[onPurchaseWritten] Token değişmedi, atlanıyor (device: ${deviceId})`);
+    return;
+  }
+
+  console.log(`[onPurchaseWritten] Yeni/değişen token tespit edildi, doğrulama başlatılıyor (device: ${deviceId})`);
 
   try {
     const secretKeyStr = PLAY_SERVICE_ACCOUNT_KEY.value() || '';

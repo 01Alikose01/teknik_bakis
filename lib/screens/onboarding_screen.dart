@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../main.dart';
 import '../services/subscription_service.dart';
 import '../services/purchase_service.dart';
 import 'payment_screen.dart';
@@ -184,10 +185,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               content: const Text('Google Play aboneliğiniz kontrol ediliyor...'),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              duration: const Duration(seconds: 2),
+              duration: const Duration(seconds: 4),
             ),
           );
-          await PurchaseService.restorePurchases();
+          final changed = await PurchaseService.restorePurchases();
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          if (changed && SubscriptionService.isPaidSubscriber) {
+            // Abonelik bulundu — uygulamaya geç
+            await SubscriptionService.markOnboarded();
+            if (!context.mounted) return;
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => MainNavigation(key: MainNavigation.navKey)),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('ℹ️ Aktif bir Google Play aboneliği bulunamadı.'),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
         },
       ),
     );

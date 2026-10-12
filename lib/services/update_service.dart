@@ -88,7 +88,12 @@ class UpdateService {
               Navigator.of(ctx).pop();
               try {
                 await InAppUpdate.startFlexibleUpdate();
-                await InAppUpdate.completeFlexibleUpdate();
+                // completeFlexibleUpdate() yalnızca indirme DOWNLOADED
+                // durumuna geçince çağrılmalı; aksi hâlde kurulum hata verir.
+                // Bu yüzden burada çağırmıyoruz — kullanıcı arka planda
+                // indirme tamamlandıktan sonra uygulama kapatılıp açılınca
+                // Play Store otomatik uygular. Gerekiyorsa ikinci bir dialog
+                // ile "Şimdi uygula" sunulabilir.
               } catch (_) {}
             },
             child: const Text(

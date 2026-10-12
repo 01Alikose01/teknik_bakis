@@ -101,18 +101,71 @@ class SubscriptionService {
         final isActive = data?['isActive'] == true;
         final planKey = (data?['plan'] as String?) ?? 'monthly';
         final expiryStr = data?['expiryTime'] as String?;
+        final subscriptionState = data?['subscriptionState'] as String?;
 
-        bool isStillValid = isActive;
-        if (expiryStr != null) {
-          final expiry = DateTime.tryParse(expiryStr);
-          if (expiry != null && DateTime.now().isAfter(expiry)) {
-            isStillValid = false;
+        bool isStillValid;
+
+        if (subscriptionState != null) {
+          // Google Play Developer API'den gelen subscription state'e göre karar ver.
+          switch (subscriptionState) {
+            case 'SUBSCRIPTION_STATE_ACTIVE':
+              // Aktif abonelik — premium açık.
+              isStillValid = true;
+              break;
+            case 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD':
+              // Ödeme gecikti ama Google Play 3–16 gün grace period tanıyor.
+              // Bu sürede premium erişimi korunmalı, kullanıcı cezalandırılmaz.
+              isStillValid = true;
+              break;
+            case 'SUBSCRIPTION_STATE_CANCELED':
+              // İptal edildi ama dönem sonu henüz gelmemiş olabilir.
+              // expiryTime geçmemişse premium devam eder.
+              if (expiryStr != null) {
+                final expiry = DateTime.tryParse(expiryStr);
+                isStillValid =
+                    expiry != null && DateTime.now().isBefore(expiry);
+              } else {
+                isStillValid = false;
+              }
+              break;
+            case 'SUBSCRIPTION_STATE_ON_HOLD':
+            case 'SUBSCRIPTION_STATE_PAUSED':
+            case 'SUBSCRIPTION_STATE_EXPIRED':
+              // Ödeme alınamadı (on-hold), kullanıcı durdurdu (paused),
+              // veya süre doldu — premium kaldırılır.
+              isStillValid = false;
+              break;
+            default:
+              // Bilinmeyen state — isActive + expiryTime ile fallback.
+              isStillValid = isActive;
+              if (expiryStr != null) {
+                final expiry = DateTime.tryParse(expiryStr);
+                if (expiry != null && DateTime.now().isAfter(expiry)) {
+                  isStillValid = false;
+                }
+              }
+          }
+        } else {
+          // subscriptionState alanı yoksa (eski backend kaydı) —
+          // mevcut isActive + expiryTime mantığıyla devam et.
+          isStillValid = isActive;
+          if (expiryStr != null) {
+            final expiry = DateTime.tryParse(expiryStr);
+            if (expiry != null && DateTime.now().isAfter(expiry)) {
+              isStillValid = false;
+            }
           }
         }
 
         if (isStillValid) {
           await _box.put(_kPlan, planKey);
         } else if (isPaidSubscriber) {
+          await cancelPaidSubscription();
+        }
+      } else {
+        // Firestore'da kayıt yok → aktif abonelik yok demektir.
+        // Yerel plan ücretliyse ücretsize çek.
+        if (isPaidSubscriber) {
           await cancelPaidSubscription();
         }
       }

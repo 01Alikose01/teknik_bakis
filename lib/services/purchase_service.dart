@@ -51,6 +51,16 @@ class PurchaseService {
   static bool _isAvailable = false;
   static bool _isLoading = false;
 
+  /// buyPlan() çağrısında hangi planın satın alınmaya çalışıldığını saklar.
+  /// _verifyAndDeliverProduct içinde offer token eşleşmesi başarısız olduğunda
+  /// bu değer fallback olarak kullanılır — 'monthly'/'yearly'
+  static String? _pendingPlanHint;
+
+  /// İşlenmiş purchase token'larını tutar — aynı token için tekrar
+  /// flowStatus.success üretilmesini önler (Google Play test renewal döngüsü gibi).
+  /// Uygulama oturumu boyunca kalıcıdır; yeniden başlatıldığında temizlenir.
+  static final Set<String> _processedTokens = {};
+
   // YENİ sistem: teknik_bakis_premium ürünü ve offer token'ları
   static ProductDetails? _monthlyProduct;
   static ProductDetails? _yearlyProduct;
@@ -99,11 +109,13 @@ class PurchaseService {
 
     await loadProducts();
 
-    // Kullanıcı uygulamayı yeniden yüklediyse veya başka cihazda aynı
-    // Google hesabıyla açtıysa aktif aboneliği otomatik geri yükle
-    if (_isAvailable) {
-      restorePurchases();
-    }
+    // NOT: restorePurchases() burada kasıtlı olarak çağrılmıyor.
+    // Uygulama açılışında otomatik restore, Google Play test ortamında
+    // her 30 dakikalık renewal'ı "purchased" event olarak stream'e düşürür
+    // ve tekrar tekrar "Tebrikler" success sheet açılmasına neden olur.
+    // Mevcut abonelik durumu SubscriptionService.syncWithBackendEntitlements()
+    // üzerinden Firestore'dan okunuyor — bu yeterli.
+    // Manuel restore: settings_screen ve onboarding_screen'deki butonlar kullanılır.
   }
 
   /// Google Play Store'dan ürün detaylarını ve fiyatlarını sorgular.
@@ -278,6 +290,11 @@ class PurchaseService {
         purchaseParam = PurchaseParam(productDetails: targetProduct);
       }
 
+      // Satın alma başlamadan hangi plan seçildiğini kaydet.
+      // _verifyAndDeliverProduct'ta offer token eşleşmesi başarısız olursa
+      // bu değer fallback plan hint'i olarak kullanılır.
+      _pendingPlanHint = plan;
+
       // Abonelikler non-consumable olarak satın alınır
       final started = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
       if (!started) {
@@ -296,16 +313,38 @@ class PurchaseService {
   }
 
   /// Satın alımları geri yükler (Uygulama yeniden yüklendiğinde veya cihaz değişiminde)
-  static Future<void> restorePurchases() async {
+  ///
+  /// Google Play'e restore isteği gönderilir. Aktif abonelik varsa
+  /// purchaseStream üzerinden `restored` event gelir ve `_verifyAndDeliverProduct`
+  /// çalışır. Aktif abonelik YOKSA (iptal edilmişse) Google Play hiç event
+  /// döndürmez — bu nedenle kısa bir bekleme sonrası backend entitlements
+  /// senkronizasyonu yapılır. Backend `isActive:false` döndürürse yerel plan
+  /// `'none'` olarak güncellenir.
+  static Future<bool> restorePurchases() async {
     try {
       if (!_isAvailable) {
         _isAvailable = await _iap.isAvailable();
       }
-      if (_isAvailable) {
-        await _iap.restorePurchases();
-      }
+      if (!_isAvailable) return false;
+
+      // Restore öncesi plan durumunu kaydet
+      final planBefore = SubscriptionService.plan;
+
+      await _iap.restorePurchases();
+
+      // Google Play aktif abonelik event'i göndermesi için kısa süre bekle.
+      // Event gelirse _onPurchaseStreamUpdated zaten planı günceller.
+      // Event gelmezse (iptal edilmiş/yok) backend ile senkronize et.
+      await Future.delayed(const Duration(seconds: 3));
+
+      // Backend entitlements kontrolü: abonelik yoksa/iptal edilmişse planı sıfırla
+      await SubscriptionService.syncWithBackendEntitlements();
+
+      // Plan değişip değişmediğini dön (UI feedback için)
+      return SubscriptionService.plan != planBefore;
     } catch (e) {
       debugPrint('[PurchaseService] restorePurchases exception: $e');
+      return false;
     }
   }
 
@@ -316,19 +355,43 @@ class PurchaseService {
       debugPrint(
           '[PurchaseService] Purchase update: ${purchaseDetails.productID}, status: ${purchaseDetails.status}');
 
+      // ── Idempotency kontrolü ─────────────────────────────────────────────
+      // Google Play test ortamında abonelik her 30 dakikada bir yenilenir ve
+      // her yenileme purchaseStream'e PurchaseStatus.purchased olarak gelir.
+      // Aynı purchaseToken daha önce işlendiyse success event üretme;
+      // yalnızca pendingCompletePurchase varsa acknowledge et.
+      final token = purchaseDetails.verificationData.serverVerificationData.isNotEmpty
+          ? purchaseDetails.verificationData.serverVerificationData
+          : purchaseDetails.verificationData.localVerificationData;
+      final isAlreadyProcessed = token.isNotEmpty && _processedTokens.contains(token);
+
       switch (purchaseDetails.status) {
         case PurchaseStatus.pending:
           flowStatus.value = PurchaseFlowStatus.pending;
           break;
 
         case PurchaseStatus.purchased:
-        case PurchaseStatus.restored:
-          final isValid = await _verifyAndDeliverProduct(purchaseDetails);
-          if (isValid) {
-            flowStatus.value = PurchaseFlowStatus.success;
+          if (isAlreadyProcessed) {
+            // Aynı token — Google Play renewal event'i. Success üretme,
+            // sadece acknowledge et (aşağıdaki completePurchase bloğu halleder).
+            debugPrint(
+                '[PurchaseService] Token zaten işlendi, success üretilmiyor: ${purchaseDetails.purchaseID}');
           } else {
-            flowStatus.value = PurchaseFlowStatus.error;
+            final isValid = await _verifyAndDeliverProduct(purchaseDetails);
+            if (isValid) {
+              // Token'ı işlendi olarak işaretle
+              if (token.isNotEmpty) _processedTokens.add(token);
+              flowStatus.value = PurchaseFlowStatus.success;
+            } else {
+              flowStatus.value = PurchaseFlowStatus.error;
+            }
           }
+          break;
+
+        case PurchaseStatus.restored:
+          // Restore'da Premium durumu güncellenir, ancak success sheet açılmaz.
+          // flowStatus değişmeden kalır — kullanıcıya "Tebrikler" mesajı gösterilmez.
+          await _verifyAndDeliverProduct(purchaseDetails);
           break;
 
         case PurchaseStatus.error:
@@ -360,47 +423,88 @@ class PurchaseService {
   static Future<bool> _verifyAndDeliverProduct(
       PurchaseDetails purchase) async {
     try {
-      // Satın alınan planı belirle
-      String planKey = 'monthly';
+      // ── Adım 1: Flutter-side plan tahmini ──────────────────────────────
+      // Bu değer yalnızca backend çağrısına hint olarak gönderilir.
+      // Gerçek plan, Cloud Function'dan dönen `confirmedPlan` tarafından belirlenir.
+      String planHint = 'monthly';
       final pid = purchase.productID;
 
       if (pid == kLegacyYearlyId) {
         // Legacy yearly restore
-        planKey = 'yearly';
+        planHint = 'yearly';
       } else if (pid == kLegacyMonthlyId) {
         // Legacy monthly restore
-        planKey = 'monthly';
+        planHint = 'monthly';
       } else if (pid == kSubscriptionId) {
-        // Yeni sistem: offer token üzerinden base plan belirle
+        // Öncelik sırası:
+        //   1. Offer token eşleşmesi (en güvenilir — Google Play'den alınan token)
+        //   2. buyPlan() sırasında kaydedilen _pendingPlanHint
+        //   3. verification data içinde 'year' geçiyor mu (son çare)
         final serverData = purchase.verificationData.serverVerificationData;
-        final localData = purchase.verificationData.localVerificationData;
-        // Offer token veya local verification data'da 'yearly' / 'year' geçiyorsa yearly
-        if (_yearlyOfferToken != null && _yearlyOfferToken!.isNotEmpty &&
+        final localData  = purchase.verificationData.localVerificationData;
+
+        final bool tokenMatchesYearly = _yearlyOfferToken != null &&
+            _yearlyOfferToken!.isNotEmpty &&
             (serverData.contains(_yearlyOfferToken!) ||
-                localData.contains('year') ||
-                localData.toLowerCase().contains('yearly'))) {
-          planKey = 'yearly';
-        } else if (serverData.contains('year') ||
-            serverData.toLowerCase().contains('yearly')) {
-          planKey = 'yearly';
-        } else {
-          planKey = 'monthly';
-        }
+                localData.contains(_yearlyOfferToken!));
+
+        final bool dataContainsYear =
+            serverData.toLowerCase().contains('year') ||
+            localData.toLowerCase().contains('year');
+
+        // _pendingPlanHint: buyPlan('yearly') ile başlatılan akışlarda
+        // offer token henüz yüklü olmasa bile doğru planı bildirir.
+        final bool pendingHintIsYearly = _pendingPlanHint == 'yearly';
+
+        planHint = (tokenMatchesYearly || dataContainsYear || pendingHintIsYearly)
+            ? 'yearly'
+            : 'monthly';
+
+        debugPrint('[PurchaseService] Plan hint (local): $planHint'
+            ' | yearlyOfferToken loaded: ${_yearlyOfferToken != null}'
+            ' | tokenMatch: $tokenMatchesYearly'
+            ' | dataContainsYear: $dataContainsYear'
+            ' | pendingHint: $_pendingPlanHint');
       }
 
-      // 1. Firebase Firestore backend doğrulaması için satın alma kaydını sakla
-      // (Arka planda Cloud Function Firestore Trigger onPurchaseWritten tetiklenir)
-      await _syncPurchaseWithBackend(purchase, planKey);
+      // ── Adım 2: Cloud Function doğrulaması ─────────────────────────────
+      // Backend Google Play lineItems üzerinden gerçek base plan'ı belirler.
+      // Bu değer planHint'ten her zaman daha güvenilirdir.
+      final serverResult = await _verifyWithCloudFunction(purchase, planHint);
 
-      // 2. Doğrudan Cloud Function Google Play Developer API doğrulaması
-      final isValidOnServer = await _verifyWithCloudFunction(purchase, planKey);
+      // ── Adım 3: Gerçek planı belirle ───────────────────────────────────
+      // Backend başarıyla doğruladıysa onun belirlediği planı kullan.
+      // Backend erişilemezse (timeout/hata) planHint ile devam et —
+      // kullanıcı para ödedi, Google Play işlemi onayladı.
+      final confirmedPlan = serverResult.isActive
+          ? serverResult.plan   // Backend'den doğrulanmış plan
+          : planHint;           // Fallback: Flutter-side tahmin
 
-      if (isValidOnServer) {
-        // Sunucu doğrulaması başarılı → Premium erişimini aç
-        await SubscriptionService.startPaidSubscription(planKey);
+      // ── Adım 4: Firestore'a yaz (doğrulanmış planla) ───────────────────
+      // _syncPurchaseWithBackend artık Cloud Function sonrası çağrılıyor;
+      // bu sayede Firestore'a yazılan plan değeri hep doğrulanmış plan olur.
+      await _syncPurchaseWithBackend(purchase, confirmedPlan);
+
+      if (serverResult.isActive) {
+        debugPrint('[PurchaseService] Plan confirmed by backend: $confirmedPlan (hint was: $planHint)');
+        await SubscriptionService.startPaidSubscription(confirmedPlan);
+        // Satın alma tamamlandı — pending hint'i temizle
+        _pendingPlanHint = null;
         return true;
       } else {
-        debugPrint('[PurchaseService] Server verification rejected the purchase');
+        // Backend erişilemedi veya doğrulama başarısız.
+        // Kullanıcı gerçekten para ödediyse planHint ile lokal aktivasyon yap.
+        // Bu durum yalnızca Cloud Function'ın erişilemez olduğu anlarda geçici
+        // koruma sağlar; bir sonraki syncWithBackendEntitlements() düzeltir.
+        if (purchase.status == PurchaseStatus.purchased) {
+          debugPrint('[PurchaseService] Backend erişilemedi ama purchase.purchased — '
+              'geçici lokal aktivasyon: $confirmedPlan');
+          await SubscriptionService.startPaidSubscription(confirmedPlan);
+          _pendingPlanHint = null;
+          return true;
+        }
+
+        debugPrint('[PurchaseService] Server verification rejected / no active purchase');
         lastErrorMessage.value =
             'Satın alma doğrulanıyor, lütfen tekrar deneyin. Ödemeniz Google Play\'de kaydedildi.';
         return false;
@@ -416,11 +520,16 @@ class PurchaseService {
 
   /// Cloud Functions HTTPS endpoint'i üzerinden Google Play Developer API doğrulaması yapar.
   ///
-  /// GÜVENLİK KURALI: Herhangi bir hata durumunda false döner.
+  /// GÜVENLİK KURALI: Herhangi bir hata durumunda isActive:false döner.
   /// Premium erişim SADECE backend "isActive: true" döndürdüğünde açılır.
-  /// Network hatası, timeout, HTTP 5xx, geçersiz cevap → false
-  static Future<bool> _verifyWithCloudFunction(
-      PurchaseDetails purchase, String planKey) async {
+  /// Network hatası, timeout, HTTP 5xx, geçersiz cevap → isActive:false
+  ///
+  /// Dönüş değeri: {isActive: bool, plan: String}
+  /// Backend Google Play lineItems üzerinden gerçek base plan'ı belirler;
+  /// bu değer Flutter tarafındaki tahminden daha güvenilirdir.
+  static Future<({bool isActive, String plan})> _verifyWithCloudFunction(
+      PurchaseDetails purchase, String planHint) async {
+    final fallback = (isActive: false, plan: planHint);
     try {
       final deviceId = await DeviceIdService.getDeviceId();
       final token = purchase.verificationData.serverVerificationData.isNotEmpty
@@ -429,7 +538,7 @@ class PurchaseService {
 
       if (token.isEmpty) {
         debugPrint('[PurchaseService] _verifyWithCloudFunction: token boş — false');
-        return false;
+        return fallback;
       }
 
       final response = await http
@@ -440,7 +549,7 @@ class PurchaseService {
               'purchaseToken': token,
               'productId': purchase.productID,
               'deviceId': deviceId,
-              'plan': planKey,
+              'plan': planHint,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -448,25 +557,28 @@ class PurchaseService {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body is Map && body['isActive'] != null) {
-          final result = body['isActive'] == true;
-          debugPrint('[PurchaseService] _verifyWithCloudFunction: isActive=$result');
-          return result;
+          final isActive = body['isActive'] == true;
+          // Backend Google Play lineItems'tan gerçek plan'ı belirler.
+          // 'yearly' veya 'monthly' — planHint'ten daha güvenilir.
+          final resolvedPlan = (body['plan'] as String?)?.isNotEmpty == true
+              ? body['plan'] as String
+              : planHint;
+          debugPrint('[PurchaseService] _verifyWithCloudFunction: isActive=$isActive, plan=$resolvedPlan');
+          return (isActive: isActive, plan: resolvedPlan);
         }
-        // Geçersiz cevap formatı → false
         debugPrint('[PurchaseService] _verifyWithCloudFunction: geçersiz cevap formatı — false');
-        return false;
+        return fallback;
       } else {
-        // HTTP 4xx, 5xx → doğrulama başarısız
         debugPrint(
             '[PurchaseService] _verifyWithCloudFunction HTTP ${response.statusCode} — false');
-        return false;
+        return fallback;
       }
     } on TimeoutException catch (e) {
       debugPrint('[PurchaseService] _verifyWithCloudFunction timeout: $e — false');
-      return false;
+      return fallback;
     } catch (e) {
       debugPrint('[PurchaseService] _verifyWithCloudFunction network error: $e — false');
-      return false;
+      return fallback;
     }
   }
 

@@ -234,16 +234,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Abonelikleri Geri Yükle',
                       subtitle: 'Google Play aboneliğinizi senkronize edin',
                       onTap: () async {
+                        // Kontrol başladığını göster
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: const Text('Google Play aboneliğiniz kontrol ediliyor...'),
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            duration: const Duration(seconds: 2),
+                            duration: const Duration(seconds: 4),
                           ),
                         );
-                        await PurchaseService.restorePurchases();
-                        if (mounted) setState(() {});
+                        final planBefore = SubscriptionService.plan;
+                        final changed = await PurchaseService.restorePurchases();
+                        if (!mounted) return;
+                        // Önceki snackbar'ı kapat
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        final planAfter = SubscriptionService.plan;
+                        final String message;
+                        if (changed && (planAfter == 'monthly' || planAfter == 'yearly')) {
+                          final label = planAfter == 'yearly' ? 'Yıllık' : 'Aylık';
+                          message = '✅ $label Premium aboneliğiniz geri yüklendi.';
+                        } else if (changed && planAfter == 'none' && planBefore != 'none') {
+                          message = 'ℹ️ Aktif abonelik bulunamadı. Ücretsiz plana geçildi.';
+                        } else if (!changed && (planAfter == 'monthly' || planAfter == 'yearly')) {
+                          final label = planAfter == 'yearly' ? 'Yıllık' : 'Aylık';
+                          message = '✅ $label Premium aboneliğiniz zaten aktif.';
+                        } else {
+                          message = 'ℹ️ Aktif bir Google Play aboneliği bulunamadı.';
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(message),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                        setState(() {});
+                        // Abonelik durumu değiştiyse tüm sekmeleri yenile
+                        if (changed) MainNavigation.refreshSubscription();
                       },
                     ),
                     _SettingsItem(

@@ -22,6 +22,7 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _processing = false;
+  bool _successHandled = false;
 
   // Ödeme başlamadan önce anlık değer saklanır — startPaidSubscription sonrası
   // isExpiredGuest false döneceğinden getter kullanmak hatalı sonuç verir.
@@ -57,6 +58,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final status = PurchaseService.flowStatus.value;
     switch (status) {
       case PurchaseFlowStatus.success:
+        if (_successHandled) return; // tekrar açılmayı engelle
+        _successHandled = true;
         setState(() => _processing = false);
         _showSuccessSheet();
         break;
@@ -150,6 +153,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       ),
     );
+    // Sheet kapandı — flowStatus'u sıfırla, böylece başka bir ekranda
+    // listener varsa tekrar success sheet açılmaz.
+    PurchaseService.flowStatus.value = PurchaseFlowStatus.idle;
   }
 
   void _goToApp() {
