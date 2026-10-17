@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/borsa_news_item.dart';
+import 'connectivity_service.dart';
 
 /// Borsa haberlerini Firestore'da günlük olarak önbelleğe alır.
 /// - Her gün 1 kez Firestore'a yazar
@@ -32,8 +34,13 @@ class BorsaNewsCacheService {
       });
 
       await prefs.setString(_prefKey, today);
-    } catch (_) {
-      // Kaydetme başarısız olursa sessizce devam et
+    } catch (e) {
+      // Kaydetme başarısız olursa sessizce devam et; pref güncellenmez,
+      // bir sonraki açılışta tekrar denenir.
+      assert(() {
+        debugPrint('[BorsaNewsCacheService] saveIfNeeded hata: $e');
+        return true;
+      }());
     }
   }
 
@@ -42,11 +49,16 @@ class BorsaNewsCacheService {
   static Future<List<BorsaNewsItem>> loadFromFirestore() async {
     try {
       final firestore = FirebaseFirestore.instance;
+      // Offline persistence kapalıyken gereksiz beklemeyi önlemek için
+      // bağlantı durumuna göre timeout ayarlanır.
+      final timeout = ConnectivityService.isOnline.value
+          ? const Duration(seconds: 10)
+          : const Duration(seconds: 3);
       final doc = await firestore
           .collection(_collectionName)
           .doc(_docId)
           .get()
-          .timeout(const Duration(seconds: 10));
+          .timeout(timeout);
 
       if (!doc.exists) return [];
 

@@ -1,0 +1,19 @@
+flutter analyze CLI hangs in this shell environment (confirmed across multiple runs).
+Manual code review of review findings applied:
+
+1. [FIXED] Firestore write errors invisible (borsa_news_cache_service.dart):
+   - catch (_) → catch (e) with assert(() { debugPrint(...); return true; }())
+   - Debug-only logging via assert; no prod behavior change.
+
+2. [FIXED] Offline Firestore fallback delay (borsa_news_cache_service.dart):
+   - loadFromFirestore() now uses adaptive timeout:
+     online → 10s, offline → 3s (via ConnectivityService.isOnline.value)
+   - Reduces blocking time when offline persistence is not enabled.
+
+3. [FIXED] _onConnectivityChanged (NewsScreen) only triggered borsa:
+   - Now also calls _loadKap() when _isOffline is true on reconnect.
+   - KAP bildirimleri bağlantı gelince otomatik yenilenir.
+
+Changed files:
+  lib/services/borsa_news_cache_service.dart
+  lib/screens/news_screen.dart

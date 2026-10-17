@@ -58,8 +58,10 @@ class _NewsScreenState extends State<NewsScreen>
   /// Bağlantı durumu değişince çağrılır.
   void _onConnectivityChanged() {
     if (!mounted) return;
-    if (ConnectivityService.isOnline.value && _isBorsaOffline) {
-      _loadBorsa(); // Bağlantı gelince otomatik yenile
+    if (ConnectivityService.isOnline.value) {
+      // Bağlantı geri geldi — her iki sekme için de yenile
+      if (_isBorsaOffline) _loadBorsa();
+      if (_isOffline) _loadKap();
     }
   }
 
