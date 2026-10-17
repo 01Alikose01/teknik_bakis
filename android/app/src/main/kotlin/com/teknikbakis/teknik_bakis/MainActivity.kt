@@ -6,11 +6,14 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+// FlutterActivity → FlutterFragmentActivity (CredentialManager için FragmentActivity gerekli)
+class MainActivity : FlutterFragmentActivity() {
+
+    private lateinit var credentialsHandler: CredentialsHandler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Android 12+ splash screen'i anında kapat — video splash biz yönetiyoruz
@@ -25,6 +28,19 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // Credentials handler
+        credentialsHandler = CredentialsHandler(
+            activity = this,
+            context = applicationContext,
+        )
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            CredentialsHandler.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            credentialsHandler.handle(call, result)
+        }
+
+        // Ayarlar kanalı (mevcut)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
