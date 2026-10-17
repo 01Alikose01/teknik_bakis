@@ -3,6 +3,8 @@ import 'dart:async';
 import '../models/borsa_news_item.dart';
 import '../models/kap_news_item.dart';
 import '../services/borsa_news_service.dart';
+import '../services/borsa_news_cache_service.dart';
+import '../services/connectivity_service.dart';
 import '../services/kap_disclosure_service.dart';
 import '../services/kap_news_service.dart';
 import '../services/subscription_service.dart';
@@ -26,6 +28,7 @@ class _NewsScreenState extends State<NewsScreen>
   bool _loadingBorsa = false;
   bool _isOffline = false;
   bool _loadedFromCache = false;
+  bool _isBorsaOffline = false;
   Timer? _refreshTimer;
   DateTime? _lastUpdated;
 
@@ -36,18 +39,28 @@ class _NewsScreenState extends State<NewsScreen>
     _loadAll();
     _refreshTimer =
         Timer.periodic(const Duration(seconds: 90), (_) => _loadAll());
+    ConnectivityService.isOnline.addListener(_onConnectivityChanged);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _refreshTimer?.cancel();
+    ConnectivityService.isOnline.removeListener(_onConnectivityChanged);
     super.dispose();
   }
 
   Future<void> _loadAll() async {
     await Future.wait([_loadKap(), _loadBorsa()]);
     if (mounted) setState(() => _lastUpdated = DateTime.now());
+  }
+
+  /// Bağlantı durumu değişince çağrılır.
+  void _onConnectivityChanged() {
+    if (!mounted) return;
+    if (ConnectivityService.isOnline.value && _isBorsaOffline) {
+      _loadBorsa(); // Bağlantı gelince otomatik yenile
+    }
   }
 
   /// GitHub veya yerel saati Türkiye saatiyle (UTC+3) "Güncelleme HH:mm" olarak döndürür.
@@ -124,10 +137,30 @@ class _NewsScreenState extends State<NewsScreen>
         setState(() {
           _borsaNews = items;
           _loadingBorsa = false;
+          _isBorsaOffline = false;
         });
       }
+      // Firestore'a günlük kaydet (ilk açılış veya yeni gün)
+      await BorsaNewsCacheService.saveIfNeeded(items);
     } catch (_) {
-      if (mounted) setState(() => _loadingBorsa = false);
+      // İnternet yok — Firestore cache'den yükle
+      try {
+        final cached = await BorsaNewsCacheService.loadFromFirestore();
+        if (mounted) {
+          setState(() {
+            if (cached.isNotEmpty) _borsaNews = cached;
+            _loadingBorsa = false;
+            _isBorsaOffline = true;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _loadingBorsa = false;
+            _isBorsaOffline = true;
+          });
+        }
+      }
     }
   }
 
@@ -317,10 +350,31 @@ class _NewsScreenState extends State<NewsScreen>
     return RefreshIndicator(
       color: const Color(0xFF34C759),
       onRefresh: _loadBorsa,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _borsaNews.length,
-        itemBuilder: (_, i) => _BorsaNewsCard(item: _borsaNews[i]),
+      child: Column(
+        children: [
+          if (_isBorsaOffline)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off, size: 13, color: Colors.orange),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Çevrimdışı • Önbellek',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.orange, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _borsaNews.length,
+              itemBuilder: (_, i) => _BorsaNewsCard(item: _borsaNews[i]),
+            ),
+          ),
+        ],
       ),
     );
   }

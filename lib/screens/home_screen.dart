@@ -6,6 +6,7 @@ import '../services/portfolio_service.dart';
 import '../services/stock_service.dart';
 import '../services/home_price_cache.dart';
 import '../services/price_sync_service.dart';
+import '../services/connectivity_service.dart';
 import '../services/app_navigation.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
@@ -102,8 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadQuickPrices();
     _loadMarketList();
 
-    // 3. PriceSyncService fiyat güncellemelerini dinle
+    // 3. Uygulama açılışında zorunlu fiyat yenileme (her zaman)
+    PriceSyncService.forceSync();
+
+    // 4. PriceSyncService fiyat güncellemelerini dinle
     PriceSyncService.lastSyncTime.addListener(_onPriceSyncUpdate);
+
+    // 5. Bağlantı değişimini dinle
+    ConnectivityService.isOnline.addListener(_onConnectivityChanged);
 
     // 4. Yeni Yaklaşan IPO bildirimleri için dinleyici
     newUpcomingIposNotifier.addListener(_onNewIposDetected);
@@ -113,6 +120,20 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onPriceSyncUpdate() {
     if (!mounted) return;
     _loadFavoritePricesFromCache();
+  }
+
+  /// Bağlantı durumu değişince çağrılır.
+  void _onConnectivityChanged() {
+    if (!mounted) return;
+    if (ConnectivityService.isOnline.value) {
+      // Bağlantı geri geldi — fiyatları yenile
+      PriceSyncService.forceSync();
+      _loadQuickPrices();
+      _loadMarketList();
+    } else {
+      // Bağlantı kesildi — cache'den göster
+      _loadFromCache();
+    }
   }
 
   /// Favori sembolleri PriceSyncService'e bildir.
@@ -203,6 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     PriceSyncService.lastSyncTime.removeListener(_onPriceSyncUpdate);
+    ConnectivityService.isOnline.removeListener(_onConnectivityChanged);
     _favoriteListSubscription?.cancel();
     _searchCtrl.dispose();
     _mainScrollCtrl.dispose();

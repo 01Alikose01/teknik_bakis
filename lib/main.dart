@@ -22,6 +22,7 @@ import 'services/settings_service.dart';
 import 'services/subscription_service.dart';
 import 'services/purchase_service.dart';
 import 'services/bist100_service.dart';
+import 'services/connectivity_service.dart';
 import 'services/home_price_cache.dart';
 import 'services/price_sync_service.dart';
 import 'services/in_app_review_service.dart';
@@ -41,6 +42,7 @@ void main() async {
   unawaited(CredentialsService.restoreCredentials().catchError((_) {}));
   PurchaseService.init(); // Google Play Billing'i arka planda başlat
   await HomePriceCache.init();
+  await ConnectivityService.init();
   await NotificationService.init();
   await NotificationService.requestPermission();
   await Bist100Service.init(); // Scanner'a girmeden önce BIST100 listesi yüklensin
