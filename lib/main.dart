@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'widgets/theme_selection_dialog.dart';
 import 'services/app_navigation.dart';
+import 'services/credentials_service.dart';
 import 'services/portfolio_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
@@ -33,6 +35,10 @@ void main() async {
   await PortfolioService.init();
   await SettingsService.init();
   await SubscriptionService.init();
+  // Zero-Tap / Restore Credentials — Nisan 2027 Google Play zorunluluğu
+  // Uygulama başlarken kayıtlı kimlik bilgisi varsa ileride kullanmak üzere
+  // sessizce kontrol edilir (otomatik login yapmaz — subscription akışı bunu yönetir)
+  unawaited(CredentialsService.restoreCredentials().catchError((_) {}));
   PurchaseService.init(); // Google Play Billing'i arka planda başlat
   await HomePriceCache.init();
   await NotificationService.init();

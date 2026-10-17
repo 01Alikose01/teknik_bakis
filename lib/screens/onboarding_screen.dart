@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
+import '../services/credentials_service.dart';
 import '../services/subscription_service.dart';
 import '../services/purchase_service.dart';
 import 'payment_screen.dart';
@@ -180,6 +181,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onStart: _proceed,
         onGuest: _continueAsGuest,
         onRestore: () async {
+          // Önce Credentials API ile kayıtlı giriş bilgisi var mı kontrol et
+          final savedCreds = await CredentialsService.restoreCredentials();
+          if (savedCreds != null && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Hoş geldiniz, ${savedCreds['username'] ?? ''}!'),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+
+          // Google Play aboneliği kontrol et (mevcut akış)
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Google Play aboneliğiniz kontrol ediliyor...'),
@@ -192,7 +208,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           if (changed && SubscriptionService.isPaidSubscriber) {
-            // Abonelik bulundu — uygulamaya geç
             await SubscriptionService.markOnboarded();
             if (!context.mounted) return;
             Navigator.of(context).pushReplacement(
