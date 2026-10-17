@@ -9,13 +9,16 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with WidgetsBindingObserver {
   late VideoPlayerController _controller;
   bool _videoFailed = false;
+  bool _navigatedAway = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initVideo();
   }
 
@@ -54,7 +57,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _navigateToHome() {
-    if (!mounted) return;
+    if (!mounted || _navigatedAway) return;
+    _navigatedAway = true;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
@@ -67,7 +71,33 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_controller.value.isInitialized) return;
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        if (_controller.value.isPlaying) {
+          _controller.pause();
+        }
+        break;
+      case AppLifecycleState.resumed:
+        // Video bitmişse navigate et, bitmemişse devam ettir
+        final pos = _controller.value.position;
+        final dur = _controller.value.duration;
+        if (dur.inMilliseconds > 0 && pos >= dur) {
+          _navigateToHome();
+        } else if (!_controller.value.isPlaying && !_navigatedAway) {
+          _controller.play();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_onVideoProgress);
     _controller.dispose();
     super.dispose();
@@ -93,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
               ),
             )
-      : const SizedBox.shrink(),
+          : const SizedBox.shrink(),
     );
   }
 }
